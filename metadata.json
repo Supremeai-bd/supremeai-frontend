@@ -1,0 +1,6 @@
+{
+  "name": "SupremeAI Studio",
+  "description": "Ultra-light, high-performance AI workspace and developer studio powered by Gemini models for intelligent workflows, reasoning, code synthesis, and multi-turn chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
