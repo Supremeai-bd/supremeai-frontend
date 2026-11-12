@@ -204,3 +204,72 @@ export const MODEL_USAGE_BREAKDOWN = [
   { model: 'Gemini 3.1 Flash Lite', tokens: 190000, percentage: 15, cost: '$0.15', color: '#10b981' },
   { model: 'Gemini 4 Argon', tokens: 50000, percentage: 4, cost: '$0.40', color: '#f59e0b' },
 ];
+
+export const INITIAL_PROMPT_TEMPLATES = [
+  {
+    id: 'tmpl_01',
+    title: 'Strict Security Audit & OWASP Fuzz',
+    category: 'security',
+    description: 'Inspect endpoints, authentication middleware, and input sanitization against Top 10 vulnerabilities.',
+    template: 'Perform a comprehensive security audit on the following code. Check for SQL/NoSQL injection, prototype pollution, unhandled async exceptions, and OWASP top 10 risks:\n\n```\n[PASTE CODE HERE]\n```',
+    tags: ['security', 'audit', 'owasp'],
+  },
+  {
+    id: 'tmpl_02',
+    title: 'TypeScript Interface & Type Guard Invariants',
+    category: 'code',
+    description: 'Generate strict non-nullable TypeScript models, schema parsers, and type predicates.',
+    template: 'Design clean, strict TypeScript interfaces for this data model. Include runtime assertion type guards (`isX(val: unknown): val is X`), schema validation, and proper generics:\n\n```json\n[PASTE JSON PAYLOAD HERE]\n```',
+    tags: ['typescript', 'interfaces', 'types'],
+  },
+  {
+    id: 'tmpl_03',
+    title: 'Distributed System Architectural Invariant Review',
+    category: 'architecture',
+    description: 'Analyze distributed microservices for split-brain risks, idempotency, and backpressure.',
+    template: 'Review the following microservice orchestration design. Evaluate idempotency guarantees, dead-letter fallback, retry storms, and event-driven backpressure:\n\n```\n[DESCRIBE ARCHITECTURE HERE]\n```',
+    tags: ['architecture', 'microservices', 'reliability'],
+  },
+  {
+    id: 'tmpl_04',
+    title: 'Refactor to React 19 Functional Hooks',
+    category: 'review',
+    description: 'Modernize legacy components into modern React 19 functional code with zero re-render bloat.',
+    template: 'Refactor the following React component to modern React 19 best practices. Use clean custom hooks, proper cleanup effects, memoization where needed, and eliminate redundant state:\n\n```tsx\n[PASTE COMPONENT HERE]\n```',
+    tags: ['react19', 'refactor', 'hooks'],
+  },
+];
+
+export const INITIAL_WEBHOOK_DELIVERIES = [
+  {
+    id: 'del_01',
+    webhookId: 'wh_slack_01',
+    eventType: 'chat.completed',
+    timestamp: 'Today at 10:48:12',
+    statusCode: 200,
+    latencyMs: 142,
+    payloadJson: '{"event":"chat.completed","sessionId":"session_108","model":"gemini-3.8-flash","tokens":840}',
+    success: true,
+  },
+  {
+    id: 'del_02',
+    webhookId: 'wh_github_02',
+    eventType: 'code.analyzed',
+    timestamp: 'Today at 09:20:04',
+    statusCode: 200,
+    latencyMs: 310,
+    payloadJson: '{"event":"code.analyzed","pr":94,"repo":"Supremeai-bd/supremeai-studio","findings":0}',
+    success: true,
+  },
+  {
+    id: 'del_03',
+    webhookId: 'wh_slack_01',
+    eventType: 'token.threshold_warning',
+    timestamp: 'Yesterday at 16:30:00',
+    statusCode: 504,
+    latencyMs: 5000,
+    payloadJson: '{"event":"token.threshold_warning","usedPercent":82,"quota":2500000}',
+    success: false,
+  },
+];
+

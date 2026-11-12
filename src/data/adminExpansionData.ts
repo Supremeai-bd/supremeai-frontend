@@ -366,3 +366,96 @@ export const INITIAL_AUDIT_RECORDS: SystemAuditRecord[] = [
     ipAddress: '10.0.4.12',
   },
 ];
+
+export const INITIAL_FEATURE_FLAGS = [
+  {
+    key: 'enable_gemini_4_reasoning',
+    name: 'Gemini 4 Carbon Reasoning Engine',
+    description: 'Enables high-depth multi-step reasoning models for all Enterprise and Pro customers.',
+    enabled: true,
+    category: 'models' as const,
+  },
+  {
+    key: 'enable_multimodal_vision',
+    name: 'Multi-Modal Vision & File Understanding',
+    description: 'Permits inline base64 image/document upload attachments in Studio Chat.',
+    enabled: true,
+    category: 'multimodal' as const,
+  },
+  {
+    key: 'enable_rag_grounding',
+    name: 'Knowledge Base Vector RAG Grounding',
+    description: 'Injects active customer knowledge documentation chunks directly into prompt inference.',
+    enabled: true,
+    category: 'agents' as const,
+  },
+  {
+    key: 'enable_continuous_agent_swarm',
+    name: 'Autonomous continuous_agent_loop.py Swarm',
+    description: 'Runs continuous background GitHub PR solver, AST verifier, and rules-breaker workers.',
+    enabled: true,
+    category: 'agents' as const,
+  },
+  {
+    key: 'enforce_strict_rate_limits',
+    name: 'Strict IP & Token Burst Throttling',
+    description: 'Enforces hard 120 RPM cap on unauthenticated or free-tier API endpoints.',
+    enabled: false,
+    category: 'security' as const,
+  },
+  {
+    key: 'maintenance_mode',
+    name: 'Global Emergency Maintenance Mode',
+    description: 'Gracefully pauses customer chat inference for database schema migrations.',
+    enabled: false,
+    category: 'infra' as const,
+  },
+];
+
+export const INITIAL_PROVIDER_KEYS = [
+  {
+    id: 'prov_google_ai',
+    provider: 'google_ai_studio' as const,
+    displayName: 'Google AI Studio (Global Direct)',
+    maskedKey: 'AIzaSy••••••••••••••••••••••••3M_9k',
+    status: 'healthy' as const,
+    latencyMs: 24,
+    priority: 1,
+    lastChecked: 'Just now (HTTP 200)',
+    rateLimitTpm: '4,000,000 TPM',
+  },
+  {
+    id: 'prov_vertex_ai',
+    provider: 'vertex_ai' as const,
+    displayName: 'Google Cloud Vertex AI (asia-northeast1)',
+    maskedKey: 'projects/688511344996/locations/asia-northeast1/publishers/google',
+    status: 'healthy' as const,
+    latencyMs: 18,
+    priority: 2,
+    lastChecked: '3m ago (HTTP 200)',
+    rateLimitTpm: '10,000,000 TPM',
+  },
+  {
+    id: 'prov_groq',
+    provider: 'groq' as const,
+    displayName: 'Groq LPU Inference Broker (Llama-3-70b Fallback)',
+    maskedKey: 'gsk_••••••••••••••••••••••••41b8',
+    status: 'healthy' as const,
+    latencyMs: 12,
+    priority: 3,
+    lastChecked: '12m ago (HTTP 200)',
+    rateLimitTpm: '2,500,000 TPM',
+  },
+  {
+    id: 'prov_anthropic',
+    provider: 'anthropic' as const,
+    displayName: 'Anthropic Claude 3.5 Sonnet (Secondary Fallback)',
+    maskedKey: 'sk-ant-••••••••••••••••••••••••9e1f',
+    status: 'untested' as const,
+    latencyMs: 120,
+    priority: 4,
+    lastChecked: '1 hour ago',
+    rateLimitTpm: '1,000,000 TPM',
+  },
+];
+

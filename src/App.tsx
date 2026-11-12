@@ -22,11 +22,16 @@ import { AdminSchemaParityView } from './components/admin/AdminSchemaParityView'
 import { AdminLlmGatewayView } from './components/admin/AdminLlmGatewayView';
 import { AdminSecurityView } from './components/admin/AdminSecurityView';
 import { AdminSystemAuditView } from './components/admin/AdminSystemAuditView';
+import { AdminFeatureFlagsView } from './components/admin/AdminFeatureFlagsView';
+import { AdminProviderKeysView } from './components/admin/AdminProviderKeysView';
+import { AdminAuthModal } from './components/admin/AdminAuthModal';
+import { PromptLibraryModal } from './components/user/PromptLibraryModal';
 import { UsageView } from './components/UsageView';
 
 import {
   ChatSession,
   ChatMessage,
+  ChatAttachment,
   RolePersona,
   ModelDetail,
   UserRole,
@@ -94,16 +99,42 @@ const AUDIT_KEY = 'supremeai_studio_audit_records';
 
 export default function App() {
   // Dual Role State: 'user' (normal user) vs 'admin' (developer studio)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('supremeai_admin_authed') === 'true';
+  });
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
     const saved = localStorage.getItem(ROLE_KEY);
-    return saved === 'admin' ? 'admin' : 'user'; // default to user view
+    return saved === 'admin' ? 'admin' : 'user';
   });
 
   const handleToggleRole = (forcedRole?: UserRole) => {
     const nextRole = forcedRole || (currentRole === 'admin' ? 'user' : 'admin');
+    if (nextRole === 'admin' && !isAdminAuthenticated) {
+      setIsAdminAuthModalOpen(true);
+      return;
+    }
     setCurrentRole(nextRole);
     localStorage.setItem(ROLE_KEY, nextRole);
     setActiveTab('chat');
+  };
+
+  const handleAdminAuthSuccess = () => {
+    setIsAdminAuthenticated(true);
+    sessionStorage.setItem('supremeai_admin_authed', 'true');
+    setIsAdminAuthModalOpen(false);
+    setCurrentRole('admin');
+    localStorage.setItem(ROLE_KEY, 'admin');
+    setActiveTab('chat');
+  };
+
+  const handleImpersonateCustomer = (customer: CustomerRecord) => {
+    setCurrentRole('user');
+    localStorage.setItem(ROLE_KEY, 'user');
+    setActiveTab('chat');
+    handleNewSession();
   };
 
   // Navigation State
@@ -889,9 +920,9 @@ export default function App() {
     }
   };
 
-  // Send Message
-  const handleSendMessage = async (text: string) => {
-    if (!text.trim() || isStreaming || !currentSession) return;
+  // Send Message with optional multimodal attachment & RAG grounding
+  const handleSendMessage = async (text: string, attachment?: ChatAttachment) => {
+    if ((!text.trim() && !attachment) || isStreaming || !currentSession) return;
 
     setInferenceError(null);
 
@@ -900,12 +931,13 @@ export default function App() {
       role: 'user',
       content: text,
       timestamp: Date.now(),
+      attachment: attachment,
     };
 
     const updatedMessages = [...currentSession.messages, userMsg];
     const isFirstUserMessage = currentSession.messages.filter((m) => m.role === 'user').length === 0;
     const sessionTitle = isFirstUserMessage
-      ? text.slice(0, 32).trim() + (text.length > 32 ? '...' : '')
+      ? (text.slice(0, 32).trim() || (attachment ? `Analysis: ${attachment.name}` : 'New Chat')) + (text.length > 32 ? '...' : '')
       : currentSession.title;
 
     setSessions((prev) =>
@@ -924,7 +956,7 @@ export default function App() {
     );
 
     // Track token usage
-    const estimatedTokens = Math.ceil(text.length / 4);
+    const estimatedTokens = Math.ceil(text.length / 4) + (attachment ? 258 : 0);
     setUserSettings((prev) => ({
       ...prev,
       monthlyTokensUsed: prev.monthlyTokensUsed + estimatedTokens,
@@ -935,6 +967,18 @@ export default function App() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    // Collect active knowledge base grounding docs
+    const activeGroundingDocs = knowledgeDocs.filter((d) => d.isGroundingActive);
+    const groundingContext =
+      activeGroundingDocs.length > 0
+        ? activeGroundingDocs
+            .map(
+              (d) =>
+                `[GROUNDING DOCUMENT: "${d.title}" (Type: ${d.type})]\n${d.contentPreview}`
+            )
+            .join('\n\n')
+        : undefined;
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -943,9 +987,11 @@ export default function App() {
         body: JSON.stringify({
           model: activeModel.id,
           systemInstruction: customInstruction || activeRole.systemInstruction,
+          groundingContext,
           messages: updatedMessages.map((m) => ({
             role: m.role,
             content: m.content,
+            attachment: m.attachment,
           })),
           stream: userSettings.streamResponses,
         }),
@@ -1163,6 +1209,8 @@ export default function App() {
               hasMessages={(currentSession?.messages?.length || 0) > 0}
               lastAutoSavedText={lastAutoSavedText}
               isAutoSaving={isAutoSaving}
+              onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+              activeGroundingDocsCount={knowledgeDocs.filter((d) => d.isGroundingActive).length}
             />
           </main>
         )}
@@ -1272,6 +1320,14 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'feature-flags' && (
+          <AdminFeatureFlagsView />
+        )}
+
+        {activeTab === 'provider-keys' && (
+          <AdminProviderKeysView />
+        )}
+
         {activeTab === 'security' && (
           <AdminSecurityView
             securityEvents={securityEvents}
@@ -1293,6 +1349,7 @@ export default function App() {
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             onDeleteCustomer={handleDeleteCustomer}
+            onImpersonateCustomer={handleImpersonateCustomer}
           />
         )}
 
@@ -1333,6 +1390,20 @@ export default function App() {
         onSaveRole={handleSaveRole}
         activeModel={activeModel}
         onSelectModel={setActiveModel}
+      />
+
+      {/* Admin Authentication Gatekeeper Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => setIsAdminAuthModalOpen(false)}
+        onSuccess={handleAdminAuthSuccess}
+      />
+
+      {/* Prompt Recipes & Library Modal */}
+      <PromptLibraryModal
+        isOpen={isPromptModalOpen}
+        onClose={() => setIsPromptModalOpen(false)}
+        onSelectTemplate={(text) => handleSendMessage(text)}
       />
     </div>
   );

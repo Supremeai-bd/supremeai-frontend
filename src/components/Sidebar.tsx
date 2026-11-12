@@ -220,6 +220,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
+              onClick={() => onSelectTab('feature-flags')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'feature-flags'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Sliders className="w-4 h-4 text-cyan-500" />
+              <span>Feature Flags</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('provider-keys')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'provider-keys'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Key className="w-4 h-4 text-purple-500" />
+              <span>Provider Keys</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => onSelectTab('security')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'security'

@@ -26,6 +26,7 @@ interface AdminCustomersViewProps {
   onAddCustomer: (customer: Omit<CustomerRecord, 'id' | 'joinedDate' | 'lastActive'>) => void;
   onUpdateCustomer: (id: string, updates: Partial<CustomerRecord>) => void;
   onDeleteCustomer: (id: string) => void;
+  onImpersonateCustomer?: (customer: CustomerRecord) => void;
 }
 
 export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
@@ -33,6 +34,7 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
   onAddCustomer,
   onUpdateCustomer,
   onDeleteCustomer,
+  onImpersonateCustomer,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<'all' | 'Paid' | 'Enterprise' | 'Free'>('all');
@@ -415,6 +417,18 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
                       {/* Actions */}
                       <td className="p-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {onImpersonateCustomer && (
+                            <button
+                              type="button"
+                              onClick={() => onImpersonateCustomer(cust)}
+                              aria-label="Login as this customer"
+                              title="Impersonate (Switch to Customer Workspace)"
+                              className="px-2 py-1 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 border border-cyan-500/20"
+                            >
+                              <UserCheck className="w-3 h-3" />
+                              <span>Login as User</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setSelectedCustomer(cust)}

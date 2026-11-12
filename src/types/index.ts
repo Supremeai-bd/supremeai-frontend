@@ -1,5 +1,11 @@
 export type UserRole = 'admin' | 'user';
 
+export interface ChatAttachment {
+  name: string;
+  mimeType: string;
+  data: string; // base64 or URL
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -7,6 +13,7 @@ export interface ChatMessage {
   timestamp: number;
   model?: string;
   roleName?: string;
+  attachment?: ChatAttachment;
 }
 
 export interface ChatSession {
@@ -261,6 +268,47 @@ export interface SystemAuditRecord {
   details: string;
   ipAddress: string;
 }
+
+export interface FeatureFlagItem {
+  key: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  category: 'models' | 'multimodal' | 'agents' | 'security' | 'infra';
+}
+
+export interface ProviderKeyItem {
+  id: string;
+  provider: 'google_ai_studio' | 'vertex_ai' | 'groq' | 'anthropic';
+  displayName: string;
+  maskedKey: string;
+  status: 'healthy' | 'degraded' | 'untested';
+  latencyMs: number;
+  priority: number;
+  lastChecked: string;
+  rateLimitTpm: string;
+}
+
+export interface PromptTemplateItem {
+  id: string;
+  title: string;
+  category: 'code' | 'architecture' | 'security' | 'review' | 'general';
+  description: string;
+  template: string;
+  tags: string[];
+}
+
+export interface WebhookDeliveryLog {
+  id: string;
+  webhookId: string;
+  eventType: string;
+  timestamp: string;
+  statusCode: number;
+  latencyMs: number;
+  payloadJson: string;
+  success: boolean;
+}
+
 
 
 

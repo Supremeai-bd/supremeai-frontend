@@ -12,7 +12,8 @@ import {
   ExternalLink,
   Lock,
 } from 'lucide-react';
-import { ApiKeyItem, WebhookItem } from '../../types';
+import { ApiKeyItem, WebhookItem, WebhookDeliveryLog } from '../../types';
+import { INITIAL_WEBHOOK_DELIVERIES } from '../../data/customerWorkspaceData';
 
 interface UserApiKeysViewProps {
   apiKeys: ApiKeyItem[];
@@ -53,6 +54,10 @@ export const UserApiKeysView: React.FC<UserApiKeysViewProps> = ({
     'chat.completed',
     'agent.finished',
   ]);
+
+  const [isDeliveriesModalOpen, setIsDeliveriesModalOpen] = useState(false);
+  const [deliveries, setDeliveries] = useState<WebhookDeliveryLog[]>(INITIAL_WEBHOOK_DELIVERIES);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
@@ -317,14 +322,24 @@ export const UserApiKeysView: React.FC<UserApiKeysViewProps> = ({
                 Receive instant HTTP POST alerts when autonomous agents finish PR reviews, token usage thresholds hit limits, or background jobs complete.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsWebhookModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Register Webhook</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeliveriesModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              >
+                <Radio className="w-4 h-4 text-cyan-500" />
+                <span>Delivery Logs & Retries</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsWebhookModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register Webhook</span>
+              </button>
+            </div>
           </div>
 
           {/* Webhooks List */}
@@ -610,6 +625,105 @@ export const UserApiKeysView: React.FC<UserApiKeysViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* --- WEBHOOK DELIVERY LOGS & RETRY MODAL --- */}
+      {isDeliveriesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Radio className="w-4 h-4 text-cyan-500" />
+                  Outbound Webhook Delivery History
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Audit trail of HTTP POST dispatches, response status codes, and retry queue
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeliveriesModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {deliveries.map((del) => {
+                const isRetrying = retryingId === del.id;
+                return (
+                  <div
+                    key={del.id}
+                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                            del.statusCode === 200
+                              ? 'bg-emerald-500/10 text-emerald-500'
+                              : 'bg-rose-500/10 text-rose-500'
+                          }`}
+                        >
+                          HTTP {del.statusCode}
+                        </span>
+                        <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          {del.eventType}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-slate-400">{del.timestamp}</span>
+                        <span className="text-[11px] font-mono text-slate-400">{del.latencyMs}ms</span>
+                        <button
+                          type="button"
+                          disabled={isRetrying}
+                          onClick={() => {
+                            setRetryingId(del.id);
+                            setTimeout(() => {
+                              setDeliveries((prev) =>
+                                prev.map((d) =>
+                                  d.id === del.id
+                                    ? {
+                                        ...d,
+                                        statusCode: 200,
+                                        success: true,
+                                        latencyMs: 165,
+                                        timestamp: 'Just now (Retried)',
+                                      }
+                                    : d
+                                )
+                              );
+                              setRetryingId(null);
+                            }, 1000);
+                          }}
+                          className="px-2.5 py-1 rounded bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {isRetrying ? 'Retrying...' : 'Retry'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 font-mono text-[11px] text-slate-600 dark:text-slate-400 overflow-x-auto">
+                      <code>{del.payloadJson}</code>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDeliveriesModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Copy, Check, Sparkles, AlertCircle, ArrowDown, Search, X, Filter } from 'lucide-react';
+import { Copy, Check, Sparkles, AlertCircle, ArrowDown, Search, X, Filter, Paperclip } from 'lucide-react';
 import { Marked } from 'marked';
 import { ChatMessage, RolePersona, ModelDetail } from '../types';
 
@@ -437,6 +437,27 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
               {/* Message Body */}
               {isUser ? (
                 <>
+                  {msg.attachment && (
+                    <div className="mb-2.5">
+                      {msg.attachment.mimeType.startsWith('image/') ? (
+                        <div className="overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700 shadow-sm max-w-sm">
+                          <img
+                            src={msg.attachment.data}
+                            alt={msg.attachment.name}
+                            className="max-h-60 w-auto object-contain bg-black/10 dark:bg-black/40"
+                          />
+                          <div className="px-2.5 py-1 text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/70 border-t border-slate-200 dark:border-slate-800 truncate">
+                            {msg.attachment.name}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-200/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 text-xs text-slate-800 dark:text-slate-200 font-mono">
+                          <Paperclip className="w-3.5 h-3.5 text-blue-500" />
+                          <span className="truncate max-w-[200px]">{msg.attachment.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <p className="whitespace-pre-wrap leading-relaxed">
                     {renderHighlightedText(msg.content, searchQuery)}
                   </p>

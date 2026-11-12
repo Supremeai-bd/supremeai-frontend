@@ -11,13 +11,16 @@ import {
   Sparkles,
   Paperclip,
   Code,
-  Check,
+  Image as ImageIcon,
+  X,
+  BookOpen,
+  Database,
 } from 'lucide-react';
-import { ModelDetail, RolePersona } from '../types';
+import { ModelDetail, RolePersona, ChatAttachment } from '../types';
 import { GEMINI_MODELS } from '../data/models';
 
 interface ChatInputProps {
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, attachment?: ChatAttachment) => void;
   onStopStreaming: () => void;
   onClearThread: () => void;
   onExportThread: (format: 'markdown' | 'json') => void;
@@ -29,6 +32,8 @@ interface ChatInputProps {
   hasMessages: boolean;
   lastAutoSavedText?: string;
   isAutoSaving?: boolean;
+  onOpenPromptLibrary?: () => void;
+  activeGroundingDocsCount?: number;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -44,6 +49,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   hasMessages,
   lastAutoSavedText = 'Auto-saved 30s ago',
   isAutoSaving = false,
+  onOpenPromptLibrary,
+  activeGroundingDocsCount = 0,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -51,7 +58,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [activeMode, setActiveMode] = useState<'chat' | 'task'>('chat');
   const [isListening, setIsListening] = useState(false);
+  const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -64,9 +74,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() || isStreaming) return;
-    onSendMessage(inputText.trim());
+    if ((!inputText.trim() && !attachment) || isStreaming) return;
+    onSendMessage(inputText.trim(), attachment || undefined);
     setInputText('');
+    setAttachment(null);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -79,8 +90,39 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  // Handle File / Image Upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setAttachment({
+        name: file.name,
+        mimeType: file.type || 'text/plain',
+        data: result,
+      });
+    };
+
+    if (file.type.startsWith('image/')) {
+      reader.readAsDataURL(file);
+    } else {
+      // For text, markdown, code, read as Data URL or text
+      reader.readAsDataURL(file);
+    }
+
+    // Reset input so re-selecting same file works
+    e.target.value = '';
+    setShowAttachMenu(false);
+  };
+
   // Web Speech API Voice Dictation
   const toggleListening = () => {
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: any;
+      webkitSpeechRecognition?: any;
+    };
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       alert('Speech recognition is not supported in this browser.');
       return;
@@ -92,8 +134,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     try {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
@@ -121,14 +162,51 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <div className="p-4 bg-transparent pb-6 transition-colors">
       <div className="max-w-3xl mx-auto space-y-3">
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf,.txt,.ts,.tsx,.json,.py,.md"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
+        {/* Attachment preview capsule if file is loaded */}
+        {attachment && (
+          <div className="flex items-center gap-2 p-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 max-w-fit shadow-xs animate-in fade-in duration-150">
+            {attachment.mimeType.startsWith('image/') ? (
+              <img
+                src={attachment.data}
+                alt={attachment.name}
+                className="w-8 h-8 rounded-md object-cover border border-slate-300 dark:border-slate-600"
+              />
+            ) : (
+              <Paperclip className="w-4 h-4 text-cyan-500" />
+            )}
+            <div className="flex flex-col">
+              <span className="text-xs font-mono font-medium text-slate-800 dark:text-slate-200 truncate max-w-[200px]">
+                {attachment.name}
+              </span>
+              <span className="text-[10px] text-slate-400">Attached for multimodal reasoning</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttachment(null)}
+              className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-rose-500 transition-colors ml-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Gemini-style Floating Input Capsule */}
         <div className="relative rounded-3xl bg-slate-100/90 dark:bg-[#1e1f20] border border-slate-200/90 dark:border-slate-800 shadow-md focus-within:shadow-lg focus-within:border-slate-400 dark:focus-within:border-slate-600 transition-all p-2.5 flex items-center gap-2">
-          {/* Plus (+) Button for Connectors & Skills */}
+          {/* Plus (+) Button for Connectors, Skills, and File Uploads */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowAttachMenu(!showAttachMenu)}
-              aria-label="Connectors and skills"
+              aria-label="Connectors, files, and skills"
               className="w-8 h-8 rounded-full hover:bg-slate-200/80 dark:hover:bg-slate-700/80 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -143,7 +221,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 />
                 <div className="absolute left-0 bottom-full mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-40 p-2 space-y-1 text-xs">
                   <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Connectors & Code Templates
+                    Input & Connectors
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setShowAttachMenu(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-cyan-500" />
+                    <span>Upload Image / Document</span>
+                  </button>
+                  {onOpenPromptLibrary && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenPromptLibrary();
+                        setShowAttachMenu(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-purple-500" />
+                      <span>Browse Prompt Recipes</span>
+                    </button>
+                  )}
+                  <div className="border-t border-slate-100 dark:border-slate-700/60 my-1 pt-1" />
+                  <div className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Quick Templates
                   </div>
                   <button
                     type="button"
@@ -158,21 +264,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     onClick={() => insertSnippet('Analyze distributed multi-agent workflows for SupremeAI.')}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                    <span>Multi-Agent Workflow</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertSnippet('Generate strict TypeScript interface for this API endpoint:')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-2 cursor-pointer"
-                  >
-                    <Paperclip className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>TypeScript Schema Spec</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Multi-Agent Swarm</span>
                   </button>
                 </div>
               </>
             )}
           </div>
+
+          {/* Quick File Upload button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach image or file for multimodal reasoning"
+            className="w-7 h-7 rounded-full hover:bg-slate-200/80 dark:hover:bg-slate-700/80 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-cyan-500 transition-colors cursor-pointer shrink-0"
+          >
+            <Paperclip className="w-3.5 h-3.5" />
+          </button>
 
           {/* Text Area (Ask Gemini / Type @ for connectors) */}
           <textarea
@@ -181,13 +289,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type @ for connectors, skills and more"
+            placeholder={attachment ? 'Add instructions for attached file...' : 'Ask Gemini or type instructions...'}
             className="flex-1 max-h-40 bg-transparent resize-none border-none focus:outline-none text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 px-2 py-1 leading-relaxed"
           />
 
           {/* Right Controls inside Capsule: Model Selector + Mic + Send */}
           <div className="flex items-center gap-1.5 shrink-0 pr-1">
-            {/* Model Selector pill directly inside input like "Flash High ⌄" */}
+            {/* Model Selector pill directly inside input */}
             <div className="relative">
               <button
                 type="button"
@@ -267,7 +375,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <button
                 type="button"
                 onClick={() => handleSubmit()}
-                disabled={!inputText.trim()}
+                disabled={!inputText.trim() && !attachment}
                 aria-label="Send prompt"
                 className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
@@ -278,35 +386,62 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
 
         {/* Gemini Segmented Pills Below: [Chat | Task] + Quick Actions */}
-        <div className="flex items-center justify-between px-2">
-          {/* Centered Segmented Pill like Gemini screenshot: Chat | Task */}
-          <div className="flex items-center p-0.5 bg-slate-200/70 dark:bg-slate-800 rounded-full text-xs">
-            <button
-              type="button"
-              onClick={() => setActiveMode('chat')}
-              className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
-                activeMode === 'chat'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              Chat
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMode('task')}
-              className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
-                activeMode === 'task'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              Task
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2">
+          {/* Centered Segmented Pill: Chat | Task */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center p-0.5 bg-slate-200/70 dark:bg-slate-800 rounded-full text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveMode('chat')}
+                className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
+                  activeMode === 'chat'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMode('task')}
+                className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
+                  activeMode === 'task'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                Task
+              </button>
+            </div>
+
+            {/* RAG Grounding Indicator Pill */}
+            {activeGroundingDocsCount > 0 && (
+              <div
+                title={`${activeGroundingDocsCount} Knowledge Base document(s) active in live chat grounding`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[11px] font-mono font-medium"
+              >
+                <Database className="w-3 h-3 text-cyan-400" />
+                <span>RAG Active ({activeGroundingDocsCount})</span>
+              </div>
+            )}
           </div>
 
-          {/* Right Action buttons: Roles, Export, Clear */}
+          {/* Right Action buttons: Prompt Recipes, Roles, Export, Clear */}
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            {onOpenPromptLibrary && (
+              <>
+                <button
+                  type="button"
+                  onClick={onOpenPromptLibrary}
+                  className="hover:text-cyan-400 text-slate-400 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <BookOpen className="w-3 h-3 text-cyan-400" />
+                  <span>Recipes</span>
+                </button>
+                <span>·</span>
+              </>
+            )}
+
             <button
               type="button"
               onClick={onOpenRoleModal}
@@ -342,7 +477,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             onExportThread('markdown');
                             setShowExportMenu(false);
                           }}
-                          className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+                          className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
                         >
                           Markdown (.md)
                         </button>
@@ -352,7 +487,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             onExportThread('json');
                             setShowExportMenu(false);
                           }}
-                          className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+                          className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
                         >
                           JSON (.json)
                         </button>
