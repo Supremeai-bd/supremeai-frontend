@@ -15,6 +15,7 @@ import {
   ArrowRightLeft,
   Users,
   Activity,
+  Radio,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole } from '../types';
 
@@ -36,6 +37,7 @@ interface SidebarProps {
   projectsCount?: number;
   activePluginsCount?: number;
   customersCount?: number;
+  mcpAlertCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -56,6 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   projectsCount = 2,
   activePluginsCount = 4,
   customersCount = 12,
+  mcpAlertCount = 0,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -131,6 +134,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                 {customersCount}
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('mcp-tower')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'mcp-tower'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Radio className={`w-4 h-4 ${mcpAlertCount > 0 ? 'text-rose-500 animate-pulse' : 'text-slate-500'}`} />
+                <span>MCP Tower</span>
+              </div>
+              {mcpAlertCount > 0 ? (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 font-semibold">
+                  {mcpAlertCount} alert{mcpAlertCount > 1 ? 's' : ''}
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-semibold">
+                  8/8 OK
+                </span>
+              )}
             </button>
 
             <button

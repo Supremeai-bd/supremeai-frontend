@@ -98,3 +98,31 @@ export interface CustomerRecord {
   region: string;
 }
 
+export interface McpServiceLog {
+  id: string;
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+  details?: string;
+  stackTrace?: string;
+}
+
+export interface McpTowerService {
+  id: string;
+  name: string;
+  displayName: string;
+  category: 'core' | 'ai' | 'integration' | 'telemetry';
+  port: number;
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'rebooting';
+  uptime: string;
+  latencyMs: number;
+  cpuPercent: number;
+  memoryMb: number;
+  lastChecked: string;
+  version: string;
+  endpoint: string;
+  errorCount: number;
+  logs: McpServiceLog[];
+}
+
+

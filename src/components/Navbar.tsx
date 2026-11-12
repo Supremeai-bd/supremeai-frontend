@@ -13,6 +13,7 @@ interface NavbarProps {
   activeModel: ModelDetail;
   currentRole: UserRole;
   onToggleRole: () => void;
+  mcpAlertCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -26,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeModel,
   currentRole,
   onToggleRole,
+  mcpAlertCount = 0,
 }) => {
   return (
     <header className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
@@ -123,6 +125,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               Customers
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab('mcp-tower')}
+              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg flex items-center gap-1.5 ${
+                activeTab === 'mcp-tower'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                  : 'hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span>MCP Tower</span>
+              {mcpAlertCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {mcpAlertCount}
+                </span>
+              )}
             </button>
             <button
               type="button"
