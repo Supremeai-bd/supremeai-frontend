@@ -255,3 +255,12 @@ export const INITIAL_MCP_SERVICES: McpTowerService[] = [
     ],
   },
 ];
+
+export const INITIAL_ADMIN_METRICS = {
+  totalServices: 8,
+  healthyCount: 6,
+  degradedCount: 1,
+  unhealthyCount: 1,
+  activeSwarmWorkers: 4,
+  deadLetterJobs: 2,
+};

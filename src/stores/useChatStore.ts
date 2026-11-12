@@ -1,0 +1,339 @@
+import { create } from 'zustand';
+import { ChatSession, ChatMessage, RolePersona, ModelDetail, ChatAttachment, KnowledgeDoc } from '../types';
+import { SYSTEM_ROLES } from '../data/roles';
+import { GEMINI_MODELS } from '../data/models';
+import { chatService } from '../services/chatService';
+import { toast } from './useToastStore';
+
+const STORAGE_KEY = 'supremeai_studio_sessions_v1';
+
+interface ChatState {
+  sessions: ChatSession[];
+  activeSessionId: string;
+  activeModel: ModelDetail;
+  activeRole: RolePersona;
+  customInstruction: string;
+  isStreaming: boolean;
+  streamingContent: string;
+  inferenceError: string | null;
+  isPromptModalOpen: boolean;
+  isRoleModalOpen: boolean;
+
+  // Session Management Actions
+  selectSession: (id: string) => void;
+  deleteSession: (id: string) => void;
+  renameSession: (id: string, newTitle: string) => void;
+  createNewSession: () => void;
+  clearCurrentThread: () => void;
+  exportThread: (format: 'markdown' | 'json') => void;
+
+  // Model & Role Actions
+  selectModel: (model: ModelDetail) => void;
+  selectRole: (role: RolePersona, customPrompt?: string) => void;
+  setCustomInstruction: (instruction: string) => void;
+  setIsPromptModalOpen: (open: boolean) => void;
+  setIsRoleModalOpen: (open: boolean) => void;
+
+  // Inference Actions
+  sendMessage: (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[]) => Promise<void>;
+  stopStreaming: () => void;
+}
+
+export const useChatStore = create<ChatState>((set, get) => {
+  let abortController: AbortController | null = null;
+
+  const getInitialSessions = (): ChatSession[] => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+
+    const initialSession: ChatSession = {
+      id: `session_${Date.now()}`,
+      title: 'SupremeAI Chat',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      model: 'gemini-3.8-flash',
+      roleId: SYSTEM_ROLES[0].id,
+      messages: [],
+    };
+    return [initialSession];
+  };
+
+  const initialSessions = getInitialSessions();
+
+  return {
+    sessions: initialSessions,
+    activeSessionId: initialSessions[0]?.id || '',
+    activeModel: GEMINI_MODELS.find((m) => m.id === 'gemini-3.8-flash') || GEMINI_MODELS[0],
+    activeRole: SYSTEM_ROLES[0],
+    customInstruction: '',
+    isStreaming: false,
+    streamingContent: '',
+    inferenceError: null,
+    isPromptModalOpen: false,
+    isRoleModalOpen: false,
+
+    selectSession: (id: string) => {
+      set({ activeSessionId: id, inferenceError: null });
+    },
+
+    deleteSession: (id: string) => {
+      const { sessions, activeSessionId, activeModel, activeRole } = get();
+      const filtered = sessions.filter((s) => s.id !== id);
+
+      if (filtered.length === 0) {
+        const fallback: ChatSession = {
+          id: `session_${Date.now()}`,
+          title: 'New Conversation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          model: activeModel.id,
+          roleId: activeRole.id,
+          messages: [],
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([fallback]));
+        set({ sessions: [fallback], activeSessionId: fallback.id });
+        return;
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      set({
+        sessions: filtered,
+        activeSessionId: activeSessionId === id ? filtered[0].id : activeSessionId,
+      });
+      toast.info('Session Deleted', 'Conversation removed from workspace history.');
+    },
+
+    renameSession: (id: string, newTitle: string) => {
+      const { sessions } = get();
+      const updated = sessions.map((s) => (s.id === id ? { ...s, title: newTitle } : s));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      set({ sessions: updated });
+    },
+
+    createNewSession: () => {
+      const { sessions, activeModel, activeRole, customInstruction } = get();
+      const newSession: ChatSession = {
+        id: `session_${Date.now()}`,
+        title: 'New Conversation',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        model: activeModel.id,
+        roleId: activeRole.id,
+        customSystemInstruction: customInstruction || undefined,
+        messages: [],
+      };
+
+      const updated = [newSession, ...sessions];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      set({
+        sessions: updated,
+        activeSessionId: newSession.id,
+        inferenceError: null,
+      });
+    },
+
+    clearCurrentThread: () => {
+      const { sessions, activeSessionId } = get();
+      const updated = sessions.map((s) =>
+        s.id === activeSessionId ? { ...s, messages: [], updatedAt: Date.now() } : s
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      set({ sessions: updated, streamingContent: '', inferenceError: null });
+      toast.info('Thread Cleared', 'Messages removed from active conversation.');
+    },
+
+    exportThread: (format: 'markdown' | 'json') => {
+      const { sessions, activeSessionId } = get();
+      const current = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+      if (!current) return;
+
+      let blob: Blob;
+      let filename: string;
+
+      if (format === 'markdown') {
+        let md = `# ${current.title}\n`;
+        md += `*Exported from SupremeAI Studio · Model: ${current.model} · Date: ${new Date().toLocaleString()}*\n\n---\n\n`;
+
+        current.messages.forEach((msg) => {
+          const sender = msg.role === 'user' ? '### User' : `### Assistant (${msg.roleName || 'SupremeAI'})`;
+          md += `${sender}\n\n${msg.content}\n\n---\n\n`;
+        });
+
+        blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        filename = `${current.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_export.md`;
+      } else {
+        const json = JSON.stringify(current, null, 2);
+        blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        filename = `${current.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_export.json`;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Thread Exported', `Downloaded as ${filename}`);
+    },
+
+    selectModel: (model: ModelDetail) => {
+      set({ activeModel: model });
+      toast.info('Model Switched', `Active model set to ${model.name}`);
+    },
+
+    selectRole: (role: RolePersona, customPrompt?: string) => {
+      const matchedModel = GEMINI_MODELS.find((m) => m.id === role.suggestedModel);
+      set((state) => ({
+        activeRole: role,
+        customInstruction: customPrompt || '',
+        activeModel: matchedModel || state.activeModel,
+      }));
+      toast.info('Role Configured', `Persona set to ${role.name}`);
+    },
+
+    setCustomInstruction: (instruction: string) => set({ customInstruction: instruction }),
+    setIsPromptModalOpen: (open: boolean) => set({ isPromptModalOpen: open }),
+    setIsRoleModalOpen: (open: boolean) => set({ isRoleModalOpen: open }),
+
+    sendMessage: async (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[]) => {
+      const { sessions, activeSessionId, activeModel, activeRole, customInstruction, isStreaming } = get();
+      if ((!text.trim() && !attachment) || isStreaming) return;
+
+      const current = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+      if (!current) return;
+
+      set({ inferenceError: null });
+
+      const userMsg: ChatMessage = {
+        id: `msg_${Date.now()}`,
+        role: 'user',
+        content: text,
+        timestamp: Date.now(),
+        attachment,
+      };
+
+      const updatedMessages = [...current.messages, userMsg];
+      const isFirstUserMessage = current.messages.filter((m) => m.role === 'user').length === 0;
+      const sessionTitle = isFirstUserMessage
+        ? (text.slice(0, 32).trim() || (attachment ? `Analysis: ${attachment.name}` : 'New Chat')) +
+          (text.length > 32 ? '...' : '')
+        : current.title;
+
+      const updatedSessions = sessions.map((s) =>
+        s.id === current.id
+          ? {
+              ...s,
+              title: sessionTitle,
+              messages: updatedMessages,
+              updatedAt: Date.now(),
+              model: activeModel.id,
+              roleId: activeRole.id,
+            }
+          : s
+      );
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
+      set({
+        sessions: updatedSessions,
+        isStreaming: true,
+        streamingContent: '',
+      });
+
+      // Collect grounding context
+      const activeGrounding = (groundingDocs || []).filter((d) => d.isGroundingActive);
+      const groundingContext =
+        activeGrounding.length > 0
+          ? activeGrounding
+              .map((d) => `[GROUNDING DOCUMENT: "${d.title}" (Type: ${d.type})]\n${d.contentPreview}`)
+              .join('\n\n')
+          : undefined;
+
+      const controller = new AbortController();
+      abortController = controller;
+
+      await chatService.streamChat({
+        model: activeModel.id,
+        messages: updatedMessages,
+        systemInstruction: customInstruction || activeRole.systemInstruction,
+        groundingContext,
+        signal: controller.signal,
+        onChunk: (chunk) => {
+          set((state) => ({ streamingContent: state.streamingContent + chunk }));
+        },
+        onDone: (fullText) => {
+          const assistantMsg: ChatMessage = {
+            id: `msg_${Date.now()}`,
+            role: 'assistant',
+            content: fullText,
+            timestamp: Date.now(),
+            model: activeModel.id,
+            roleName: activeRole.name,
+          };
+
+          const finalSessions = get().sessions.map((s) =>
+            s.id === current.id
+              ? {
+                  ...s,
+                  messages: [...s.messages, assistantMsg],
+                  updatedAt: Date.now(),
+                }
+              : s
+          );
+
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(finalSessions));
+          set({
+            sessions: finalSessions,
+            isStreaming: false,
+            streamingContent: '',
+          });
+          abortController = null;
+        },
+        onError: (err) => {
+          set({
+            isStreaming: false,
+            streamingContent: '',
+            inferenceError: err.message,
+          });
+          abortController = null;
+          toast.error('Inference Error', err.message);
+        },
+      });
+    },
+
+    stopStreaming: () => {
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+      }
+
+      const { streamingContent, sessions, activeSessionId, activeModel, activeRole } = get();
+      if (streamingContent.trim()) {
+        const assistantMsg: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          role: 'assistant',
+          content: streamingContent,
+          timestamp: Date.now(),
+          model: activeModel.id,
+          roleName: activeRole.name,
+        };
+
+        const updated = sessions.map((s) =>
+          s.id === activeSessionId ? { ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() } : s
+        );
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        set({ sessions: updated });
+      }
+
+      set({ isStreaming: false, streamingContent: '' });
+      toast.info('Generation Stopped', 'Model inference paused by user.');
+    },
+  };
+});
