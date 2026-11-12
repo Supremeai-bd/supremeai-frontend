@@ -14,6 +14,7 @@ import {
   User,
   ArrowRightLeft,
   Users,
+  Activity,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole } from '../types';
 
@@ -160,6 +161,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
+              onClick={() => onSelectTab('usage')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'usage'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-slate-500" />
+              <span>Usage Analytics</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => onSelectTab('repos')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'repos'
@@ -220,6 +234,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                 {activePluginsCount} active
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('usage')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'usage'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-slate-500" />
+              <span>Usage Analytics</span>
             </button>
 
             <button

@@ -11,6 +11,7 @@ import {
   Sparkles,
   Paperclip,
   Code,
+  Check,
 } from 'lucide-react';
 import { ModelDetail, RolePersona } from '../types';
 import { GEMINI_MODELS } from '../data/models';
@@ -26,6 +27,8 @@ interface ChatInputProps {
   activeRole: RolePersona;
   onOpenRoleModal: () => void;
   hasMessages: boolean;
+  lastAutoSavedText?: string;
+  isAutoSaving?: boolean;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -39,6 +42,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   activeRole,
   onOpenRoleModal,
   hasMessages,
+  lastAutoSavedText = 'Auto-saved 30s ago',
+  isAutoSaving = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -368,6 +373,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               </>
             )}
           </div>
+        </div>
+
+        {/* Quiet Auto-Save Status Footer */}
+        <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 px-2 pt-0.5">
+          <div className="flex items-center gap-1.5 font-mono">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isAutoSaving ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'
+              }`}
+            />
+            <span className="text-[10px]">
+              {isAutoSaving ? 'Auto-saving session...' : lastAutoSavedText}
+            </span>
+          </div>
+
+          <span className="text-[10px]">
+            Google Gemini · Model: <span className="font-mono">{activeModel.name.replace('Gemini ', '')}</span>
+          </span>
         </div>
       </div>
     </div>

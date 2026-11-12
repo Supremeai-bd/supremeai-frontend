@@ -126,6 +126,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => onSelectTab('usage')}
+              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                activeTab === 'usage'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                  : 'hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Usage
+            </button>
+            <button
+              type="button"
               onClick={() => onSelectTab('repos')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
                 activeTab === 'repos'
@@ -170,6 +181,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               Plugins & Tools
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab('usage')}
+              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                activeTab === 'usage'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                  : 'hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Usage
             </button>
             <button
               type="button"

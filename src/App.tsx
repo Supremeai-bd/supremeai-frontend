@@ -11,6 +11,7 @@ import { UserProjectsView } from './components/user/UserProjectsView';
 import { UserPluginsView } from './components/user/UserPluginsView';
 import { UserSettingsView } from './components/user/UserSettingsView';
 import { AdminCustomersView } from './components/admin/AdminCustomersView';
+import { UsageView } from './components/UsageView';
 
 import {
   ChatSession,
@@ -191,6 +192,34 @@ export default function App() {
   const [streamingContent, setStreamingContent] = useState('');
   const [inferenceError, setInferenceError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Periodic auto-save mechanism every 30 seconds
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<number>(Date.now());
+  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
+
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      try {
+        if (sessions && sessions.length > 0) {
+          setIsAutoSaving(true);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+          localStorage.setItem('supremeai_studio_autosave_ts', String(Date.now()));
+          setLastAutoSaveTime(Date.now());
+          setTimeout(() => setIsAutoSaving(false), 1200);
+        }
+      } catch (err) {
+        console.warn('Auto-save periodic error:', err);
+      }
+    }, 30000); // 30,000 ms = 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [sessions]);
+
+  const lastAutoSavedText = `Auto-saved at ${new Date(lastAutoSaveTime).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })}`;
 
   useEffect(() => {
     try {
@@ -594,6 +623,8 @@ export default function App() {
               activeRole={activeRole}
               onOpenRoleModal={() => setIsRoleModalOpen(true)}
               hasMessages={(currentSession?.messages?.length || 0) > 0}
+              lastAutoSavedText={lastAutoSavedText}
+              isAutoSaving={isAutoSaving}
             />
           </main>
         )}
@@ -626,7 +657,12 @@ export default function App() {
           />
         )}
 
-        {/* 3. Admin Specific Views */}
+        {/* 3. Usage Analytics (Recharts Bar Chart) */}
+        {activeTab === 'usage' && (
+          <UsageView sessions={sessions} darkMode={darkMode} />
+        )}
+
+        {/* 4. Admin Specific Views */}
         {activeTab === 'customers' && (
           <AdminCustomersView
             customers={customers}
