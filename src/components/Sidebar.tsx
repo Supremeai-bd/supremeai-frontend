@@ -105,11 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside
-      className={`w-64 border-r border-slate-200/80 dark:border-slate-800/80 bg-slate-50/85 dark:bg-[#131314]/95 backdrop-blur-xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 ${
-        layoutMode === 'sidebar-focus' ? 'h-screen' : 'h-[calc(100vh-3.5rem)]'
-      } select-none`}
-    >
+    <aside className="w-64 h-full min-h-0 border-r border-slate-200/80 dark:border-slate-800/80 bg-slate-50/85 dark:bg-[#131314]/95 backdrop-blur-xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden">
       {/* Top Studio Brand Header when Top Navbar is hidden (Sidebar Focus mode) */}
       {layoutMode === 'sidebar-focus' && (
         <div className="px-3.5 pt-3.5 pb-1 flex items-center justify-between gap-2">
@@ -566,7 +562,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Threads List */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5">
         {filteredSessions.map((session) => {
           const isActive = session.id === activeSessionId && activeTab === 'chat';
 

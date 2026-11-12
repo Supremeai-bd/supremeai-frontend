@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Eye, Terminal, Globe, Code2, X, GripVertical, Maximize2, Minimize2 } from 'lucide-react';
 import { useWorkspaceStore, WorkspaceTab } from '../../stores/useWorkspaceStore';
 import { WorkspacePreviewTab } from './WorkspacePreviewTab';
@@ -18,12 +18,15 @@ export const WorkspaceDock: React.FC = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const dockRef = useRef<HTMLElement>(null);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isDragging) return;
-      const totalWidth = window.innerWidth;
-      const newWidthPx = totalWidth - e.clientX;
+      const parentRect = dockRef.current?.parentElement?.getBoundingClientRect();
+      const totalWidth = parentRect?.width || window.innerWidth;
+      const rightEdge = parentRect?.right || window.innerWidth;
+      const newWidthPx = rightEdge - e.clientX;
       const newPct = (newWidthPx / totalWidth) * 100;
       setDockWidthPercent(newPct);
     },
@@ -55,19 +58,17 @@ export const WorkspaceDock: React.FC = () => {
 
   return (
     <aside
-      style={isMaximized ? { width: '100%' } : undefined}
+      ref={dockRef}
+      style={
+        (isMaximized
+          ? { width: '100%' }
+          : { '--dock-w': `${dockWidthPercent}%` }) as React.CSSProperties
+      }
       className={`${
         isMaximized
           ? 'absolute inset-0 z-40 flex'
-          : 'fixed inset-0 z-40 lg:static lg:inset-auto flex'
-      } flex-col h-full border-l border-slate-200 dark:border-cyan-500/20 bg-white/95 dark:bg-[#090d16]/95 backdrop-blur-xl shadow-2xl shrink-0 transition-[box-shadow] ${
-        !isMaximized ? 'lg:w-[var(--dock-w)]' : ''
-      }`}
-      ref={(el) => {
-        if (el && !isMaximized) {
-          el.style.setProperty('--dock-w', `${dockWidthPercent}%`);
-        }
-      }}
+          : 'absolute inset-y-0 right-0 z-40 w-[88%] max-w-[440px] md:static md:inset-auto md:w-[var(--dock-w)] md:min-w-[280px] md:max-w-[62%] flex'
+      } flex-col h-full border-l border-slate-200 dark:border-cyan-500/20 bg-white/95 dark:bg-[#090d16]/95 backdrop-blur-xl shadow-2xl shrink-0 transition-[box-shadow]`}
     >
       {/* Left Resizable Divider Handle */}
       {!isMaximized && (

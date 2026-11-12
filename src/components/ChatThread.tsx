@@ -35,12 +35,13 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'assistant'>('all');
 
-  // Auto-scroll on new message or streaming updates
+  // Auto-scroll internal message container only (never scroll ancestor/window/iframe)
   useEffect(() => {
-    if (!searchQuery.trim() && scrollEndRef.current) {
-      scrollEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const el = containerRef.current;
+    if (!searchQuery.trim() && el) {
+      el.scrollTop = el.scrollHeight;
     }
-  }, [messages, streamingContent, searchQuery]);
+  }, [messages.length, streamingContent, searchQuery]);
 
   // Scroll detection for "Scroll to bottom" button
   const handleScroll = () => {
@@ -50,7 +51,10 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   };
 
   const scrollToBottom = () => {
-    scrollEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = containerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
   };
 
   // Event delegation for code block copy, preview, and workspace dock buttons inside markdown
@@ -109,7 +113,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
       {/* Search Bar (Only shown when there are messages in the thread) */}
       {!isEmpty && (
         <ChatSearchBar
@@ -129,7 +133,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
         ref={containerRef}
         onScroll={handleScroll}
         onClick={handleContainerClick}
-        className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4"
+        className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4"
       >
         {isEmpty ? (
           <ChatEmptyState

@@ -1,5 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { PanelLeft, PanelRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  PanelLeft,
+  PanelRight,
+  BookOpen,
+  Sliders,
+  Download,
+  Trash2,
+  Database,
+} from 'lucide-react';
+import { motion } from 'motion/react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ChatThread } from './components/ChatThread';
@@ -45,6 +54,128 @@ import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { UserProject, ChatAttachment } from './types';
 
 const THEME_KEY = 'supremeai_studio_theme';
+
+export const ReactAmbientAura: React.FC<{ isEmpty?: boolean }> = ({ isEmpty = true }) => {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0, nx: 0.5, ny: 0.5 });
+  const [keyPulse, setKeyPulse] = useState(0);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const nx = e.clientX / Math.max(window.innerWidth, 1);
+      const ny = e.clientY / Math.max(window.innerHeight, 1);
+      setMousePos({
+        x: (nx - 0.5) * 44,
+        y: (ny - 0.5) * 44,
+        nx,
+        ny,
+      });
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') {
+        setKeyPulse((prev) => prev + 1);
+        clearTimeout(timeout);
+        timeout = setTimeout(() => setKeyPulse(0), 340);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  const isTyping = keyPulse > 0;
+  const waveAmplitude = isTyping ? 24 : 12 + (mousePos.ny - 0.5) * 18;
+  const waveShift = (mousePos.nx - 0.5) * 40;
+
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none select-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-500 ${
+        isEmpty ? 'opacity-100' : 'opacity-30'
+      }`}
+    >
+      {/* Interactive Mouse & Keystroke Glowing Neural Orb */}
+      <motion.div
+        animate={{
+          x: mousePos.x * 1.1,
+          y: mousePos.y * 1.1,
+          scale: isTyping ? 1.18 : [1, 1.07, 1],
+          opacity: isTyping ? 0.65 : [0.35, 0.5, 0.35],
+        }}
+        transition={{
+          x: { type: 'spring', stiffness: 55, damping: 20 },
+          y: { type: 'spring', stiffness: 55, damping: 20 },
+          scale: isTyping
+            ? { duration: 0.22 }
+            : { duration: 7, repeat: Infinity, ease: 'easeInOut' },
+          opacity: isTyping
+            ? { duration: 0.22 }
+            : { duration: 7, repeat: Infinity, ease: 'easeInOut' },
+        }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[26rem] h-[26rem] rounded-full bg-gradient-to-tr from-cyan-400/25 via-blue-500/20 to-violet-500/25 blur-3xl"
+      />
+
+      {/* Secondary Counter-Orbital Glow */}
+      <motion.div
+        animate={{
+          x: -mousePos.x * 0.7,
+          y: -mousePos.y * 0.7,
+          scale: isTyping ? 1.12 : 1,
+        }}
+        transition={{ type: 'spring', stiffness: 45, damping: 22 }}
+        className="absolute top-[42%] left-[52%] -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-gradient-to-br from-violet-500/15 via-cyan-400/15 to-emerald-400/10 blur-2xl"
+      />
+
+      {/* Interactive SVG Neural Wave */}
+      <svg
+        viewBox="0 0 1200 320"
+        preserveAspectRatio="none"
+        className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-72 opacity-55 dark:opacity-65"
+      >
+        <defs>
+          <linearGradient id="neural-wave-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(6, 182, 212, 0)" />
+            <stop offset="30%" stopColor="rgba(6, 182, 212, 0.45)" />
+            <stop offset="70%" stopColor="rgba(139, 92, 246, 0.45)" />
+            <stop offset="100%" stopColor="rgba(139, 92, 246, 0)" />
+          </linearGradient>
+          <linearGradient id="neural-wave-blue" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(59, 130, 246, 0)" />
+            <stop offset="50%" stopColor="rgba(59, 130, 246, 0.35)" />
+            <stop offset="100%" stopColor="rgba(6, 182, 212, 0)" />
+          </linearGradient>
+        </defs>
+
+        <motion.path
+          animate={{
+            d: `M 0 160 Q ${300 + waveShift} ${160 - waveAmplitude * 2.2}, 600 160 T 1200 160`,
+            strokeWidth: isTyping ? 2.2 : 1.4,
+          }}
+          transition={{ type: 'spring', stiffness: 90, damping: 18 }}
+          fill="none"
+          stroke="url(#neural-wave-cyan)"
+        />
+
+        <motion.path
+          animate={{
+            d: `M 0 170 Q ${320 - waveShift} ${170 + waveAmplitude * 1.9}, 600 165 T 1200 155`,
+            strokeWidth: isTyping ? 1.8 : 1.1,
+          }}
+          transition={{ type: 'spring', stiffness: 70, damping: 20 }}
+          fill="none"
+          stroke="url(#neural-wave-blue)"
+        />
+      </svg>
+    </div>
+  );
+};
 
 export default function App() {
   // Routing hook via Query Parameter (?tab=...) and Hash (#...)
@@ -152,6 +283,8 @@ export default function App() {
 
   // Navigation & Layout UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatUtilityMode, setChatUtilityMode] = useState<'chat' | 'task'>('chat');
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const { isDockOpen, toggleDock } = useWorkspaceStore();
   const layoutMode = userSettings.layoutMode || 'sidebar-focus';
 
@@ -185,17 +318,43 @@ export default function App() {
   // Active session lookup
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
-  // Auto-save timestamp tracking
-  const [lastAutoSaveTime] = useState<number>(Date.now());
-  const lastAutoSavedText = `Auto-saved at ${new Date(lastAutoSaveTime).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`;
+  // Auto-hide left sidebar whenever a user sends a message or streaming starts
+  const prevSessionMsgRef = useRef<{ sessionId: string; count: number }>({
+    sessionId: currentSession?.id || '',
+    count: currentSession?.messages?.length || 0,
+  });
+  const wasStreamingRef = useRef<boolean>(isStreaming);
+
+  useEffect(() => {
+    const sid = currentSession?.id || '';
+    const count = currentSession?.messages?.length || 0;
+    const prev = prevSessionMsgRef.current;
+
+    const messageAddedInSameSession = sid === prev.sessionId && count > prev.count;
+    const streamingJustStarted = !wasStreamingRef.current && isStreaming;
+
+    if (messageAddedInSameSession || streamingJustStarted) {
+      setSidebarOpen(false);
+    }
+
+    prevSessionMsgRef.current = { sessionId: sid, count };
+    wasStreamingRef.current = isStreaming;
+  }, [currentSession?.id, currentSession?.messages?.length, isStreaming]);
+
+  // Also collapse left sidebar when opening WorkspaceDock on medium/narrow viewports to prevent crowding
+  const wasDockOpenRef = useRef<boolean>(isDockOpen);
+  useEffect(() => {
+    if (!wasDockOpenRef.current && isDockOpen && window.innerWidth < 1200) {
+      setSidebarOpen(false);
+    }
+    wasDockOpenRef.current = isDockOpen;
+  }, [isDockOpen]);
 
   // Project Quick Action Handlers
   const handleChatWithProject = (project: UserProject) => {
     createNewSession();
     setActiveTab('chat');
+    setSidebarOpen(false);
     sendMessage(
       `Please inspect my connected GitHub repository: "${project.name}" (${project.repoUrl}, branch: ${project.branch}). Description: ${project.description}. Give me a quick architecture summary and recommended next steps.`,
       undefined,
@@ -206,6 +365,7 @@ export default function App() {
   const handleTriggerCodeReview = (project: UserProject) => {
     createNewSession();
     setActiveTab('chat');
+    setSidebarOpen(false);
     sendMessage(
       `Perform a comprehensive AI Code Review for the repository "${project.name}" (${project.repoUrl}). Check for security vulnerabilities, TypeScript strictness, and clean architecture.`,
       undefined,
@@ -214,6 +374,7 @@ export default function App() {
   };
 
   const handleSendMessageWrapper = async (text: string, attachment?: ChatAttachment) => {
+    setSidebarOpen(false);
     const estimatedTokens = Math.ceil(text.length / 4) + (attachment ? 258 : 0);
     recordTokenUsage(estimatedTokens);
     await sendMessage(text, attachment, knowledgeDocs);
@@ -241,7 +402,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div
-        className={`flex flex-col h-screen bg-[#f8fafc] dark:bg-[#080b11] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors relative ${
+        className={`flex flex-col h-full w-full bg-[#f8fafc] dark:bg-[#080b11] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors relative ${
           currentRole === 'admin' ? 'cyber-scanline' : ''
         }`}
       >
@@ -275,7 +436,7 @@ export default function App() {
         )}
 
         {/* Main Viewport Container */}
-        <div className="flex-1 flex overflow-hidden relative z-10">
+        <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative z-10">
           {/* Studio Sidebar */}
           <Sidebar
             sessions={sessions}
@@ -316,31 +477,157 @@ export default function App() {
             </button>
           )}
 
-          {/* 1. Chat Workspace + Collapsible Resizable Split Dock (Preview / Terminal / Browser / Code) */}
+          {/* 1. Chat Workspace + Collapsible Resizable Right Split Dock (Preview / Terminal / Browser / Code) */}
           {activeTab === 'chat' && (
-            <div className="flex-1 flex overflow-hidden relative">
-              <main className="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(219,234,254,0.45),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(30,58,138,0.2),rgba(19,19,20,0))]">
-                {/* Floating 1-click Right Workspace Dock Toggle in Sidebar Focus Mode */}
-                {layoutMode === 'sidebar-focus' && (
-                  <div className="absolute top-3.5 right-4 z-20 flex items-center gap-2 pointer-events-none">
+            <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative">
+              <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(219,234,254,0.45),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(30,58,138,0.2),rgba(19,19,20,0))]">
+                {/* Interactive React Ambient Aura in empty chat area */}
+                <ReactAmbientAura isEmpty={isChatEmpty} />
+
+                {/* Right-Aligned Workspace & Chat Utility Controls (Moved from bottom bar to right side) */}
+                <div
+                  className={`relative z-20 px-3 sm:px-4 pt-3 flex items-center justify-end gap-1.5 flex-wrap pointer-events-none shrink-0 ${
+                    layoutMode === 'sidebar-focus' && !sidebarOpen ? 'pl-14' : ''
+                  }`}
+                >
+                  <div className="pointer-events-auto flex items-center gap-1.5 flex-wrap justify-end">
+                    {/* Chat | Task mode selector */}
+                    <div className="flex items-center p-0.5 rounded-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-[11px] shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => setChatUtilityMode('chat')}
+                        className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                          chatUtilityMode === 'chat'
+                            ? 'bg-slate-900 dark:bg-slate-800 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChatUtilityMode('task')}
+                        className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                          chatUtilityMode === 'task'
+                            ? 'bg-slate-900 dark:bg-slate-800 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Task
+                      </button>
+                    </div>
+
+                    {/* RAG Active indicator */}
+                    {knowledgeDocs.filter((d) => d.isGroundingActive).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('user-knowledge')}
+                        title="Knowledge Base Grounding Active"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 text-[11px] font-mono font-medium cursor-pointer hover:bg-cyan-500/20 transition-colors"
+                      >
+                        <Database className="w-3 h-3" />
+                        <span>RAG ({knowledgeDocs.filter((d) => d.isGroundingActive).length})</span>
+                      </button>
+                    )}
+
+                    {/* Recipes button */}
                     <button
                       type="button"
-                      onClick={toggleDock}
-                      aria-label={isDockOpen ? 'Close workspace dock' : 'Open workspace dock'}
-                      className={`pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium backdrop-blur-md border transition-all cursor-pointer shadow-xs ${
-                        isDockOpen
-                          ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-300'
-                          : 'bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                      }`}
+                      onClick={() => setIsPromptModalOpen(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer shadow-xs"
                     >
-                      <PanelRight className="w-3.5 h-3.5" />
-                      <span>{isDockOpen ? 'Close Dock' : 'Workspace'}</span>
+                      <BookOpen className="w-3 h-3 text-cyan-500" />
+                      <span className="hidden sm:inline">Recipes</span>
                     </button>
+
+                    {/* Role selector */}
+                    <button
+                      type="button"
+                      onClick={() => setIsRoleModalOpen(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span className="hidden md:inline">{activeRole.name}</span>
+                    </button>
+
+                    {/* Export & Clear when messages exist */}
+                    {(currentSession?.messages?.length || 0) > 0 && (
+                      <>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowExportMenu((prev) => !prev)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-xs"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span className="hidden md:inline">Export</span>
+                          </button>
+
+                          {showExportMenu && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setShowExportMenu(false)}
+                              />
+                              <div className="absolute right-0 top-full mt-1.5 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-40 p-1 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    exportThread('markdown');
+                                    setShowExportMenu(false);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
+                                >
+                                  Markdown (.md)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    exportThread('json');
+                                    setShowExportMenu(false);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
+                                >
+                                  JSON (.json)
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={clearCurrentThread}
+                          title="Clear Thread"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-500 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span className="hidden md:inline">Clear</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* 1-click Right Workspace Dock Toggle in Sidebar Focus Mode */}
+                    {layoutMode === 'sidebar-focus' && (
+                      <button
+                        type="button"
+                        onClick={toggleDock}
+                        aria-label={isDockOpen ? 'Close workspace dock' : 'Open workspace dock'}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium backdrop-blur-md border transition-all cursor-pointer shadow-xs ${
+                          isDockOpen
+                            ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-300'
+                            : 'bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <PanelRight className="w-3.5 h-3.5" />
+                        <span>{isDockOpen ? 'Close Dock' : 'Workspace'}</span>
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {isChatEmpty ? (
-                  <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto px-4 pb-8 pt-12">
+                  <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center overflow-y-auto px-4 pb-8">
                     <ChatEmptyState
                       activeRole={activeRole}
                       activeModel={activeModel}
@@ -350,23 +637,15 @@ export default function App() {
                       <ChatInput
                         onSendMessage={handleSendMessageWrapper}
                         onStopStreaming={stopStreaming}
-                        onClearThread={clearCurrentThread}
-                        onExportThread={exportThread}
                         isStreaming={isStreaming}
                         activeModel={activeModel}
                         onSelectModel={selectModel}
-                        activeRole={activeRole}
-                        onOpenRoleModal={() => setIsRoleModalOpen(true)}
-                        hasMessages={false}
-                        lastAutoSavedText={lastAutoSavedText}
-                        isAutoSaving={false}
                         onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
-                        activeGroundingDocsCount={knowledgeDocs.filter((d) => d.isGroundingActive).length}
                       />
                     </div>
                   </div>
                 ) : (
-                  <>
+                  <div className="relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden">
                     <ChatThread
                       messages={currentSession?.messages || []}
                       activeRole={activeRole}
@@ -381,20 +660,12 @@ export default function App() {
                     <ChatInput
                       onSendMessage={handleSendMessageWrapper}
                       onStopStreaming={stopStreaming}
-                      onClearThread={clearCurrentThread}
-                      onExportThread={exportThread}
                       isStreaming={isStreaming}
                       activeModel={activeModel}
                       onSelectModel={selectModel}
-                      activeRole={activeRole}
-                      onOpenRoleModal={() => setIsRoleModalOpen(true)}
-                      hasMessages={(currentSession?.messages?.length || 0) > 0}
-                      lastAutoSavedText={lastAutoSavedText}
-                      isAutoSaving={false}
                       onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
-                      activeGroundingDocsCount={knowledgeDocs.filter((d) => d.isGroundingActive).length}
                     />
-                  </>
+                  </div>
                 )}
               </main>
 

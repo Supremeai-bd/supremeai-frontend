@@ -5,58 +5,36 @@ import {
   Plus,
   Mic,
   ChevronDown,
-  Trash2,
-  Download,
-  Sliders,
   Sparkles,
   Paperclip,
   Code,
   Image as ImageIcon,
   X,
   BookOpen,
-  Database,
 } from 'lucide-react';
-import { ModelDetail, RolePersona, ChatAttachment } from '../types';
+import { ModelDetail, ChatAttachment } from '../types';
 import { GEMINI_MODELS } from '../data/models';
 
 interface ChatInputProps {
   onSendMessage: (text: string, attachment?: ChatAttachment) => void;
   onStopStreaming: () => void;
-  onClearThread: () => void;
-  onExportThread: (format: 'markdown' | 'json') => void;
   isStreaming: boolean;
   activeModel: ModelDetail;
   onSelectModel: (model: ModelDetail) => void;
-  activeRole: RolePersona;
-  onOpenRoleModal: () => void;
-  hasMessages: boolean;
-  lastAutoSavedText?: string;
-  isAutoSaving?: boolean;
   onOpenPromptLibrary?: () => void;
-  activeGroundingDocsCount?: number;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   onStopStreaming,
-  onClearThread,
-  onExportThread,
   isStreaming,
   activeModel,
   onSelectModel,
-  activeRole,
-  onOpenRoleModal,
-  hasMessages,
-  lastAutoSavedText = 'Auto-saved 30s ago',
-  isAutoSaving = false,
   onOpenPromptLibrary,
-  activeGroundingDocsCount = 0,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [activeMode, setActiveMode] = useState<'chat' | 'task'>('chat');
   const [isListening, setIsListening] = useState(false);
   const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
 
@@ -160,8 +138,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="w-full p-4 bg-transparent pb-6 transition-colors">
-      <div className="max-w-3xl mx-auto space-y-3">
+    <div className="w-full px-4 py-3 bg-transparent transition-colors">
+      <div className="max-w-3xl mx-auto space-y-2.5">
         {/* Hidden File Input */}
         <input
           ref={fileInputRef}
@@ -383,149 +361,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               </button>
             )}
           </div>
-        </div>
-
-        {/* Gemini Segmented Pills Below: [Chat | Task] + Quick Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-2">
-          {/* Centered Segmented Pill: Chat | Task */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center p-0.5 bg-slate-200/70 dark:bg-slate-800 rounded-full text-xs">
-              <button
-                type="button"
-                onClick={() => setActiveMode('chat')}
-                className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
-                  activeMode === 'chat'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                Chat
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveMode('task')}
-                className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
-                  activeMode === 'task'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                Task
-              </button>
-            </div>
-
-            {/* RAG Grounding Indicator Pill */}
-            {activeGroundingDocsCount > 0 && (
-              <div
-                title={`${activeGroundingDocsCount} Knowledge Base document(s) active in live chat grounding`}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[11px] font-mono font-medium"
-              >
-                <Database className="w-3 h-3 text-cyan-400" />
-                <span>RAG Active ({activeGroundingDocsCount})</span>
-              </div>
-            )}
-          </div>
-
-          {/* Right Action buttons: Prompt Recipes, Roles, Export, Clear */}
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            {onOpenPromptLibrary && (
-              <>
-                <button
-                  type="button"
-                  onClick={onOpenPromptLibrary}
-                  className="hover:text-cyan-400 text-slate-400 flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <BookOpen className="w-3 h-3 text-cyan-400" />
-                  <span>Recipes</span>
-                </button>
-                <span>·</span>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={onOpenRoleModal}
-              className="hover:text-slate-900 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
-            >
-              <Sliders className="w-3 h-3" />
-              <span>{activeRole.name}</span>
-            </button>
-
-            {hasMessages && (
-              <>
-                <span>·</span>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowExportMenu(!showExportMenu)}
-                    className="hover:text-slate-900 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>Export</span>
-                  </button>
-
-                  {showExportMenu && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-30"
-                        onClick={() => setShowExportMenu(false)}
-                      />
-                      <div className="absolute right-0 bottom-full mb-1.5 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-40 p-1 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onExportThread('markdown');
-                            setShowExportMenu(false);
-                          }}
-                          className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
-                        >
-                          Markdown (.md)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onExportThread('json');
-                            setShowExportMenu(false);
-                          }}
-                          className="w-full text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
-                        >
-                          JSON (.json)
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={onClearThread}
-                  className="hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 cursor-pointer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Clear</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Quiet Auto-Save Status Footer */}
-        <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 px-2 pt-0.5">
-          <div className="flex items-center gap-1.5 font-mono">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isAutoSaving ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'
-              }`}
-            />
-            <span className="text-[10px]">
-              {isAutoSaving ? 'Auto-saving session...' : lastAutoSavedText}
-            </span>
-          </div>
-
-          <span className="text-[10px]">
-            Google Gemini · Model: <span className="font-mono">{activeModel.name.replace('Gemini ', '')}</span>
-          </span>
         </div>
       </div>
     </div>
