@@ -1,3 +1,5 @@
+export type UserRole = 'admin' | 'user';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -16,6 +18,7 @@ export interface ChatSession {
   roleId: string;
   customSystemInstruction?: string;
   messages: ChatMessage[];
+  projectId?: string;
 }
 
 export interface RolePersona {
@@ -41,4 +44,40 @@ export interface ModelDetail {
   contextTokens: string;
   reasoningCapability: 'Standard' | 'High' | 'Extreme';
   tier: 'standard' | 'advanced';
+}
+
+export interface UserProject {
+  id: string;
+  name: string;
+  repoUrl: string;
+  branch: string;
+  description: string;
+  language: string;
+  stars: number;
+  lastSynced: number;
+  aiReviewStatus: 'idle' | 'reviewed' | 'pending';
+}
+
+export interface PluginItem {
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  category: 'developer' | 'ai-grounding' | 'productivity' | 'security';
+  isEnabled: boolean;
+  version: string;
+  author: string;
+}
+
+export interface UserAccountSettings {
+  name: string;
+  email: string;
+  role: UserRole;
+  plan: 'Pro' | 'Free' | 'Enterprise';
+  monthlyTokensUsed: number;
+  monthlyTokensLimit: number;
+  emailNotifications: boolean;
+  autoCodeReview: boolean;
+  streamResponses: boolean;
+  defaultModel: string;
 }

@@ -7,17 +7,51 @@ import { RoleModal } from './components/RoleModal';
 import { RoleLab } from './components/RoleLab';
 import { ModelMatrix } from './components/ModelMatrix';
 import { RepoHub } from './components/RepoHub';
+import { UserProjectsView } from './components/user/UserProjectsView';
+import { UserPluginsView } from './components/user/UserPluginsView';
+import { UserSettingsView } from './components/user/UserSettingsView';
 
-import { ChatSession, ChatMessage, RolePersona, ModelDetail } from './types';
+import {
+  ChatSession,
+  ChatMessage,
+  RolePersona,
+  ModelDetail,
+  UserRole,
+  UserProject,
+  PluginItem,
+  UserAccountSettings,
+} from './types';
 import { SYSTEM_ROLES } from './data/roles';
 import { GEMINI_MODELS } from './data/models';
+import {
+  INITIAL_PLUGINS,
+  INITIAL_USER_PROJECTS,
+  DEFAULT_USER_SETTINGS,
+} from './data/userPlugins';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
 const THEME_KEY = 'supremeai_studio_theme';
+const ROLE_KEY = 'supremeai_studio_user_role';
+const PROJECTS_KEY = 'supremeai_studio_user_projects';
+const PLUGINS_KEY = 'supremeai_studio_user_plugins';
+const SETTINGS_KEY = 'supremeai_studio_user_settings';
 
 export default function App() {
+  // Dual Role State: 'user' (normal user) vs 'admin' (developer studio)
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    const saved = localStorage.getItem(ROLE_KEY);
+    return saved === 'admin' ? 'admin' : 'user'; // default to user view
+  });
+
+  const handleToggleRole = (forcedRole?: UserRole) => {
+    const nextRole = forcedRole || (currentRole === 'admin' ? 'user' : 'admin');
+    setCurrentRole(nextRole);
+    localStorage.setItem(ROLE_KEY, nextRole);
+    setActiveTab('chat');
+  };
+
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'chat' | 'roles' | 'models' | 'repos'>('chat');
+  const [activeTab, setActiveTab] = useState<string>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Theme State
@@ -47,6 +81,45 @@ export default function App() {
   const [customInstruction, setCustomInstruction] = useState<string>('');
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
+  // User Projects State
+  const [userProjects, setUserProjects] = useState<UserProject[]>(() => {
+    try {
+      const saved = localStorage.getItem(PROJECTS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_USER_PROJECTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(userProjects));
+  }, [userProjects]);
+
+  // User Plugins State
+  const [userPlugins, setUserPlugins] = useState<PluginItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(PLUGINS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_PLUGINS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(PLUGINS_KEY, JSON.stringify(userPlugins));
+  }, [userPlugins]);
+
+  // User Account Settings State
+  const [userSettings, setUserSettings] = useState<UserAccountSettings>(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_USER_SETTINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings));
+  }, [userSettings]);
+
   // Sessions and Chat History
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     try {
@@ -59,10 +132,9 @@ export default function App() {
       console.warn('Failed to parse saved sessions:', e);
     }
 
-    // Default initial session
     const initialSession: ChatSession = {
       id: `session_${Date.now()}`,
-      title: 'SupremeAI Session',
+      title: 'SupremeAI Chat',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       model: 'gemini-3.8-flash',
@@ -80,7 +152,6 @@ export default function App() {
   const [inferenceError, setInferenceError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Synchronize localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
@@ -89,7 +160,6 @@ export default function App() {
     }
   }, [sessions]);
 
-  // Current Active Session
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
   // Create New Session
@@ -151,7 +221,7 @@ export default function App() {
     setInferenceError(null);
   };
 
-  // Export Thread (Markdown or JSON)
+  // Export Thread
   const handleExportThread = (format: 'markdown' | 'json') => {
     if (!currentSession) return;
 
@@ -193,7 +263,6 @@ export default function App() {
     }
     setIsStreaming(false);
 
-    // Save partial response if available
     if (streamingContent.trim() && currentSession) {
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now()}`,
@@ -215,7 +284,7 @@ export default function App() {
     }
   };
 
-  // Send Message (Multi-turn chat flow with Gemini server-side streaming)
+  // Send Message
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isStreaming || !currentSession) return;
 
@@ -228,7 +297,6 @@ export default function App() {
       timestamp: Date.now(),
     };
 
-    // Update conversation title if first user message
     const updatedMessages = [...currentSession.messages, userMsg];
     const isFirstUserMessage = currentSession.messages.filter((m) => m.role === 'user').length === 0;
     const sessionTitle = isFirstUserMessage
@@ -250,7 +318,13 @@ export default function App() {
       )
     );
 
-    // Start streaming
+    // Track token usage
+    const estimatedTokens = Math.ceil(text.length / 4);
+    setUserSettings((prev) => ({
+      ...prev,
+      monthlyTokensUsed: prev.monthlyTokensUsed + estimatedTokens,
+    }));
+
     setIsStreaming(true);
     setStreamingContent('');
     const controller = new AbortController();
@@ -268,17 +342,17 @@ export default function App() {
             role: m.role,
             content: m.content,
           })),
-          stream: true,
+          stream: userSettings.streamResponses,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server returned error status ${response.status}`);
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       if (!response.body) {
-        throw new Error('No readable response body received from server.');
+        throw new Error('No readable response body received.');
       }
 
       const reader = response.body.getReader();
@@ -298,26 +372,19 @@ export default function App() {
           const trimmed = line.trim();
           if (trimmed.startsWith('data: ')) {
             const dataStr = trimmed.slice(6);
-            if (dataStr === '[DONE]') {
-              break;
-            }
+            if (dataStr === '[DONE]') break;
             try {
               const parsed = JSON.parse(dataStr);
-              if (parsed.error) {
-                throw new Error(parsed.error);
-              }
+              if (parsed.error) throw new Error(parsed.error);
               if (parsed.text) {
                 accumulatedText += parsed.text;
                 setStreamingContent(accumulatedText);
               }
-            } catch (parseErr) {
-              // Ignore non-json or split lines
-            }
+            } catch {}
           }
         }
       }
 
-      // Finalize assistant message
       if (accumulatedText.trim()) {
         const assistantMsg: ChatMessage = {
           id: `msg_${Date.now()}`,
@@ -342,12 +409,10 @@ export default function App() {
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
-        // User aborted intentionally
+        // Aborted intentionally
       } else {
         console.error('Chat error:', err);
-        const errorMsg =
-          err instanceof Error ? err.message : 'Unknown communication error during inference';
-        setInferenceError(errorMsg);
+        setInferenceError(err instanceof Error ? err.message : 'Inference error');
       }
     } finally {
       setIsStreaming(false);
@@ -356,27 +421,74 @@ export default function App() {
     }
   };
 
-  // Role selection handler
+  // User Project Actions
+  const handleAddProject = (
+    project: Omit<UserProject, 'id' | 'lastSynced' | 'stars' | 'aiReviewStatus'>
+  ) => {
+    const newProject: UserProject = {
+      ...project,
+      id: `proj_${Date.now()}`,
+      lastSynced: Date.now(),
+      stars: 1,
+      aiReviewStatus: 'idle',
+    };
+    setUserProjects([newProject, ...userProjects]);
+  };
+
+  const handleDeleteProject = (id: string) => {
+    setUserProjects(userProjects.filter((p) => p.id !== id));
+  };
+
+  const handleChatWithProject = (project: UserProject) => {
+    handleNewSession();
+    handleSendMessage(
+      `Please inspect my connected GitHub repository: "${project.name}" (${project.repoUrl}, branch: ${project.branch}). Description: ${project.description}. Give me a quick architecture summary and recommended next steps.`
+    );
+  };
+
+  const handleTriggerCodeReview = (project: UserProject) => {
+    handleNewSession();
+    handleSendMessage(
+      `Perform a comprehensive AI Code Review for the repository "${project.name}" (${project.repoUrl}). Check for security vulnerabilities, TypeScript strictness, and clean architecture.`
+    );
+  };
+
+  // User Plugin Actions
+  const handleTogglePlugin = (id: string) => {
+    setUserPlugins(
+      userPlugins.map((p) => (p.id === id ? { ...p, isEnabled: !p.isEnabled } : p))
+    );
+  };
+
+  const handleAddCustomPlugin = (plugin: Omit<PluginItem, 'id'>) => {
+    const newPlugin: PluginItem = {
+      ...plugin,
+      id: `plugin_${Date.now()}`,
+    };
+    setUserPlugins([newPlugin, ...userPlugins]);
+  };
+
+  // User Settings Actions
+  const handleUpdateSettings = (newSettings: Partial<UserAccountSettings>) => {
+    setUserSettings((prev) => ({ ...prev, ...newSettings }));
+  };
+
+  // Role Modal Handler
   const handleSaveRole = (role: RolePersona, customPrompt?: string) => {
     setActiveRole(role);
     setCustomInstruction(customPrompt || '');
-
-    // Synchronize suggested model
     const matchedModel = GEMINI_MODELS.find((m) => m.id === role.suggestedModel);
-    if (matchedModel) {
-      setActiveModel(matchedModel);
-    }
+    if (matchedModel) setActiveModel(matchedModel);
   };
 
   const handleSelectRoleFromLab = (role: RolePersona, customPrompt?: string) => {
     setActiveRole(role);
     setCustomInstruction(customPrompt || '');
-
     const matchedModel = GEMINI_MODELS.find((m) => m.id === role.suggestedModel);
-    if (matchedModel) {
-      setActiveModel(matchedModel);
-    }
+    if (matchedModel) setActiveModel(matchedModel);
   };
+
+  const activePluginsCount = userPlugins.filter((p) => p.isEnabled).length;
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-[#131314] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors">
@@ -390,9 +502,11 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         activeModel={activeModel}
+        currentRole={currentRole}
+        onToggleRole={() => handleToggleRole()}
       />
 
-      {/* Main Studio Viewport */}
+      {/* Main Viewport */}
       <div className="flex-1 flex overflow-hidden">
         {/* Gemini-Style Sidebar */}
         <Sidebar
@@ -408,9 +522,14 @@ export default function App() {
           onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
           onSelectTab={setActiveTab}
           activeTab={activeTab}
+          currentRole={currentRole}
+          onToggleRole={() => handleToggleRole()}
+          projectsCount={userProjects.length}
+          activePluginsCount={activePluginsCount}
         />
 
-        {/* Tab View Switcher with Gemini ambient radial glow in background */}
+        {/* --- Tab Views --- */}
+        {/* 1. Chat Tab (Shared between User and Admin, with role-specific depth) */}
         {activeTab === 'chat' && (
           <main className="flex-1 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(219,234,254,0.45),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(30,58,138,0.2),rgba(19,19,20,0))]">
             <ChatThread
@@ -438,6 +557,35 @@ export default function App() {
           </main>
         )}
 
+        {/* 2. User Specific Views */}
+        {activeTab === 'user-projects' && (
+          <UserProjectsView
+            projects={userProjects}
+            onAddProject={handleAddProject}
+            onDeleteProject={handleDeleteProject}
+            onChatWithProject={handleChatWithProject}
+            onTriggerCodeReview={handleTriggerCodeReview}
+          />
+        )}
+
+        {activeTab === 'user-plugins' && (
+          <UserPluginsView
+            plugins={userPlugins}
+            onTogglePlugin={handleTogglePlugin}
+            onAddCustomPlugin={handleAddCustomPlugin}
+          />
+        )}
+
+        {activeTab === 'user-settings' && (
+          <UserSettingsView
+            settings={userSettings}
+            onUpdateSettings={handleUpdateSettings}
+            onSwitchRole={(newRole) => handleToggleRole(newRole)}
+            currentRole={currentRole}
+          />
+        )}
+
+        {/* 3. Admin Specific Views */}
         {activeTab === 'roles' && (
           <RoleLab
             onSelectRoleForChat={handleSelectRoleFromLab}
