@@ -195,3 +195,130 @@ mark.search-highlight {
   color: #fef08a;
 }
 
+/* ========================================================
+   CYBER-GROUND HUD CORE STYLES (Cyberpunk / Futuristic AI OS)
+   ======================================================== */
+
+/* Perspective Cyber Grid */
+.cyber-ground-grid {
+  background-image: 
+    linear-gradient(to right, rgba(6, 182, 212, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(ellipse 85% 65% at 50% 35%, black 40%, transparent 95%);
+}
+
+.dark .cyber-ground-grid {
+  background-image: 
+    linear-gradient(to right, rgba(0, 240, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Cyber Aurora Plasma Glow Blobs */
+@keyframes cyber-float-cyan {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.28;
+  }
+  50% {
+    transform: translate(40px, -25px) scale(1.12);
+    opacity: 0.42;
+  }
+}
+
+@keyframes cyber-float-violet {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate(-35px, 30px) scale(1.18);
+    opacity: 0.38;
+  }
+}
+
+.cyber-aurora-cyan {
+  animation: cyber-float-cyan 14s ease-in-out infinite;
+}
+
+.cyber-aurora-violet {
+  animation: cyber-float-violet 18s ease-in-out infinite;
+}
+
+/* Frosted Cyber Glassmorphism */
+.cyber-hud-glass {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(6, 182, 212, 0.18);
+}
+
+.dark .cyber-hud-glass {
+  background-color: rgba(11, 15, 25, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 240, 255, 0.16);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.45);
+}
+
+/* Mouse-Tracking Interactive Spotlight Card */
+.cyber-glow-card {
+  position: relative;
+  overflow: hidden;
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  --glow-opacity: 0;
+}
+
+.cyber-glow-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    650px circle at var(--mouse-x) var(--mouse-y),
+    rgba(0, 240, 255, 0.1),
+    transparent 45%
+  );
+  opacity: var(--glow-opacity);
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+/* HUD Scanline Beam (Active in Admin Command Center) */
+.cyber-scanline {
+  position: relative;
+}
+
+.cyber-scanline::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  z-index: 20;
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+  opacity: 0.28;
+}
+
+/* Terminal Cursor Blink */
+@keyframes cyber-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cyber-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background-color: #00f0ff;
+  margin-left: 2px;
+  animation: cyber-cursor-blink 1s infinite;
+  vertical-align: middle;
+}
+

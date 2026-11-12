@@ -37,6 +37,7 @@ import { useChatStore } from './stores/useChatStore';
 import { useAdminStore } from './stores/useAdminStore';
 import { useCustomerStore } from './stores/useCustomerStore';
 import { useTabRouter } from './hooks/useTabRouter';
+import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { UserProject, ChatAttachment } from './types';
 
 const THEME_KEY = 'supremeai_studio_theme';
@@ -172,6 +173,9 @@ export default function App() {
     fetchMcpServices();
   }, [fetchMcpServices]);
 
+  // Live Server-Sent Events (SSE) telemetry pipeline for Admin Studio
+  useMcpTelemetry(currentRole === 'admin');
+
   // Active session lookup
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
@@ -229,27 +233,40 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="flex flex-col h-screen bg-white dark:bg-[#131314] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors">
+      <div
+        className={`flex flex-col h-screen bg-[#f8fafc] dark:bg-[#080b11] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors relative ${
+          currentRole === 'admin' ? 'cyber-scanline' : ''
+        }`}
+      >
+        {/* Cyber-Ground Perspective Digital Neon Grid */}
+        <div className="absolute inset-0 cyber-ground-grid pointer-events-none z-0" />
+
+        {/* Ambient Neon Plasma Aurora Glow Blobs */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-cyan-500/15 dark:bg-cyan-500/10 blur-3xl pointer-events-none z-0 cyber-aurora-cyan" />
+        <div className="absolute -bottom-32 -right-32 w-[32rem] h-[32rem] rounded-full bg-purple-500/15 dark:bg-violet-600/10 blur-3xl pointer-events-none z-0 cyber-aurora-violet" />
+
         {/* Top Bar Navigation */}
-        <Navbar
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          onNewSession={createNewSession}
-          darkMode={darkMode}
-          onToggleDarkMode={toggleDarkMode}
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          activeModel={activeModel}
-          currentRole={currentRole}
-          onToggleRole={() => handleToggleRole()}
-          mcpAlertCount={mcpAlertCount}
-          authUser={authUser}
-          onSignOut={logout}
-          trustedUntil={trustedBrowserUntil}
-        />
+        <div className="relative z-10">
+          <Navbar
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            onNewSession={createNewSession}
+            darkMode={darkMode}
+            onToggleDarkMode={toggleDarkMode}
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            activeModel={activeModel}
+            currentRole={currentRole}
+            onToggleRole={() => handleToggleRole()}
+            mcpAlertCount={mcpAlertCount}
+            authUser={authUser}
+            onSignOut={logout}
+            trustedUntil={trustedBrowserUntil}
+          />
+        </div>
 
         {/* Main Viewport Container */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative z-10">
           {/* Studio Sidebar */}
           <Sidebar
             sessions={sessions}

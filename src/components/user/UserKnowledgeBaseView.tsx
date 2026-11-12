@@ -14,9 +14,9 @@ import {
   Database,
   ToggleLeft,
   ToggleRight,
-  HelpCircle,
 } from 'lucide-react';
 import { KnowledgeDoc } from '../../types';
+import { FileProcessingPreviewModal } from './knowledge/FileProcessingPreviewModal';
 
 interface UserKnowledgeBaseViewProps {
   documents: KnowledgeDoc[];
@@ -331,87 +331,12 @@ export const UserKnowledgeBaseView: React.FC<UserKnowledgeBaseViewProps> = ({
         )}
       </div>
 
-      {/* --- UPLOAD DOC MODAL --- */}
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileUp className="w-4 h-4 text-blue-600" />
-                Upload Grounding Document
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsUploadModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateDocument} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Document Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. SupremeAI Architecture Reference.md"
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Document Format
-                </label>
-                <select
-                  value={newType}
-                  onChange={(e) => setNewType(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                >
-                  <option value="markdown">Markdown (.md)</option>
-                  <option value="code">TypeScript / Codebase (.ts / .py)</option>
-                  <option value="pdf">PDF Document (.pdf)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Document Content / Raw Text
-                </label>
-                <textarea
-                  required
-                  rows={6}
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="Paste Markdown, API specs, or codebase documentation to be parsed and chunked..."
-                  className="w-full p-3 text-xs font-mono rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsUploadModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
-                >
-                  Parse & Vectorize
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* --- LIVE PROCESSING & PREVIEW MODAL --- */}
+      <FileProcessingPreviewModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onAddDocument={onAddDocument}
+      />
 
       {/* --- PREVIEW MODAL --- */}
       {previewDoc && (
