@@ -1,6 +1,6 @@
-import React from 'react';
-import { Sun, Moon, PanelLeft, ExternalLink, ShieldCheck, User } from 'lucide-react';
-import { ModelDetail, UserRole } from '../types';
+import React, { useState } from 'react';
+import { Sun, Moon, PanelLeft, ExternalLink, ShieldCheck, User, LogOut, ChevronDown, Laptop, Sparkles } from 'lucide-react';
+import { ModelDetail, UserRole, AuthUser } from '../types';
 
 interface NavbarProps {
   activeTab: string;
@@ -14,6 +14,9 @@ interface NavbarProps {
   currentRole: UserRole;
   onToggleRole: () => void;
   mcpAlertCount?: number;
+  authUser?: AuthUser | null;
+  onSignOut?: () => void;
+  trustedUntil?: number | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,7 +31,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentRole,
   onToggleRole,
   mcpAlertCount = 0,
+  authUser,
+  onSignOut,
+  trustedUntil,
 }) => {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   return (
     <header className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
       {/* Zone 1: Sidebar Toggle + Brand Wordmark with Gemini Star */}
@@ -226,30 +233,32 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
       </nav>
 
-      {/* Zone 3: Role Switcher + Model + Theme */}
+      {/* Zone 3: Role Switcher + Model + Theme + Profile / Sign Out */}
       <div className="flex items-center gap-2.5 shrink-0">
-        {/* Role Switcher Pill */}
-        <button
-          type="button"
-          onClick={onToggleRole}
-          className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer ${
-            currentRole === 'admin'
-              ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
-              : 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100'
-          }`}
-        >
-          {currentRole === 'admin' ? (
-            <>
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin Studio</span>
-            </>
-          ) : (
-            <>
-              <User className="w-3.5 h-3.5" />
-              <span>User Mode</span>
-            </>
-          )}
-        </button>
+        {/* Role Switcher Pill: ONLY shown if Admin User ID is matched or already in admin mode */}
+        {(currentRole === 'admin' || authUser?.isAdminEligible) && (
+          <button
+            type="button"
+            onClick={onToggleRole}
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer ${
+              currentRole === 'admin'
+                ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
+                : 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100'
+            }`}
+          >
+            {currentRole === 'admin' ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin Studio</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-cyan-500" />
+                <span>Switch to Admin</span>
+              </>
+            )}
+          </button>
+        )}
 
         {/* Model Indicator */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
@@ -266,6 +275,105 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
+
+        {/* User Account & Sign Out Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(!isProfileOpen)}
+            className="flex items-center gap-1.5 p-1 pl-1.5 pr-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700 transition-colors cursor-pointer"
+          >
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center text-[11px] font-bold">
+              {authUser?.avatar || authUser?.name?.charAt(0) || 'U'}
+            </div>
+            <span className="hidden md:inline-block text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-[100px]">
+              {authUser?.name?.split(' ')[0] || 'User'}
+            </span>
+            <ChevronDown className="w-3 h-3 text-slate-400" />
+          </button>
+
+          {isProfileOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setIsProfileOpen(false)}
+              />
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-[#111622] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-40 p-3 space-y-2.5 animate-in fade-in text-xs">
+                {/* User info */}
+                <div className="pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+                  <div className="font-semibold text-slate-900 dark:text-white truncate">
+                    {authUser?.name || 'SupremeAI User'}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono truncate">
+                    {authUser?.email || 'user@supremeai.bd'}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                      {authUser?.plan || 'Pro'} Plan
+                    </span>
+                    {authUser?.isAdminEligible && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                        Admin Eligible
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 7-day browser status */}
+                {trustedUntil && trustedUntil > Date.now() && (
+                  <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-400 flex items-center gap-2">
+                    <Laptop className="w-3.5 h-3.5 shrink-0" />
+                    <span>7-Day Trusted Device Verified</span>
+                  </div>
+                )}
+
+                {/* Navigation items */}
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectTab('user-settings');
+                      setIsProfileOpen(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    Account & Security Settings
+                  </button>
+                  {authUser?.isAdminEligible && currentRole === 'user' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleRole();
+                        setIsProfileOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Switch to Admin Studio</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Sign Out Action */}
+                {onSignOut && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        onSignOut();
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

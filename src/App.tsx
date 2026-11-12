@@ -25,7 +25,9 @@ import { AdminSystemAuditView } from './components/admin/AdminSystemAuditView';
 import { AdminFeatureFlagsView } from './components/admin/AdminFeatureFlagsView';
 import { AdminProviderKeysView } from './components/admin/AdminProviderKeysView';
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
+import { AdminTwoFactorModal } from './components/admin/AdminTwoFactorModal';
 import { PromptLibraryModal } from './components/user/PromptLibraryModal';
+import { AuthPage } from './components/auth/AuthPage';
 import { UsageView } from './components/UsageView';
 
 import {
@@ -35,6 +37,7 @@ import {
   RolePersona,
   ModelDetail,
   UserRole,
+  AuthUser,
   UserProject,
   PluginItem,
   UserAccountSettings,
@@ -96,13 +99,45 @@ const GATEWAY_KEY = 'supremeai_studio_gateway_routes';
 const SECURITY_KEY = 'supremeai_studio_security_events';
 const BLOCKED_IPS_KEY = 'supremeai_studio_blocked_ips';
 const AUDIT_KEY = 'supremeai_studio_audit_records';
+const AUTH_USER_KEY = 'supremeai_auth_user';
+const TRUSTED_BROWSER_KEY = 'supremeai_trusted_browser_until';
 
 export default function App() {
-  // Dual Role State: 'user' (normal user) vs 'admin' (developer studio)
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('supremeai_admin_authed') === 'true';
+  // Current Authenticated User (Sign In / Sign Out state)
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_USER_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    // Seed default admin user for instant initial access
+    return {
+      id: 'usr_admin_01',
+      name: 'Ziaul Haq (Admin)',
+      email: 'njelmedia@gmail.com',
+      avatar: 'Z',
+      role: 'admin',
+      isAdminEligible: true,
+      adminUserId: 'admin_root_001',
+      plan: 'Enterprise',
+      createdAt: '2026-01-15',
+    };
   });
+
+  // 7-Day Trusted Browser Token State
+  const [trustedBrowserUntil, setTrustedBrowserUntil] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem(TRUSTED_BROWSER_KEY);
+      if (saved) {
+        const val = Number(saved);
+        if (val > Date.now()) return val;
+      }
+    } catch {}
+    return null;
+  });
+
+  // Dual Role State: 'user' (normal user) vs 'admin' (developer studio)
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
 
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
@@ -110,24 +145,69 @@ export default function App() {
     return saved === 'admin' ? 'admin' : 'user';
   });
 
+  // Role Switcher with Admin User ID matching and 2FA / 7-Day Browser Trust verification
   const handleToggleRole = (forcedRole?: UserRole) => {
     const nextRole = forcedRole || (currentRole === 'admin' ? 'user' : 'admin');
-    if (nextRole === 'admin' && !isAdminAuthenticated) {
-      setIsAdminAuthModalOpen(true);
-      return;
+
+    if (nextRole === 'admin') {
+      // Security Check 1: User account must match verified Admin Identity
+      if (!authUser?.isAdminEligible) {
+        alert('Access Restricted: Only verified Admin accounts matching adminUserId (admin_root_001) are permitted to switch to Admin Studio.');
+        return;
+      }
+
+      // Security Check 2: Check 7-Day Trusted Browser Token
+      const isBrowserTrusted = trustedBrowserUntil !== null && trustedBrowserUntil > Date.now();
+      if (!isBrowserTrusted) {
+        // Needs 2-Step Authentication (TOTP token or Fingerprint Biometric)
+        setIsTwoFactorModalOpen(true);
+        return;
+      }
     }
+
     setCurrentRole(nextRole);
     localStorage.setItem(ROLE_KEY, nextRole);
     setActiveTab('chat');
   };
 
+  const handleTwoFactorSuccess = (newTrustedUntil: number | null) => {
+    if (newTrustedUntil) {
+      setTrustedBrowserUntil(newTrustedUntil);
+      localStorage.setItem(TRUSTED_BROWSER_KEY, String(newTrustedUntil));
+    }
+    setIsTwoFactorModalOpen(false);
+    setCurrentRole('admin');
+    localStorage.setItem(ROLE_KEY, 'admin');
+    setActiveTab('chat');
+  };
+
   const handleAdminAuthSuccess = () => {
-    setIsAdminAuthenticated(true);
-    sessionStorage.setItem('supremeai_admin_authed', 'true');
     setIsAdminAuthModalOpen(false);
     setCurrentRole('admin');
     localStorage.setItem(ROLE_KEY, 'admin');
     setActiveTab('chat');
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem(AUTH_USER_KEY);
+    setAuthUser(null);
+    setCurrentRole('user');
+    localStorage.setItem(ROLE_KEY, 'user');
+    sessionStorage.removeItem('supremeai_admin_authed');
+  };
+
+  const handleLoginSuccess = (user: AuthUser, _token: string) => {
+    setAuthUser(user);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    const roleToSet = user.isAdminEligible && user.role === 'admin' ? 'admin' : 'user';
+    setCurrentRole(roleToSet);
+    localStorage.setItem(ROLE_KEY, roleToSet);
+    setActiveTab('chat');
+  };
+
+  const handleRevokeTrustedBrowser = () => {
+    localStorage.removeItem(TRUSTED_BROWSER_KEY);
+    setTrustedBrowserUntil(null);
   };
 
   const handleImpersonateCustomer = (customer: CustomerRecord) => {
@@ -1141,6 +1221,11 @@ export default function App() {
 
   const activePluginsCount = userPlugins.filter((p) => p.isEnabled).length;
 
+  // If user is logged out, render the Login / Sign Up Page
+  if (!authUser) {
+    return <AuthPage onLoginSuccess={handleLoginSuccess} darkMode={darkMode} />;
+  }
+
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-[#131314] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors">
       {/* Top Bar Navigation Contract: 3 zones */}
@@ -1156,6 +1241,9 @@ export default function App() {
         currentRole={currentRole}
         onToggleRole={() => handleToggleRole()}
         mcpAlertCount={mcpAlertCount}
+        authUser={authUser}
+        onSignOut={handleSignOut}
+        trustedUntil={trustedBrowserUntil}
       />
 
       {/* Main Viewport */}
@@ -1180,6 +1268,8 @@ export default function App() {
           activePluginsCount={activePluginsCount}
           customersCount={customers.length}
           mcpAlertCount={mcpAlertCount}
+          authUser={authUser}
+          onSignOut={handleSignOut}
         />
 
         {/* --- Tab Views --- */}
@@ -1279,6 +1369,10 @@ export default function App() {
             onUpdateSettings={handleUpdateSettings}
             onSwitchRole={(newRole) => handleToggleRole(newRole)}
             currentRole={currentRole}
+            isAdminEligible={authUser?.isAdminEligible}
+            trustedUntil={trustedBrowserUntil}
+            onRevokeTrustedBrowser={handleRevokeTrustedBrowser}
+            onSignOut={handleSignOut}
           />
         )}
 
@@ -1397,6 +1491,14 @@ export default function App() {
         isOpen={isAdminAuthModalOpen}
         onClose={() => setIsAdminAuthModalOpen(false)}
         onSuccess={handleAdminAuthSuccess}
+      />
+
+      {/* Admin 2-Step Authentication Modal (TOTP & Biometric with 7-Day Trusted Browser) */}
+      <AdminTwoFactorModal
+        isOpen={isTwoFactorModalOpen}
+        onClose={() => setIsTwoFactorModalOpen(false)}
+        onSuccess={handleTwoFactorSuccess}
+        userEmail={authUser?.email || 'admin@supremeai.bd'}
       />
 
       {/* Prompt Recipes & Library Modal */}

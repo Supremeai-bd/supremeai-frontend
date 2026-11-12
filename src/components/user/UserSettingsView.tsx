@@ -12,6 +12,10 @@ import {
   Gauge,
   Sparkles,
   ArrowRight,
+  Laptop,
+  LogOut,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react';
 import { UserAccountSettings, UserRole } from '../../types';
 import { GEMINI_MODELS } from '../../data/models';
@@ -21,6 +25,10 @@ interface UserSettingsViewProps {
   onUpdateSettings: (newSettings: Partial<UserAccountSettings>) => void;
   onSwitchRole: (newRole: UserRole) => void;
   currentRole: UserRole;
+  isAdminEligible?: boolean;
+  trustedUntil?: number | null;
+  onRevokeTrustedBrowser?: () => void;
+  onSignOut?: () => void;
 }
 
 export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
@@ -28,6 +36,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   onUpdateSettings,
   onSwitchRole,
   currentRole,
+  isAdminEligible = false,
+  trustedUntil = null,
+  onRevokeTrustedBrowser,
+  onSignOut,
 }) => {
   const [name, setName] = useState(settings.name);
   const [email, setEmail] = useState(settings.email);
@@ -68,35 +80,40 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
         </p>
       </div>
 
-      {/* Role Workspace Switcher Card */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-slate-900 dark:to-slate-900/90 border border-blue-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-              Active Workspace
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
-              {currentRole === 'admin' ? 'Admin / Developer Studio' : 'Normal User Mode'}
-            </span>
+      {/* Role Workspace Switcher Card - Only visible when Admin User ID is matched */}
+      {(isAdminEligible || currentRole === 'admin') && (
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-slate-900 dark:to-slate-900/90 border border-blue-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                Active Workspace
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
+                {currentRole === 'admin' ? 'Admin / Developer Studio' : 'Normal User Mode'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                Admin Eligible
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {currentRole === 'admin'
+                ? 'You are in the Admin Studio with full access to Model Matrix, Swarm, and Ecosystem Repos.'
+                : 'You are in Normal User mode with streamlined chat, personal GitHub projects, and plugins.'}
+            </p>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            {currentRole === 'admin'
-              ? 'You are in the Admin Studio with full access to Model Matrix, System Prompt Lab, and Ecosystem Repos.'
-              : 'You are in Normal User mode with streamlined chat, personal GitHub projects, and plugins.'}
-          </p>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => onSwitchRole(currentRole === 'admin' ? 'user' : 'admin')}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs whitespace-nowrap shrink-0"
-        >
-          <span>
-            {currentRole === 'admin' ? 'Switch to User View' : 'Switch to Admin Studio'}
-          </span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => onSwitchRole(currentRole === 'admin' ? 'user' : 'admin')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+          >
+            <span>
+              {currentRole === 'admin' ? 'Switch to User View' : 'Switch to Admin Studio'}
+            </span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* User Profile Card */}
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
@@ -275,6 +292,90 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </button>
         </div>
       </form>
+
+      {/* Security & 2-Step Authentication & Trusted Browser Card */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-cyan-500" />
+          <span>Security, 2-Step Verification & Trusted Devices</span>
+        </h2>
+
+        <div className="space-y-3 divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+          <div className="flex items-center justify-between pt-1">
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                Two-Factor Authentication (TOTP / Biometric)
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                Enforces secondary 6-digit TOTP token or hardware fingerprint touch when activating Admin Studio.
+              </span>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+              ACTIVE (ENFORCED)
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <Laptop className="w-4 h-4 text-cyan-500" />
+                <span>7-Day Trusted Browser Policy</span>
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                {trustedUntil && trustedUntil > Date.now() ? (
+                  <>
+                    This browser is currently trusted until{' '}
+                    <strong className="text-cyan-500 dark:text-cyan-400 font-mono">
+                      {new Date(trustedUntil).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </strong>{' '}
+                    ({Math.max(1, Math.ceil((trustedUntil - Date.now()) / (24 * 60 * 60 * 1000)))} days remaining).
+                  </>
+                ) : (
+                  'No active 7-day browser trust token on this device. 2FA will be prompted on next Admin switch.'
+                )}
+              </span>
+            </div>
+
+            {trustedUntil && trustedUntil > Date.now() && onRevokeTrustedBrowser && (
+              <button
+                type="button"
+                onClick={onRevokeTrustedBrowser}
+                className="px-3 py-1.5 rounded-lg border border-rose-300 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                Revoke Trusted Browser
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Account Session Sign Out Card */}
+      <div className="p-5 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+        <div>
+          <h3 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+            <ShieldAlert className="w-4 h-4 text-rose-500" />
+            <span>Active Session Management</span>
+          </h3>
+          <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
+            Signing out will clear your session token and lock the workspace. You will need to log back in.
+          </p>
+        </div>
+
+        {onSignOut && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out of SupremeAI</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };

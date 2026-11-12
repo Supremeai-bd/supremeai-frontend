@@ -1,0 +1,338 @@
+import React, { useState } from 'react';
+import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, CheckCircle2, AlertCircle, KeyRound, Laptop } from 'lucide-react';
+import { AuthUser } from '../../types';
+
+interface AuthPageProps {
+  onLoginSuccess: (user: AuthUser, token: string) => void;
+  darkMode?: boolean;
+}
+
+export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = true }) => {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('njelmedia@gmail.com');
+  const [password, setPassword] = useState('admin123');
+  const [name, setName] = useState('');
+  const [plan, setPlan] = useState<'Free' | 'Pro' | 'Enterprise'>('Pro');
+  const [rememberMe, setRememberMe] = useState(true);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
+    const payload = mode === 'login' ? { email, password } : { name, email, password, plan };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Authentication failed. Please check your credentials.');
+      }
+
+      onLoginSuccess(data.user, data.token);
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Demo account quick picker
+  const pickDemoAccount = (demoEmail: string, demoPass: string, demoName: string) => {
+    setMode('login');
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setName(demoName);
+    setErrorMessage(null);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-slate-50 dark:bg-[#0a0d14] text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[360px] bg-gradient-to-tr from-cyan-500/10 via-blue-500/10 to-purple-500/10 blur-[100px] pointer-events-none rounded-full" />
+
+      <div className="w-full max-w-md relative z-10 space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 text-xs font-semibold mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <span>SupremeAI Studio Next-Gen Architecture</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center justify-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7">
+              <path
+                d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"
+                fill="url(#gemini-logo-gradient)"
+              />
+              <defs>
+                <linearGradient id="gemini-logo-gradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#3B82F6" />
+                  <stop offset="0.5" stopColor="#8B5CF6" />
+                  <stop offset="1" stopColor="#EC4899" />
+                </linearGradient>
+              </defs>
+            </svg>
+            SupremeAI Workspace
+          </h1>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            {mode === 'login'
+              ? 'Sign in to access your projects, agent swarm, and multi-turn Gemini reasoning models.'
+              : 'Create your developer account to begin crafting AI workflows and microservice telemetry.'}
+          </p>
+        </div>
+
+        {/* Main Card */}
+        <div className="rounded-3xl bg-white dark:bg-[#111622] border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5">
+          {/* Segmented Mode Selector: Sign In / Create Account */}
+          <div className="flex p-1 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('login');
+                setErrorMessage(null);
+              }}
+              className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                mode === 'login'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signup');
+                setErrorMessage(null);
+              }}
+              className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                mode === 'signup'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+
+          {errorMessage && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-xs animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Sarah Chen"
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
+                  />
+                  <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Work Email Address
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
+                />
+                <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Password
+                </label>
+                {mode === 'login' && (
+                  <span className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer">
+                    Forgot password?
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
+                />
+                <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              </div>
+            </div>
+
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Initial Plan Tier
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Free', 'Pro', 'Enterprise'] as const).map((tier) => (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => setPlan(tier)}
+                      className={`p-2 rounded-xl text-center border text-xs font-medium transition-all cursor-pointer ${
+                        plan === tier
+                          ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-500 dark:text-cyan-400'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {tier}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-300 dark:border-slate-700 text-cyan-600 focus:ring-0"
+                />
+                <span>Remember me on this device</span>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <span>{mode === 'login' ? 'Sign In to Studio' : 'Create Free Workspace'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Quick Demo Logins Section */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+              <span>Quick Test Accounts</span>
+              <span className="text-cyan-500 lowercase font-mono">1-click demo</span>
+            </div>
+
+            <div className="space-y-1.5">
+              {/* Admin Demo */}
+              <button
+                type="button"
+                onClick={() => pickDemoAccount('njelmedia@gmail.com', 'admin123', 'Ziaul Haq (Admin)')}
+                className="w-full flex items-center justify-between p-2 rounded-xl bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/20 text-left transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-500 flex items-center justify-center font-bold text-[10px]">
+                    👑
+                  </div>
+                  <div className="truncate">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-cyan-400">
+                      Super Admin (njelmedia@gmail.com)
+                    </div>
+                    <div className="text-[10px] text-slate-400">Matched Admin ID: admin_root_001 • Has Admin Switch</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-mono">
+                  Select
+                </span>
+              </button>
+
+              {/* Standard Pro User Demo */}
+              <button
+                type="button"
+                onClick={() => pickDemoAccount('sarah.chen@fintech.io', 'password123', 'Sarah Chen')}
+                className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-left transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-[10px]">
+                    💻
+                  </div>
+                  <div className="truncate">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-400">
+                      Developer (sarah.chen@fintech.io)
+                    </div>
+                    <div className="text-[10px] text-slate-400">Standard User • Admin Switch Hidden</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-400 font-mono">
+                  Select
+                </span>
+              </button>
+
+              {/* Free Viewer Demo */}
+              <button
+                type="button"
+                onClick={() => pickDemoAccount('alex.j@partner.io', 'password123', 'Alex Johnson')}
+                className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-left transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-500 flex items-center justify-center font-bold text-[10px]">
+                    👥
+                  </div>
+                  <div className="truncate">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-purple-400">
+                      Viewer (alex.j@partner.io)
+                    </div>
+                    <div className="text-[10px] text-slate-400">Free Tier User • Admin Switch Hidden</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-400 font-mono">
+                  Select
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Security badge footer */}
+        <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
+          <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          <span>SupremeAI Zero-Trust Vault • TOTP & WebAuthn Biometric 2FA Enabled</span>
+        </div>
+      </div>
+    </div>
+  );
+};

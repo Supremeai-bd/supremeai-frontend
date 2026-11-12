@@ -1,5 +1,25 @@
 export type UserRole = 'admin' | 'user';
 
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  isAdminEligible: boolean;
+  adminUserId?: string;
+  role: UserRole;
+  plan: 'Free' | 'Pro' | 'Enterprise';
+  createdAt: string;
+}
+
+export interface TrustedBrowserInfo {
+  isTrusted: boolean;
+  trustedUntil: number | null;
+  daysRemaining: number;
+  authorizedAt: number | null;
+  userAgent?: string;
+}
+
 export interface ChatAttachment {
   name: string;
   mimeType: string;

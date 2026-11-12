@@ -22,8 +22,9 @@ import {
   Bot,
   Database,
   FileCheck2,
+  LogOut,
 } from 'lucide-react';
-import { ChatSession, RolePersona, UserRole } from '../types';
+import { ChatSession, RolePersona, UserRole, AuthUser } from '../types';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -44,6 +45,8 @@ interface SidebarProps {
   activePluginsCount?: number;
   customersCount?: number;
   mcpAlertCount?: number;
+  authUser?: AuthUser | null;
+  onSignOut?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -65,6 +68,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activePluginsCount = 4,
   customersCount = 12,
   mcpAlertCount = 0,
+  authUser,
+  onSignOut,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -579,7 +584,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* User Profile Footer with Quick Role Switcher */}
+      {/* User Profile Footer with Quick Role Switcher (Admin-Only) and Sign Out */}
       <div className="p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40">
         <div className="flex items-center justify-between">
           <div
@@ -587,27 +592,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
           >
             <div className="w-7 h-7 rounded-full bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 flex items-center justify-center text-xs font-semibold shrink-0">
-              Z
+              {authUser?.avatar || authUser?.name?.charAt(0) || 'U'}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                ziaul haq
+              <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+                {authUser?.name || 'User'}
               </div>
-              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
-                {currentRole === 'admin' ? 'Admin' : 'Pro'}
+              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium">
+                {currentRole === 'admin' ? 'Admin' : (authUser?.plan || 'Pro')}
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleRole}
-            title={currentRole === 'admin' ? 'Switch to User View' : 'Switch to Admin Studio'}
-            aria-label="Switch workspace role"
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-[10px]"
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Role switch button: ONLY shown if user is admin-eligible or already in admin mode */}
+            {(currentRole === 'admin' || authUser?.isAdminEligible) && (
+              <button
+                type="button"
+                onClick={onToggleRole}
+                title={currentRole === 'admin' ? 'Switch to User View' : 'Switch to Admin Studio'}
+                aria-label="Switch workspace role"
+                className="p-1.5 text-slate-400 hover:text-cyan-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-[10px]"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {onSignOut && (
+              <button
+                type="button"
+                onClick={onSignOut}
+                title="Sign Out"
+                aria-label="Sign out of account"
+                className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </aside>
