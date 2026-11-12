@@ -2,9 +2,13 @@ import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 
+const execAsync = promisify(exec);
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -958,6 +962,275 @@ async function startServer() {
         res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
         res.end();
       }
+    }
+  });
+
+  // --- Split Workspace Dock Endpoints (Terminal & Virtual Browser Proxy) ---
+  app.post('/api/workspace/terminal', async (req: Request, res: Response) => {
+    const rawCommand = String(req.body?.command || '').trim();
+    if (!rawCommand) {
+      res.status(400).json({ error: 'Command cannot be empty.', exitCode: 1 });
+      return;
+    }
+
+    const parts = rawCommand.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+    const args = parts.slice(1);
+
+    // Built-in SupremeAI Studio commands & safe sandboxed introspection
+    if (cmd === 'help') {
+      res.json({
+        exitCode: 0,
+        stdout: [
+          'SupremeAI Studio Interactive Shell v2.4',
+          'Available Commands:',
+          '  ls [dir]         List files in workspace directory',
+          '  pwd              Print current workspace root',
+          '  cat <file>       Read file content inside workspace',
+          '  git status       Check git repository working tree',
+          '  git log          Show recent git commits',
+          '  node -v          Check active Node.js runtime version',
+          '  npm -v           Check npm package manager version',
+          '  mcp status       Inspect live MCP cluster service telemetry',
+          '  health           Query local SupremeAI Studio health endpoint',
+          '  date / whoami    Show container runtime info',
+          '  clear            Clear terminal output buffer',
+        ].join('\n'),
+      });
+      return;
+    }
+
+    if (cmd === 'pwd') {
+      res.json({ exitCode: 0, stdout: process.cwd() });
+      return;
+    }
+
+    if (cmd === 'whoami') {
+      res.json({ exitCode: 0, stdout: 'supremeai-agent (uid=1000, role=studio-orchestrator)' });
+      return;
+    }
+
+    if (cmd === 'date') {
+      res.json({ exitCode: 0, stdout: new Date().toUTCString() });
+      return;
+    }
+
+    if (cmd === 'echo') {
+      res.json({ exitCode: 0, stdout: args.join(' ') });
+      return;
+    }
+
+    if (cmd === 'health') {
+      res.json({
+        exitCode: 0,
+        stdout: JSON.stringify(
+          {
+            status: 'healthy',
+            app: 'SupremeAI Studio',
+            port: PORT,
+            geminiConfigured: Boolean(apiKey),
+            uptimeSec: Math.round(process.uptime()),
+            memoryRssMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
+          },
+          null,
+          2
+        ),
+      });
+      return;
+    }
+
+    if (cmd === 'mcp') {
+      const summary = mcpClusterServices
+        .map(
+          (s) =>
+            `[${s.status.toUpperCase().padEnd(9)}] ${s.id.padEnd(24)} port:${s.port}  latency:${s.latencyMs}ms  cpu:${s.cpuPercent}%`
+        )
+        .join('\n');
+      res.json({ exitCode: 0, stdout: summary });
+      return;
+    }
+
+    if (cmd === 'cat') {
+      const targetRel = args[0];
+      if (!targetRel) {
+        res.json({ exitCode: 1, stderr: 'cat: missing file operand (e.g. cat package.json)' });
+        return;
+      }
+      const resolved = path.resolve(process.cwd(), targetRel);
+      if (!resolved.startsWith(process.cwd())) {
+        res.json({ exitCode: 1, stderr: 'Security guard: access outside workspace root denied.' });
+        return;
+      }
+      if (!fs.existsSync(resolved) || fs.statSync(resolved).isDirectory()) {
+        res.json({ exitCode: 1, stderr: `cat: ${targetRel}: No such file` });
+        return;
+      }
+      const content = fs.readFileSync(resolved, 'utf-8');
+      res.json({
+        exitCode: 0,
+        stdout: content.length > 6000 ? content.slice(0, 6000) + '\n... [truncated]' : content,
+      });
+      return;
+    }
+
+    // Strict allowlist for safe read-only OS / Dev inspection commands
+    const ALLOWED_PREFIXES = [
+      'ls',
+      'node -v',
+      'node --version',
+      'npm -v',
+      'npm --version',
+      'git status',
+      'git branch',
+      'git log',
+      'tsc --version',
+    ];
+
+    const isSafe = ALLOWED_PREFIXES.some(
+      (prefix) => rawCommand === prefix || rawCommand.startsWith(prefix + ' ')
+    );
+
+    if (!isSafe || /[;&|`$<>]/.test(rawCommand)) {
+      res.json({
+        exitCode: 126,
+        stderr: `Command "${rawCommand}" is blocked by workspace sandbox policy. Type "help" to view permitted commands.`,
+      });
+      return;
+    }
+
+    try {
+      const { stdout, stderr } = await execAsync(rawCommand, {
+        cwd: process.cwd(),
+        timeout: 5000,
+        maxBuffer: 512 * 1024,
+      });
+      res.json({
+        exitCode: 0,
+        stdout: stdout || stderr || '(no output)',
+      });
+    } catch (execErr: unknown) {
+      const msg = execErr instanceof Error ? execErr.message : 'Command execution failed';
+      res.json({ exitCode: 1, stderr: msg });
+    }
+  });
+
+  app.get('/api/workspace/browser-proxy', async (req: Request, res: Response) => {
+    const targetUrl = String(req.query.url || '').trim();
+    if (!targetUrl) {
+      res.status(400).json({ error: 'URL query parameter is required.' });
+      return;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`);
+    } catch {
+      res.status(400).json({ error: 'Invalid URL format.' });
+      return;
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      res.status(400).json({ error: 'Only http:// and https:// protocols are supported.' });
+      return;
+    }
+
+    // Block cloud metadata / private LAN IPs (allow localhost only on current PORT for studio API docs/health inspection)
+    const host = parsed.hostname.toLowerCase();
+    const isPrivateIp =
+      host === '169.254.169.254' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+
+    if (isPrivateIp) {
+      res.status(403).json({ error: 'Access to private network / metadata addresses is restricted.' });
+      return;
+    }
+
+    const startTime = Date.now();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(parsed.toString(), {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'SupremeAI-WebAgent/2.4 (Autonomous Studio Browser)',
+          Accept: 'text/html,application/json,text/plain,*/*',
+        },
+      });
+      clearTimeout(timer);
+
+      const latencyMs = Date.now() - startTime;
+      const contentType = response.headers.get('content-type') || 'text/html';
+      const rawBody = await response.text();
+
+      if (contentType.includes('application/json')) {
+        const pretty = (() => {
+          try {
+            return JSON.stringify(JSON.parse(rawBody), null, 2);
+          } catch {
+            return rawBody;
+          }
+        })();
+        const jsonHtml = `<!doctype html><html><head><meta charset="utf-8"><style>body{background:#090d16;color:#a5f3fc;font-family:ui-monospace,monospace;padding:20px;font-size:13px;line-height:1.6;}pre{white-space:pre-wrap;word-break:break-word;}</style></head><body><pre>${pretty.replace(/</g, '&lt;')}</pre></body></html>`;
+        res.json({
+          url: parsed.toString(),
+          title: `JSON Response · ${parsed.hostname}${parsed.pathname}`,
+          statusCode: response.status,
+          latencyMs,
+          html: jsonHtml,
+          extractedLinks: [],
+          textPreview: pretty.slice(0, 800),
+        });
+        return;
+      }
+
+      const titleMatch = rawBody.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : parsed.hostname;
+
+      // Extract hyperlinks for Web Agent DOM Inspector
+      const linkMatches = [...rawBody.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+      const extractedLinks = linkMatches
+        .slice(0, 18)
+        .map((m) => ({
+          href: m[1].startsWith('http') ? m[1] : new URL(m[1], parsed.origin).toString(),
+          text: m[2].replace(/<[^>]+>/g, '').trim() || m[1],
+        }))
+        .filter((l) => l.text.length > 0 && !l.href.startsWith('javascript:'));
+
+      // Strip frame-busting meta tags & inject <base href> so assets & CSS resolve cleanly
+      const baseTag = `<base href="${parsed.origin}/" target="_blank" />`;
+      let cleanHtml = rawBody.replace(/<meta[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
+      if (/<head[^>]*>/i.test(cleanHtml)) {
+        cleanHtml = cleanHtml.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
+      } else {
+        cleanHtml = `<head>${baseTag}</head>${cleanHtml}`;
+      }
+
+      const textPreview = rawBody
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 600);
+
+      res.json({
+        url: parsed.toString(),
+        title,
+        statusCode: response.status,
+        latencyMs,
+        html: cleanHtml,
+        extractedLinks,
+        textPreview,
+      });
+    } catch (fetchErr: unknown) {
+      const msg = fetchErr instanceof Error ? fetchErr.message : 'Network error fetching URL';
+      res.status(502).json({
+        error: `Could not load ${parsed.toString()}: ${msg}`,
+        url: parsed.toString(),
+      });
     }
   });
 

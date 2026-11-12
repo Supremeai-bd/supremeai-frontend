@@ -4,6 +4,7 @@ import { ChatMessage, RolePersona, ModelDetail } from '../types';
 import { ChatSearchBar } from './chat/ChatSearchBar';
 import { ChatEmptyState } from './chat/ChatEmptyState';
 import { ChatMessageItem } from './chat/ChatMessageItem';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 
 interface ChatThreadProps {
   messages: ChatMessage[];
@@ -13,6 +14,7 @@ interface ChatThreadProps {
   streamingContent: string;
   onSendPrompt: (promptText: string) => void;
   error: string | null;
+  userName?: string;
 }
 
 export const ChatThread: React.FC<ChatThreadProps> = ({
@@ -23,6 +25,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   streamingContent,
   onSendPrompt,
   error,
+  userName,
 }) => {
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,8 +53,28 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
     scrollEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Event delegation for code block copy buttons inside markdown
+  // Event delegation for code block copy, preview, and workspace dock buttons inside markdown
   const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    const previewBtn = (e.target as HTMLElement).closest('.preview-code-btn') as HTMLButtonElement | null;
+    if (previewBtn) {
+      const encodedCode = previewBtn.getAttribute('data-code');
+      const lang = previewBtn.getAttribute('data-lang') || 'html';
+      if (encodedCode) {
+        useWorkspaceStore.getState().loadCodeIntoWorkspace(decodeURIComponent(encodedCode), lang, 'preview');
+      }
+      return;
+    }
+
+    const editBtn = (e.target as HTMLElement).closest('.edit-code-btn') as HTMLButtonElement | null;
+    if (editBtn) {
+      const encodedCode = editBtn.getAttribute('data-code');
+      const lang = editBtn.getAttribute('data-lang') || 'html';
+      if (encodedCode) {
+        useWorkspaceStore.getState().loadCodeIntoWorkspace(decodeURIComponent(encodedCode), lang, 'code');
+      }
+      return;
+    }
+
     const target = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLButtonElement | null;
     if (!target) return;
 
@@ -112,7 +135,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
           <ChatEmptyState
             activeRole={activeRole}
             activeModel={activeModel}
-            onSendPrompt={onSendPrompt}
+            userName={userName}
           />
         ) : (
           <div className="max-w-4xl mx-auto space-y-4">

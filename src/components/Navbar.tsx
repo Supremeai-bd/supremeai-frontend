@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Sun, Moon, PanelLeft, ExternalLink, ShieldCheck, User, LogOut, ChevronDown, Laptop, Sparkles } from 'lucide-react';
+import { Sun, Moon, PanelLeft, PanelRight, ExternalLink, ShieldCheck, User, LogOut, ChevronDown, Laptop, Sparkles } from 'lucide-react';
 import { ModelDetail, UserRole, AuthUser } from '../types';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 
 interface NavbarProps {
   activeTab: string;
@@ -36,6 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   trustedUntil,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
   return (
     <header className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
       {/* Zone 1: Sidebar Toggle + Brand Wordmark with Gemini Star */}
@@ -265,6 +267,29 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
           <span className="font-mono text-[10px]">{activeModel.name.replace('Gemini ', '')}</span>
         </div>
+
+        {/* Split Workspace Dock Toggle (Preview / Terminal / Browser) */}
+        <button
+          type="button"
+          onClick={() => {
+            if (activeTab !== 'chat') {
+              onSelectTab('chat');
+              setDockOpen(true);
+            } else {
+              toggleDock();
+            }
+          }}
+          aria-label="Toggle Split Workspace Dock"
+          title="Toggle Split Workspace (Preview, Terminal, Browser)"
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+            isDockOpen && activeTab === 'chat'
+              ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400 shadow-xs'
+              : 'border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:border-cyan-500/40 hover:text-cyan-500'
+          }`}
+        >
+          <PanelRight className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Workspace</span>
+        </button>
 
         {/* Theme Toggle */}
         <button

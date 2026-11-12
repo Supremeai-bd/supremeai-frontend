@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { PanelLeft, PanelRight } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ChatThread } from './components/ChatThread';
+import { ChatEmptyState } from './components/chat/ChatEmptyState';
 import { ChatInput } from './components/ChatInput';
 import { RoleModal } from './components/RoleModal';
 import { RoleLab } from './components/RoleLab';
@@ -31,11 +33,13 @@ import { AuthPage } from './components/auth/AuthPage';
 import { UsageView } from './components/UsageView';
 import { ToastContainer } from './components/common/ToastContainer';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { WorkspaceDock } from './components/workspace/WorkspaceDock';
 
 import { useAuthStore } from './stores/useAuthStore';
 import { useChatStore } from './stores/useChatStore';
 import { useAdminStore } from './stores/useAdminStore';
 import { useCustomerStore } from './stores/useCustomerStore';
+import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { useTabRouter } from './hooks/useTabRouter';
 import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { UserProject, ChatAttachment } from './types';
@@ -148,6 +152,8 @@ export default function App() {
 
   // Navigation & Layout UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { isDockOpen, toggleDock } = useWorkspaceStore();
+  const layoutMode = userSettings.layoutMode || 'sidebar-focus';
 
   // Theme state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -230,6 +236,7 @@ export default function App() {
 
   const mcpAlertCount = getMcpAlertCount();
   const activePluginsCount = userPlugins.filter((p) => p.isEnabled).length;
+  const isChatEmpty = (currentSession?.messages?.length || 0) === 0 && !isStreaming;
 
   return (
     <ErrorBoundary>
@@ -245,25 +252,27 @@ export default function App() {
         <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-cyan-500/15 dark:bg-cyan-500/10 blur-3xl pointer-events-none z-0 cyber-aurora-cyan" />
         <div className="absolute -bottom-32 -right-32 w-[32rem] h-[32rem] rounded-full bg-purple-500/15 dark:bg-violet-600/10 blur-3xl pointer-events-none z-0 cyber-aurora-violet" />
 
-        {/* Top Bar Navigation */}
-        <div className="relative z-10">
-          <Navbar
-            activeTab={activeTab}
-            onSelectTab={setActiveTab}
-            onNewSession={createNewSession}
-            darkMode={darkMode}
-            onToggleDarkMode={toggleDarkMode}
-            sidebarOpen={sidebarOpen}
-            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-            activeModel={activeModel}
-            currentRole={currentRole}
-            onToggleRole={() => handleToggleRole()}
-            mcpAlertCount={mcpAlertCount}
-            authUser={authUser}
-            onSignOut={logout}
-            trustedUntil={trustedBrowserUntil}
-          />
-        </div>
+        {/* Top Bar Navigation (Only shown in Classic Top Navigation layout mode) */}
+        {layoutMode === 'classic' && (
+          <div className="relative z-10">
+            <Navbar
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              onNewSession={createNewSession}
+              darkMode={darkMode}
+              onToggleDarkMode={toggleDarkMode}
+              sidebarOpen={sidebarOpen}
+              onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+              activeModel={activeModel}
+              currentRole={currentRole}
+              onToggleRole={() => handleToggleRole()}
+              mcpAlertCount={mcpAlertCount}
+              authUser={authUser}
+              onSignOut={logout}
+              trustedUntil={trustedBrowserUntil}
+            />
+          </div>
+        )}
 
         {/* Main Viewport Container */}
         <div className="flex-1 flex overflow-hidden relative z-10">
@@ -289,38 +298,108 @@ export default function App() {
             mcpAlertCount={mcpAlertCount}
             authUser={authUser}
             onSignOut={logout}
+            darkMode={darkMode}
+            onToggleDarkMode={toggleDarkMode}
+            layoutMode={layoutMode}
           />
 
-          {/* 1. Chat Workspace (Shared User & Admin) */}
-          {activeTab === 'chat' && (
-            <main className="flex-1 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(219,234,254,0.45),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(30,58,138,0.2),rgba(19,19,20,0))]">
-              <ChatThread
-                messages={currentSession?.messages || []}
-                activeRole={activeRole}
-                activeModel={activeModel}
-                isStreaming={isStreaming}
-                streamingContent={streamingContent}
-                onSendPrompt={handleSendMessageWrapper}
-                error={inferenceError}
-              />
+          {/* Floating Sidebar Expand Button for Sidebar Focus Mode when Sidebar is collapsed */}
+          {layoutMode === 'sidebar-focus' && !sidebarOpen && (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              className="absolute top-3.5 left-3.5 z-30 p-2 rounded-xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white shadow-xs transition-colors cursor-pointer"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+          )}
 
-              <ChatInput
-                onSendMessage={handleSendMessageWrapper}
-                onStopStreaming={stopStreaming}
-                onClearThread={clearCurrentThread}
-                onExportThread={exportThread}
-                isStreaming={isStreaming}
-                activeModel={activeModel}
-                onSelectModel={selectModel}
-                activeRole={activeRole}
-                onOpenRoleModal={() => setIsRoleModalOpen(true)}
-                hasMessages={(currentSession?.messages?.length || 0) > 0}
-                lastAutoSavedText={lastAutoSavedText}
-                isAutoSaving={false}
-                onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
-                activeGroundingDocsCount={knowledgeDocs.filter((d) => d.isGroundingActive).length}
-              />
-            </main>
+          {/* 1. Chat Workspace + Collapsible Resizable Split Dock (Preview / Terminal / Browser / Code) */}
+          {activeTab === 'chat' && (
+            <div className="flex-1 flex overflow-hidden relative">
+              <main className="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(219,234,254,0.45),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(30,58,138,0.2),rgba(19,19,20,0))]">
+                {/* Floating 1-click Right Workspace Dock Toggle in Sidebar Focus Mode */}
+                {layoutMode === 'sidebar-focus' && (
+                  <div className="absolute top-3.5 right-4 z-20 flex items-center gap-2 pointer-events-none">
+                    <button
+                      type="button"
+                      onClick={toggleDock}
+                      aria-label={isDockOpen ? 'Close workspace dock' : 'Open workspace dock'}
+                      className={`pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium backdrop-blur-md border transition-all cursor-pointer shadow-xs ${
+                        isDockOpen
+                          ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-300'
+                          : 'bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <PanelRight className="w-3.5 h-3.5" />
+                      <span>{isDockOpen ? 'Close Dock' : 'Workspace'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {isChatEmpty ? (
+                  <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto px-4 pb-8 pt-12">
+                    <ChatEmptyState
+                      activeRole={activeRole}
+                      activeModel={activeModel}
+                      userName={authUser?.name}
+                    />
+                    <div className="w-full max-w-4xl mt-2">
+                      <ChatInput
+                        onSendMessage={handleSendMessageWrapper}
+                        onStopStreaming={stopStreaming}
+                        onClearThread={clearCurrentThread}
+                        onExportThread={exportThread}
+                        isStreaming={isStreaming}
+                        activeModel={activeModel}
+                        onSelectModel={selectModel}
+                        activeRole={activeRole}
+                        onOpenRoleModal={() => setIsRoleModalOpen(true)}
+                        hasMessages={false}
+                        lastAutoSavedText={lastAutoSavedText}
+                        isAutoSaving={false}
+                        onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+                        activeGroundingDocsCount={knowledgeDocs.filter((d) => d.isGroundingActive).length}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <ChatThread
+                      messages={currentSession?.messages || []}
+                      activeRole={activeRole}
+                      activeModel={activeModel}
+                      isStreaming={isStreaming}
+                      streamingContent={streamingContent}
+                      onSendPrompt={handleSendMessageWrapper}
+                      error={inferenceError}
+                      userName={authUser?.name}
+                    />
+
+                    <ChatInput
+                      onSendMessage={handleSendMessageWrapper}
+                      onStopStreaming={stopStreaming}
+                      onClearThread={clearCurrentThread}
+                      onExportThread={exportThread}
+                      isStreaming={isStreaming}
+                      activeModel={activeModel}
+                      onSelectModel={selectModel}
+                      activeRole={activeRole}
+                      onOpenRoleModal={() => setIsRoleModalOpen(true)}
+                      hasMessages={(currentSession?.messages?.length || 0) > 0}
+                      lastAutoSavedText={lastAutoSavedText}
+                      isAutoSaving={false}
+                      onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+                      activeGroundingDocsCount={knowledgeDocs.filter((d) => d.isGroundingActive).length}
+                    />
+                  </>
+                )}
+              </main>
+
+              <WorkspaceDock />
+            </div>
           )}
 
           {/* 2. Customer Workspace Views */}

@@ -160,7 +160,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="p-4 bg-transparent pb-6 transition-colors">
+    <div className="w-full p-4 bg-transparent pb-6 transition-colors">
       <div className="max-w-3xl mx-auto space-y-3">
         {/* Hidden File Input */}
         <input

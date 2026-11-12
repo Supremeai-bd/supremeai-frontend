@@ -16,6 +16,8 @@ import {
   LogOut,
   KeyRound,
   ShieldAlert,
+  PanelLeft,
+  LayoutGrid,
 } from 'lucide-react';
 import { UserAccountSettings, UserRole } from '../../types';
 import { GEMINI_MODELS } from '../../data/models';
@@ -47,6 +49,9 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const [autoCodeReview, setAutoCodeReview] = useState(settings.autoCodeReview);
   const [streamResponses, setStreamResponses] = useState(settings.streamResponses);
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
+  const [layoutMode, setLayoutMode] = useState<'sidebar-focus' | 'classic'>(
+    settings.layoutMode || 'sidebar-focus'
+  );
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
@@ -58,6 +63,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       autoCodeReview,
       streamResponses,
       defaultModel,
+      layoutMode,
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
@@ -217,6 +223,56 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Workspace Layout Mode Segmented Selector */}
+        <div>
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            Workspace Navigation Layout
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setLayoutMode('sidebar-focus');
+                onUpdateSettings({ layoutMode: 'sidebar-focus' });
+              }}
+              className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                layoutMode === 'sidebar-focus'
+                  ? 'border-cyan-500/60 bg-cyan-500/10 text-slate-900 dark:text-white shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+              }`}
+            >
+              <PanelLeft className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'sidebar-focus' ? 'text-cyan-500' : 'text-slate-400'}`} />
+              <div>
+                <div className="text-xs font-semibold">Sidebar Focus (Gemini)</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  Full-height canvas without duplicate top navbar.
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLayoutMode('classic');
+                onUpdateSettings({ layoutMode: 'classic' });
+              }}
+              className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                layoutMode === 'classic'
+                  ? 'border-cyan-500/60 bg-cyan-500/10 text-slate-900 dark:text-white shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+              }`}
+            >
+              <LayoutGrid className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'classic' ? 'text-cyan-500' : 'text-slate-400'}`} />
+              <div>
+                <div className="text-xs font-semibold">Top Navigation (Classic)</div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  Traditional top header bar with quick tabs and profile menu.
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Toggles */}

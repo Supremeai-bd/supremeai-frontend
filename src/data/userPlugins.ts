@@ -105,4 +105,5 @@ export const DEFAULT_USER_SETTINGS: UserAccountSettings = {
   autoCodeReview: true,
   streamResponses: true,
   defaultModel: 'gemini-3.8-flash',
+  layoutMode: 'sidebar-focus',
 };

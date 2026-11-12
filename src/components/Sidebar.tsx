@@ -23,6 +23,9 @@ import {
   Database,
   FileCheck2,
   LogOut,
+  PanelLeft,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole, AuthUser } from '../types';
 
@@ -47,6 +50,9 @@ interface SidebarProps {
   mcpAlertCount?: number;
   authUser?: AuthUser | null;
   onSignOut?: () => void;
+  darkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  layoutMode?: 'sidebar-focus' | 'classic';
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -70,6 +76,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mcpAlertCount = 0,
   authUser,
   onSignOut,
+  darkMode,
+  onToggleDarkMode,
+  layoutMode = 'sidebar-focus',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,7 +105,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="w-64 border-r border-slate-200/80 dark:border-slate-800/80 bg-slate-50/70 dark:bg-[#131314] flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 h-[calc(100vh-3.5rem)] select-none">
+    <aside
+      className={`w-64 border-r border-slate-200/80 dark:border-slate-800/80 bg-slate-50/85 dark:bg-[#131314]/95 backdrop-blur-xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 ${
+        layoutMode === 'sidebar-focus' ? 'h-screen' : 'h-[calc(100vh-3.5rem)]'
+      } select-none`}
+    >
+      {/* Top Studio Brand Header when Top Navbar is hidden (Sidebar Focus mode) */}
+      {layoutMode === 'sidebar-focus' && (
+        <div className="px-3.5 pt-3.5 pb-1 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => onSelectTab('chat')}
+            className="flex items-center gap-2 cursor-pointer group min-w-0"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-5 h-5 shrink-0 transition-transform group-hover:scale-105"
+            >
+              <path
+                d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"
+                fill="url(#sidebar-gemini-gradient)"
+              />
+              <defs>
+                <linearGradient
+                  id="sidebar-gemini-gradient"
+                  x1="2"
+                  y1="2"
+                  x2="22"
+                  y2="22"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#06B6D4" />
+                  <stop offset="0.5" stopColor="#3B82F6" />
+                  <stop offset="1" stopColor="#8B5CF6" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100 truncate">
+              SupremeAI Studio
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleOpen}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            className="p-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Action: Gemini-style "+ New chat" pill button */}
       <div className="p-3">
         <button
@@ -604,7 +666,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            {onToggleDarkMode && (
+              <button
+                type="button"
+                onClick={onToggleDarkMode}
+                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label="Toggle color theme"
+                className="p-1.5 text-slate-400 hover:text-amber-500 dark:hover:text-cyan-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
+            )}
+
             {/* Role switch button: ONLY shown if user is admin-eligible or already in admin mode */}
             {(currentRole === 'admin' || authUser?.isAdminEligible) && (
               <button

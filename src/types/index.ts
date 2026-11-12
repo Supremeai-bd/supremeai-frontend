@@ -107,6 +107,7 @@ export interface UserAccountSettings {
   autoCodeReview: boolean;
   streamResponses: boolean;
   defaultModel: string;
+  layoutMode?: 'sidebar-focus' | 'classic';
 }
 
 export interface CustomerRecord {

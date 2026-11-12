@@ -39,10 +39,19 @@ markdownProcessor.use({
             <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
             <span class="uppercase tracking-wider text-[11px]">${cleanLang}</span>
           </span>
-          <button type="button" class="copy-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-            <span>Copy</span>
-          </button>
+          <div class="flex items-center gap-1.5">
+            <button type="button" class="preview-code-btn flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              <span>Preview</span>
+            </button>
+            <button type="button" class="edit-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
+              <span>Dock</span>
+            </button>
+            <button type="button" class="copy-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span>Copy</span>
+            </button>
+          </div>
         </div>
         <pre class="p-3.5 overflow-x-auto text-xs leading-relaxed font-mono text-slate-100 bg-slate-950"><code class="language-${cleanLang}">${escapedText}</code></pre>
       </div>`;
