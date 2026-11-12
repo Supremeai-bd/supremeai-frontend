@@ -81,3 +81,20 @@ export interface UserAccountSettings {
   streamResponses: boolean;
   defaultModel: string;
 }
+
+export interface CustomerRecord {
+  id: string;
+  name: string;
+  email: string;
+  tier: 'Free' | 'Pro' | 'Enterprise';
+  status: 'active' | 'past_due' | 'suspended';
+  mrr: number;
+  tokensUsed: number;
+  tokenLimit: number;
+  connectedRepos: number;
+  joinedDate: string;
+  lastActive: string;
+  githubHandle?: string;
+  region: string;
+}
+

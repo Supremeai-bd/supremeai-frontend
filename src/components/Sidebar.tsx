@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   User,
   ArrowRightLeft,
+  Users,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole } from '../types';
 
@@ -33,6 +34,7 @@ interface SidebarProps {
   onToggleRole: () => void;
   projectsCount?: number;
   activePluginsCount?: number;
+  customersCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -52,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleRole,
   projectsCount = 2,
   activePluginsCount = 4,
+  customersCount = 12,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -109,6 +112,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <MessageSquare className="w-4 h-4 text-slate-500" />
               <span>Studio Chat</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('customers')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'customers'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Users className="w-4 h-4 text-slate-500" />
+                <span>Customers</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                {customersCount}
+              </span>
             </button>
 
             <button

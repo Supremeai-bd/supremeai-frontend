@@ -10,6 +10,7 @@ import { RepoHub } from './components/RepoHub';
 import { UserProjectsView } from './components/user/UserProjectsView';
 import { UserPluginsView } from './components/user/UserPluginsView';
 import { UserSettingsView } from './components/user/UserSettingsView';
+import { AdminCustomersView } from './components/admin/AdminCustomersView';
 
 import {
   ChatSession,
@@ -20,6 +21,7 @@ import {
   UserProject,
   PluginItem,
   UserAccountSettings,
+  CustomerRecord,
 } from './types';
 import { SYSTEM_ROLES } from './data/roles';
 import { GEMINI_MODELS } from './data/models';
@@ -28,6 +30,7 @@ import {
   INITIAL_USER_PROJECTS,
   DEFAULT_USER_SETTINGS,
 } from './data/userPlugins';
+import { INITIAL_CUSTOMERS } from './data/customerData';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
 const THEME_KEY = 'supremeai_studio_theme';
@@ -35,6 +38,7 @@ const ROLE_KEY = 'supremeai_studio_user_role';
 const PROJECTS_KEY = 'supremeai_studio_user_projects';
 const PLUGINS_KEY = 'supremeai_studio_user_plugins';
 const SETTINGS_KEY = 'supremeai_studio_user_settings';
+const CUSTOMERS_KEY = 'supremeai_studio_customers';
 
 export default function App() {
   // Dual Role State: 'user' (normal user) vs 'admin' (developer studio)
@@ -119,6 +123,42 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings));
   }, [userSettings]);
+
+  // Customers State (for Admin Workspace)
+  const [customers, setCustomers] = useState<CustomerRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOMERS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_CUSTOMERS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+  }, [customers]);
+
+  const handleAddCustomer = (
+    newCust: Omit<CustomerRecord, 'id' | 'joinedDate' | 'lastActive'>
+  ) => {
+    const customer: CustomerRecord = {
+      ...newCust,
+      id: `cust_${String(Date.now()).slice(-4)}`,
+      joinedDate: new Date().toISOString().slice(0, 10),
+      lastActive: 'Just now',
+    };
+    setUserSettings((prev) => prev); // keep state synchronized
+    setCustomers([customer, ...customers]);
+  };
+
+  const handleUpdateCustomer = (id: string, updates: Partial<CustomerRecord>) => {
+    setCustomers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+    );
+  };
+
+  const handleDeleteCustomer = (id: string) => {
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+  };
 
   // Sessions and Chat History
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -526,6 +566,7 @@ export default function App() {
           onToggleRole={() => handleToggleRole()}
           projectsCount={userProjects.length}
           activePluginsCount={activePluginsCount}
+          customersCount={customers.length}
         />
 
         {/* --- Tab Views --- */}
@@ -586,6 +627,15 @@ export default function App() {
         )}
 
         {/* 3. Admin Specific Views */}
+        {activeTab === 'customers' && (
+          <AdminCustomersView
+            customers={customers}
+            onAddCustomer={handleAddCustomer}
+            onUpdateCustomer={handleUpdateCustomer}
+            onDeleteCustomer={handleDeleteCustomer}
+          />
+        )}
+
         {activeTab === 'roles' && (
           <RoleLab
             onSelectRoleForChat={handleSelectRoleFromLab}
