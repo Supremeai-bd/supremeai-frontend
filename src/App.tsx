@@ -10,8 +10,18 @@ import { RepoHub } from './components/RepoHub';
 import { UserProjectsView } from './components/user/UserProjectsView';
 import { UserPluginsView } from './components/user/UserPluginsView';
 import { UserSettingsView } from './components/user/UserSettingsView';
+import { UserApiKeysView } from './components/user/UserApiKeysView';
+import { UserKnowledgeBaseView } from './components/user/UserKnowledgeBaseView';
+import { UserTeamView } from './components/user/UserTeamView';
+import { UserBillingView } from './components/user/UserBillingView';
 import { AdminCustomersView } from './components/admin/AdminCustomersView';
 import { AdminMcpTowerView } from './components/admin/AdminMcpTowerView';
+import { AdminAgentSwarmView } from './components/admin/AdminAgentSwarmView';
+import { AdminTaskQueueView } from './components/admin/AdminTaskQueueView';
+import { AdminSchemaParityView } from './components/admin/AdminSchemaParityView';
+import { AdminLlmGatewayView } from './components/admin/AdminLlmGatewayView';
+import { AdminSecurityView } from './components/admin/AdminSecurityView';
+import { AdminSystemAuditView } from './components/admin/AdminSystemAuditView';
 import { UsageView } from './components/UsageView';
 
 import {
@@ -25,6 +35,17 @@ import {
   UserAccountSettings,
   CustomerRecord,
   McpTowerService,
+  ApiKeyItem,
+  WebhookItem,
+  KnowledgeDoc,
+  TeamMember,
+  BillingInvoice,
+  SwarmWorker,
+  TaskQueueJob,
+  SchemaParityTable,
+  LlmGatewayRoute,
+  SecurityEventLog,
+  SystemAuditRecord,
 } from './types';
 import { SYSTEM_ROLES } from './data/roles';
 import { GEMINI_MODELS } from './data/models';
@@ -35,6 +56,21 @@ import {
 } from './data/userPlugins';
 import { INITIAL_CUSTOMERS } from './data/customerData';
 import { INITIAL_MCP_SERVICES } from './data/mcpTowerData';
+import {
+  INITIAL_API_KEYS,
+  INITIAL_WEBHOOKS,
+  INITIAL_KNOWLEDGE_DOCS,
+  INITIAL_TEAM_MEMBERS,
+  INITIAL_INVOICES,
+} from './data/customerWorkspaceData';
+import {
+  INITIAL_SWARM_WORKERS,
+  INITIAL_QUEUE_JOBS,
+  INITIAL_SCHEMA_PARITY,
+  INITIAL_LLM_GATEWAY_ROUTES,
+  INITIAL_SECURITY_LOGS,
+  INITIAL_AUDIT_RECORDS,
+} from './data/adminExpansionData';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
 const THEME_KEY = 'supremeai_studio_theme';
@@ -43,6 +79,18 @@ const PROJECTS_KEY = 'supremeai_studio_user_projects';
 const PLUGINS_KEY = 'supremeai_studio_user_plugins';
 const SETTINGS_KEY = 'supremeai_studio_user_settings';
 const CUSTOMERS_KEY = 'supremeai_studio_customers';
+const API_KEYS_KEY = 'supremeai_studio_api_keys';
+const WEBHOOKS_KEY = 'supremeai_studio_webhooks';
+const KNOWLEDGE_KEY = 'supremeai_studio_knowledge_docs';
+const TEAM_KEY = 'supremeai_studio_team_members';
+const INVOICES_KEY = 'supremeai_studio_invoices';
+const SWARM_KEY = 'supremeai_studio_swarm_workers';
+const QUEUE_KEY = 'supremeai_studio_queue_jobs';
+const SCHEMA_KEY = 'supremeai_studio_schema_tables';
+const GATEWAY_KEY = 'supremeai_studio_gateway_routes';
+const SECURITY_KEY = 'supremeai_studio_security_events';
+const BLOCKED_IPS_KEY = 'supremeai_studio_blocked_ips';
+const AUDIT_KEY = 'supremeai_studio_audit_records';
 
 export default function App() {
   // Dual Role State: 'user' (normal user) vs 'admin' (developer studio)
@@ -163,6 +211,323 @@ export default function App() {
   const handleDeleteCustomer = (id: string) => {
     setCustomers((prev) => prev.filter((c) => c.id !== id));
   };
+
+  // --- Customer Expansion States ---
+  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(API_KEYS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_API_KEYS;
+  });
+  useEffect(() => {
+    localStorage.setItem(API_KEYS_KEY, JSON.stringify(apiKeys));
+  }, [apiKeys]);
+
+  const handleAddApiKey = (newKey: Omit<ApiKeyItem, 'id' | 'createdAt' | 'lastUsed'>) => {
+    const keyItem: ApiKeyItem = {
+      ...newKey,
+      id: `key_${Date.now()}`,
+      createdAt: new Date().toISOString().slice(0, 10),
+      lastUsed: 'Never',
+    };
+    setApiKeys([keyItem, ...apiKeys]);
+  };
+
+  const handleRevokeApiKey = (id: string) => {
+    setApiKeys((prev) =>
+      prev.map((k) => (k.id === id ? { ...k, status: 'revoked' as const } : k))
+    );
+  };
+
+  const [webhooks, setWebhooks] = useState<WebhookItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(WEBHOOKS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_WEBHOOKS;
+  });
+  useEffect(() => {
+    localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(webhooks));
+  }, [webhooks]);
+
+  const handleAddWebhook = (
+    newWebhook: Omit<WebhookItem, 'id' | 'lastTriggered' | 'failureCount'>
+  ) => {
+    const wh: WebhookItem = {
+      ...newWebhook,
+      id: `wh_${Date.now()}`,
+      lastTriggered: 'Never',
+      failureCount: 0,
+    };
+    setWebhooks([wh, ...webhooks]);
+  };
+
+  const handleDeleteWebhook = (id: string) => {
+    setWebhooks((prev) => prev.filter((w) => w.id !== id));
+  };
+
+  const handleTestWebhook = (id: string) => {
+    setWebhooks((prev) =>
+      prev.map((w) =>
+        w.id === id ? { ...w, lastTriggered: 'Just now (200 OK test ping)' } : w
+      )
+    );
+  };
+
+  const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>(() => {
+    try {
+      const saved = localStorage.getItem(KNOWLEDGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_KNOWLEDGE_DOCS;
+  });
+  useEffect(() => {
+    localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(knowledgeDocs));
+  }, [knowledgeDocs]);
+
+  const handleAddKnowledgeDoc = (
+    doc: Omit<KnowledgeDoc, 'id' | 'lastIndexed'>
+  ) => {
+    const newDoc: KnowledgeDoc = {
+      ...doc,
+      id: `doc_${Date.now()}`,
+      lastIndexed: 'Just now',
+    };
+    setKnowledgeDocs([newDoc, ...knowledgeDocs]);
+  };
+
+  const handleToggleKnowledgeGrounding = (id: string) => {
+    setKnowledgeDocs((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, isGroundingActive: !d.isGroundingActive } : d))
+    );
+  };
+
+  const handleDeleteKnowledgeDoc = (id: string) => {
+    setKnowledgeDocs((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
+    try {
+      const saved = localStorage.getItem(TEAM_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_TEAM_MEMBERS;
+  });
+  useEffect(() => {
+    localStorage.setItem(TEAM_KEY, JSON.stringify(teamMembers));
+  }, [teamMembers]);
+
+  const handleInviteTeamMember = (
+    member: Omit<TeamMember, 'id' | 'joinedDate' | 'avatar'>
+  ) => {
+    const newMem: TeamMember = {
+      ...member,
+      id: `mem_${Date.now()}`,
+      joinedDate: 'Just now',
+      avatar: member.name.charAt(0).toUpperCase() || 'M',
+    };
+    setTeamMembers([...teamMembers, newMem]);
+  };
+
+  const handleUpdateTeamRole = (id: string, newRole: TeamMember['role']) => {
+    setTeamMembers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, role: newRole } : m))
+    );
+  };
+
+  const handleRemoveTeamMember = (id: string) => {
+    setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const [invoices, setInvoices] = useState<BillingInvoice[]>(() => {
+    try {
+      const saved = localStorage.getItem(INVOICES_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_INVOICES;
+  });
+  useEffect(() => {
+    localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+  }, [invoices]);
+
+  const handleTopUpTokens = (addedTokens: number, costUsd: number) => {
+    setUserSettings((prev) => ({
+      ...prev,
+      monthlyTokensLimit: prev.monthlyTokensLimit + addedTokens,
+    }));
+    const newInv: BillingInvoice = {
+      id: `inv_topup_${Date.now()}`,
+      invoiceNumber: `TOP-2026-${String(Date.now()).slice(-4)}`,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      amountUsd: costUsd,
+      status: 'paid',
+      planName: `Pay-As-You-Go Credits (${(addedTokens / 1000000).toFixed(1)}M Tokens)`,
+    };
+    setInvoices([newInv, ...invoices]);
+  };
+
+  // --- Admin Expansion States ---
+  const [swarmWorkers, setSwarmWorkers] = useState<SwarmWorker[]>(() => {
+    try {
+      const saved = localStorage.getItem(SWARM_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_SWARM_WORKERS;
+  });
+  useEffect(() => {
+    localStorage.setItem(SWARM_KEY, JSON.stringify(swarmWorkers));
+  }, [swarmWorkers]);
+
+  const handleToggleSwarmWorker = (id: string) => {
+    setSwarmWorkers((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? { ...w, status: w.status === 'active' ? ('paused' as const) : ('active' as const) }
+          : w
+      )
+    );
+  };
+
+  const handleScaleWorker = (id: string, delta: number) => {
+    setSwarmWorkers((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              cpuPercent: Math.max(1, Math.min(95, Math.round(w.cpuPercent + delta * 4))),
+            }
+          : w
+      )
+    );
+  };
+
+  const [queueJobs, setQueueJobs] = useState<TaskQueueJob[]>(() => {
+    try {
+      const saved = localStorage.getItem(QUEUE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_QUEUE_JOBS;
+  });
+  useEffect(() => {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queueJobs));
+  }, [queueJobs]);
+
+  const handleRetryQueueJob = (id: string) => {
+    setQueueJobs((prev) =>
+      prev.map((j) =>
+        j.id === id
+          ? { ...j, status: 'active' as const, attempts: 1, errorDetails: undefined }
+          : j
+      )
+    );
+  };
+
+  const handleRetryAllDlq = () => {
+    setQueueJobs((prev) =>
+      prev.map((j) =>
+        j.status === 'dlq'
+          ? { ...j, status: 'active' as const, attempts: 1, errorDetails: undefined }
+          : j
+      )
+    );
+  };
+
+  const handleClearCompletedJobs = () => {
+    setQueueJobs((prev) => prev.filter((j) => j.status !== 'completed'));
+  };
+
+  const [schemaTables, setSchemaTables] = useState<SchemaParityTable[]>(() => {
+    try {
+      const saved = localStorage.getItem(SCHEMA_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_SCHEMA_PARITY;
+  });
+  useEffect(() => {
+    localStorage.setItem(SCHEMA_KEY, JSON.stringify(schemaTables));
+  }, [schemaTables]);
+
+  const handleRunParitySync = () => {
+    setSchemaTables((prev) =>
+      prev.map((t) => ({
+        ...t,
+        driftDetected: false,
+        driftSummary: undefined,
+        prodColumns: t.localColumns,
+        lastMigrated: `${new Date().toISOString().slice(0, 10)} (Parity Synced)`,
+      }))
+    );
+  };
+
+  const [gatewayRoutes, setGatewayRoutes] = useState<LlmGatewayRoute[]>(() => {
+    try {
+      const saved = localStorage.getItem(GATEWAY_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_LLM_GATEWAY_ROUTES;
+  });
+  useEffect(() => {
+    localStorage.setItem(GATEWAY_KEY, JSON.stringify(gatewayRoutes));
+  }, [gatewayRoutes]);
+
+  const handleToggleFailover = (routeId: string) => {
+    setGatewayRoutes((prev) =>
+      prev.map((r) =>
+        r.id === routeId ? { ...r, autoFailoverActive: !r.autoFailoverActive } : r
+      )
+    );
+  };
+
+  const handleUpdateGatewayPrice = (routeId: string, newPrice: number) => {
+    setGatewayRoutes((prev) =>
+      prev.map((r) => (r.id === routeId ? { ...r, customerPricePer1M: newPrice } : r))
+    );
+  };
+
+  const [securityEvents, setSecurityEvents] = useState<SecurityEventLog[]>(() => {
+    try {
+      const saved = localStorage.getItem(SECURITY_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_SECURITY_LOGS;
+  });
+  useEffect(() => {
+    localStorage.setItem(SECURITY_KEY, JSON.stringify(securityEvents));
+  }, [securityEvents]);
+
+  const [blockedIps, setBlockedIps] = useState<{ ip: string; reason: string; date: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem(BLOCKED_IPS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      { ip: '45.154.255.8', reason: 'Internal MCP Port Scanner', date: '2 days ago' },
+      { ip: '198.51.100.44', reason: 'Adversarial Jailbreak Payload Injection', date: 'Today' },
+    ];
+  });
+  useEffect(() => {
+    localStorage.setItem(BLOCKED_IPS_KEY, JSON.stringify(blockedIps));
+  }, [blockedIps]);
+
+  const handleAddBlockedIp = (ip: string, reason: string) => {
+    setBlockedIps([{ ip, reason, date: 'Just now' }, ...blockedIps]);
+  };
+
+  const handleRemoveBlockedIp = (ip: string) => {
+    setBlockedIps((prev) => prev.filter((b) => b.ip !== ip));
+  };
+
+  const [auditRecords, setAuditRecords] = useState<SystemAuditRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(AUDIT_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_AUDIT_RECORDS;
+  });
+  useEffect(() => {
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(auditRecords));
+  }, [auditRecords]);
 
   // --- MCP Tower Services & Cluster Health State ---
   const MCP_SERVICES_KEY = 'supremeai_studio_mcp_services';
@@ -813,6 +1178,45 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'user-api-keys' && (
+          <UserApiKeysView
+            apiKeys={apiKeys}
+            onAddApiKey={handleAddApiKey}
+            onRevokeApiKey={handleRevokeApiKey}
+            webhooks={webhooks}
+            onAddWebhook={handleAddWebhook}
+            onDeleteWebhook={handleDeleteWebhook}
+            onTestWebhook={handleTestWebhook}
+          />
+        )}
+
+        {activeTab === 'user-knowledge' && (
+          <UserKnowledgeBaseView
+            documents={knowledgeDocs}
+            onAddDocument={handleAddKnowledgeDoc}
+            onToggleGrounding={handleToggleKnowledgeGrounding}
+            onDeleteDocument={handleDeleteKnowledgeDoc}
+          />
+        )}
+
+        {activeTab === 'user-team' && (
+          <UserTeamView
+            members={teamMembers}
+            onInviteMember={handleInviteTeamMember}
+            onUpdateRole={handleUpdateTeamRole}
+            onRemoveMember={handleRemoveTeamMember}
+          />
+        )}
+
+        {activeTab === 'user-billing' && (
+          <UserBillingView
+            invoices={invoices}
+            currentTokensUsed={userSettings.monthlyTokensUsed}
+            tokensLimit={userSettings.monthlyTokensLimit}
+            onTopUpTokens={handleTopUpTokens}
+          />
+        )}
+
         {activeTab === 'user-plugins' && (
           <UserPluginsView
             plugins={userPlugins}
@@ -836,6 +1240,53 @@ export default function App() {
         )}
 
         {/* 4. Admin Specific Views */}
+        {activeTab === 'agent-swarm' && (
+          <AdminAgentSwarmView
+            workers={swarmWorkers}
+            onToggleWorkerStatus={handleToggleSwarmWorker}
+            onScaleConcurrency={handleScaleWorker}
+          />
+        )}
+
+        {activeTab === 'task-queue' && (
+          <AdminTaskQueueView
+            jobs={queueJobs}
+            onRetryJob={handleRetryQueueJob}
+            onRetryAllDlq={handleRetryAllDlq}
+            onClearCompleted={handleClearCompletedJobs}
+          />
+        )}
+
+        {activeTab === 'schema-parity' && (
+          <AdminSchemaParityView
+            tables={schemaTables}
+            onRunParitySync={handleRunParitySync}
+          />
+        )}
+
+        {activeTab === 'llm-gateway' && (
+          <AdminLlmGatewayView
+            routes={gatewayRoutes}
+            onToggleFailover={handleToggleFailover}
+            onUpdatePrice={handleUpdateGatewayPrice}
+          />
+        )}
+
+        {activeTab === 'security' && (
+          <AdminSecurityView
+            securityEvents={securityEvents}
+            onAddBlockedIp={handleAddBlockedIp}
+            onRemoveBlockedIp={handleRemoveBlockedIp}
+            blockedIps={blockedIps}
+          />
+        )}
+
+        {activeTab === 'system-audit' && (
+          <AdminSystemAuditView
+            auditRecords={auditRecords}
+          />
+        )}
+
         {activeTab === 'customers' && (
           <AdminCustomersView
             customers={customers}

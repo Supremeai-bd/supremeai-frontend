@@ -10,7 +10,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = Number(process.env.PORT) || 3000;
+const portArgIndex = process.argv.indexOf('--port');
+const PORT = portArgIndex !== -1 ? Number(process.argv[portArgIndex + 1]) || 3000 : 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Supported Gemini models as specified in requirements
@@ -38,14 +39,6 @@ const SUPPORTED_MODELS: Record<string, { name: string; description: string; tier
 };
 
 const apiKey = process.env.GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({
-  apiKey,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -618,7 +611,7 @@ async function startServer() {
     });
   } else {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);

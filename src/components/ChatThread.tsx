@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Copy, Check, Sparkles, User, AlertCircle, ArrowDown } from 'lucide-react';
-import { marked } from 'marked';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Copy, Check, Sparkles, AlertCircle, ArrowDown, Search, X, Filter } from 'lucide-react';
+import { Marked } from 'marked';
 import { ChatMessage, RolePersona, ModelDetail } from '../types';
 
 interface ChatThreadProps {
@@ -13,6 +13,54 @@ interface ChatThreadProps {
   error: string | null;
 }
 
+// Escape HTML utility for code blocks
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Configured Marked instance for high-fidelity code blocks, tables, and lists
+const markdownProcessor = new Marked({
+  gfm: true,
+  breaks: true,
+});
+
+markdownProcessor.use({
+  renderer: {
+    code({ text, lang }: { text: string; lang?: string }) {
+      const cleanLang = (lang || 'code').trim();
+      const escapedText = escapeHtml(text);
+      const encodedCode = encodeURIComponent(text);
+
+      return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-md">
+        <div class="code-block-header flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-xs font-mono select-none">
+          <span class="flex items-center gap-1.5 font-medium text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="uppercase tracking-wider text-[11px]">${cleanLang}</span>
+          </span>
+          <button type="button" class="copy-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            <span>Copy</span>
+          </button>
+        </div>
+        <pre class="p-3.5 overflow-x-auto text-xs leading-relaxed font-mono text-slate-100 bg-slate-950"><code class="language-${cleanLang}">${escapedText}</code></pre>
+      </div>`;
+    },
+  },
+  hooks: {
+    postprocess(html: string) {
+      // Wrap tables in responsive overflow wrapper
+      return html
+        .replace(/<table>/g, '<div class="markdown-table-wrapper"><table>')
+        .replace(/<\/table>/g, '</table></div>');
+    },
+  },
+});
+
 export const ChatThread: React.FC<ChatThreadProps> = ({
   messages,
   activeRole,
@@ -24,15 +72,25 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
 }) => {
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'assistant'>('all');
+  const [isSearchVisible, setIsSearchVisible] = useState<boolean>(true);
+
+  // Auto-scroll on new message or streaming content
   useEffect(() => {
-    if (scrollEndRef.current) {
+    // Only auto-scroll if user is not actively searching through historical messages
+    if (!searchQuery.trim() && scrollEndRef.current) {
       scrollEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, searchQuery]);
 
+  // Handle scroll detection for "Scroll to bottom" button
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
@@ -44,31 +102,204 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
     scrollEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Copy whole assistant response to clipboard
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const renderMarkdown = (content: string) => {
-    try {
-      const html = marked.parse(content, { breaks: true, gfm: true });
-      return { __html: html as string };
-    } catch {
-      return { __html: content };
-    }
+  // Event delegation for code-block level Copy buttons
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLButtonElement | null;
+    if (!target) return;
+
+    e.preventDefault();
+    const encoded = target.getAttribute('data-code');
+    if (!encoded) return;
+
+    const rawCode = decodeURIComponent(encoded);
+    navigator.clipboard.writeText(rawCode).then(() => {
+      const span = target.querySelector('span:last-child');
+      if (span) {
+        const originalText = span.textContent;
+        span.textContent = 'Copied!';
+        target.classList.add('text-emerald-400');
+        setTimeout(() => {
+          span.textContent = originalText;
+          target.classList.remove('text-emerald-400');
+        }, 2000);
+      }
+    });
   };
 
-  const displayMessages = messages.filter((m) => m.role !== 'system');
+  // Keyboard shortcut listener: Cmd/Ctrl+F focuses search, Esc clears search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsSearchVisible(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      } else if (e.key === 'Escape' && searchQuery) {
+        setSearchQuery('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery]);
+
+  // Markdown rendering helper with error fallback
+  const renderMarkdown = useCallback((content: string) => {
+    try {
+      const html = markdownProcessor.parse(content);
+      return { __html: html as string };
+    } catch {
+      return { __html: escapeHtml(content) };
+    }
+  }, []);
+
+  // Filter messages based on search query and role filter
+  const allDisplayMessages = useMemo(() => {
+    return messages.filter((m) => m.role !== 'system');
+  }, [messages]);
+
+  const filteredMessages = useMemo(() => {
+    let result = allDisplayMessages;
+
+    // Apply role filter
+    if (roleFilter !== 'all') {
+      result = result.filter((m) => m.role === roleFilter);
+    }
+
+    // Apply keyword search query
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      result = result.filter((m) => {
+        const contentMatch = m.content.toLowerCase().includes(query);
+        const roleMatch = m.roleName?.toLowerCase().includes(query);
+        const modelMatch = m.model?.toLowerCase().includes(query);
+        return contentMatch || roleMatch || modelMatch;
+      });
+    }
+
+    return result;
+  }, [allDisplayMessages, searchQuery, roleFilter]);
+
+  // Helper to highlight matching text in user messages
+  const renderHighlightedText = (text: string, query: string) => {
+    if (!query.trim()) return text;
+
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <mark key={i} className="search-highlight font-medium">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
+  const hasMessages = allDisplayMessages.length > 0;
+  const isSearchActive = searchQuery.trim().length > 0 || roleFilter !== 'all';
 
   return (
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto px-4 md:px-8 py-6 relative space-y-6"
+      onClick={handleContainerClick}
+      className="flex-1 overflow-y-auto px-4 md:px-8 py-4 relative space-y-4"
     >
+      {/* Sticky Search & Filter Bar at top of thread */}
+      {hasMessages && (
+        <div className="sticky top-0 z-20 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200/80 dark:border-slate-800/80 -mx-4 md:-mx-8 px-4 md:px-8 py-2.5 transition-all shadow-xs">
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            {/* Search Input Container */}
+            <div className="relative flex-1 flex items-center">
+              <Search className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search messages in session (Ctrl+F)..."
+                className="w-full pl-9 pr-8 py-1.5 text-xs rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search query (Esc)"
+                  className="absolute right-2.5 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Filters & Match Indicator */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+              {/* Role filter buttons */}
+              <div className="flex items-center rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700/70 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('all')}
+                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                    roleFilter === 'all'
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('user')}
+                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                    roleFilter === 'user'
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  User
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('assistant')}
+                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                    roleFilter === 'assistant'
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  AI
+                </button>
+              </div>
+
+              {/* Match Counter Badge */}
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                {isSearchActive ? (
+                  <span className="inline-flex items-center gap-1 font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900/60">
+                    {filteredMessages.length} of {allDisplayMessages.length}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px]">
+                    {allDisplayMessages.length} msgs
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Empty State: Pure Google Gemini Web Interface Layout */}
-      {displayMessages.length === 0 && !isStreaming && (
+      {!hasMessages && !isStreaming && (
         <div className="max-w-2xl mx-auto my-auto min-h-[480px] flex flex-col justify-center items-center text-center px-4 space-y-8">
           {/* Centered Gemini Heading */}
           <div className="space-y-3">
@@ -80,7 +311,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
             </p>
           </div>
 
-          {/* Quick starter suggestions list (matching Gemini layout in screenshot) */}
+          {/* Quick starter suggestions list */}
           <div className="w-full max-w-lg space-y-2.5 pt-2 text-left">
             {activeRole.quickPrompts.map((prompt, idx) => (
               <button
@@ -103,8 +334,33 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
         </div>
       )}
 
+      {/* Zero matches empty state when searching */}
+      {hasMessages && filteredMessages.length === 0 && isSearchActive && (
+        <div className="max-w-md mx-auto py-16 text-center space-y-3">
+          <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+            <Search className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            No matching messages found
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+            {searchQuery ? `No messages matched "${searchQuery}"` : 'No messages found with the current role filter.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setRoleFilter('all');
+            }}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200/60 dark:border-blue-800/60 transition-colors cursor-pointer"
+          >
+            Clear Search Filter
+          </button>
+        </div>
+      )}
+
       {/* Render Message Thread */}
-      {displayMessages.map((msg, idx) => {
+      {filteredMessages.map((msg, idx) => {
         const isUser = msg.role === 'user';
         const isAssistant = msg.role === 'assistant';
 
@@ -143,7 +399,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
 
             {/* Message bubble */}
             <div
-              className={`relative rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[85%] ${
+              className={`relative rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[88%] sm:max-w-[85%] ${
                 isUser
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
                   : 'bg-transparent text-slate-800 dark:text-slate-200'
@@ -171,7 +427,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
                     ) : (
                       <>
                         <Copy className="w-3 h-3" />
-                        <span className="text-[10px]">Copy</span>
+                        <span className="text-[10px]">Copy response</span>
                       </>
                     )}
                   </button>
@@ -180,27 +436,54 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
 
               {/* Message Body */}
               {isUser ? (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <>
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {renderHighlightedText(msg.content, searchQuery)}
+                  </p>
+                  {/* User Timestamp */}
+                  <div className="mt-1.5 text-[10px] tabular-nums text-slate-400 dark:text-slate-500 text-right">
+                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </>
               ) : (
-                <div
-                  className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-slate-900 dark:prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-pre:rounded-xl prose-pre:p-3.5 prose-code:font-mono prose-code:text-xs text-slate-800 dark:text-slate-200 space-y-2 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:overflow-x-auto [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                  dangerouslySetInnerHTML={renderMarkdown(msg.content)}
-                />
-              )}
+                <>
+                  <div
+                    className="markdown-body text-slate-800 dark:text-slate-200"
+                    dangerouslySetInnerHTML={renderMarkdown(msg.content)}
+                  />
+                  {/* AI Response Footer with Copy to Clipboard Button & Timestamp */}
+                  <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(msg.content, idx)}
+                      aria-label="Copy entire response to clipboard"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200/90 dark:bg-slate-800/90 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-xs active:scale-95"
+                    >
+                      {copiedIndex === idx ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied to Clipboard!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                          <span>Copy to Clipboard</span>
+                        </>
+                      )}
+                    </button>
 
-              {/* Timestamp */}
-              <div
-                className={`mt-1.5 text-[10px] tabular-nums ${
-                  isUser
-                    ? 'text-slate-400 dark:text-slate-500 text-right'
-                    : 'text-slate-400 dark:text-slate-500'
-                }`}
-              >
-                {new Date(msg.timestamp).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
+                    <div className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
+                      {new Date(msg.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* User Avatar */}
@@ -243,11 +526,11 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
               <span className="font-medium text-slate-600 dark:text-slate-400">{activeRole.name}</span>
               <span>·</span>
               <span className="font-mono text-[10px]">{activeModel.id}</span>
-              <span className="text-blue-500 animate-pulse">Thinking...</span>
+              <span className="text-blue-500 animate-pulse font-medium">Generating...</span>
             </div>
             {streamingContent ? (
               <div
-                className="prose prose-sm dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3.5 [&_pre]:rounded-xl"
+                className="markdown-body text-slate-800 dark:text-slate-200"
                 dangerouslySetInnerHTML={renderMarkdown(streamingContent)}
               />
             ) : (
