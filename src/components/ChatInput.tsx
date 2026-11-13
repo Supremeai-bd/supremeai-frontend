@@ -35,6 +35,7 @@ interface ChatInputProps {
   developerMode?: boolean;
   enableKnowledgeGrounding?: boolean;
   onOpenLiveVoice?: () => void;
+  isLiveVoiceOpen?: boolean;
 }
 
 const TIER_RANK: Record<PlanTier, number> = {
@@ -57,6 +58,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   developerMode: developerModeProp,
   enableKnowledgeGrounding = false,
   onOpenLiveVoice,
+  isLiveVoiceOpen = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -453,14 +455,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <Mic className="w-4 h-4" />
             </button>
 
-            {/* Real-time Voice Conversation (Gemini Live API) */}
+            {/* Real-time 3D Voice Conversation (Gemini Live API) */}
             {onOpenLiveVoice && (
               <button
                 type="button"
                 onClick={onOpenLiveVoice}
                 aria-label="Live Voice Conversation"
-                title="Start real-time voice conversation (gemini-3.8-live)"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full theme-accent-active border text-xs font-medium hover:brightness-105 transition-all cursor-pointer shrink-0"
+                aria-pressed={isLiveVoiceOpen}
+                title={
+                  isLiveVoiceOpen
+                    ? 'Close 3D Voice Avatar side panel'
+                    : 'Open 3D Voice Avatar side panel (gemini-3.8-live)'
+                }
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer shrink-0 ${
+                  isLiveVoiceOpen
+                    ? 'theme-btn-primary border-transparent'
+                    : 'theme-accent-active hover:brightness-105'
+                }`}
               >
                 <AudioLines className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Voice</span>

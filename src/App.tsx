@@ -23,7 +23,7 @@ import { Sidebar } from './components/Sidebar';
 import { ChatThread } from './components/ChatThread';
 import { ChatEmptyState } from './components/chat/ChatEmptyState';
 import { ChatHistoryView } from './components/chat/ChatHistoryView';
-import { LiveVoiceModal } from './components/chat/LiveVoiceModal';
+import { LiveVoicePanel } from './components/chat/LiveVoicePanel';
 import { ChatInput } from './components/ChatInput';
 import { RoleModal } from './components/RoleModal';
 import { RoleLab } from './components/RoleLab';
@@ -819,7 +819,8 @@ export default function App() {
                           onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
                           developerMode={developerMode}
                           enableKnowledgeGrounding={enableKnowledgeGrounding}
-                          onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
+                          onOpenLiveVoice={() => setIsLiveVoiceOpen((v) => !v)}
+                          isLiveVoiceOpen={isLiveVoiceOpen}
                         />
                       </div>
                       <WorkspaceTipBar
@@ -875,11 +876,24 @@ export default function App() {
                       onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
                       developerMode={developerMode}
                       enableKnowledgeGrounding={enableKnowledgeGrounding}
-                      onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
+                      onOpenLiveVoice={() => setIsLiveVoiceOpen((v) => !v)}
+                      isLiveVoiceOpen={isLiveVoiceOpen}
                     />
                   </div>
                 )}
               </main>
+
+              <LiveVoicePanel
+                isOpen={isLiveVoiceOpen}
+                onClose={() => setIsLiveVoiceOpen(false)}
+                systemInstruction={
+                  customInstruction.trim() ||
+                  userSettings.customInstructions?.trim() ||
+                  activeRole.systemInstruction
+                }
+                roleName={activeRole.name}
+                onCommitTurn={appendVoiceTurn}
+              />
 
               {(developerMode || currentRole === 'admin') && <WorkspaceDock />}
             </div>
@@ -1254,18 +1268,6 @@ export default function App() {
           onClose={() => setIsPromptModalOpen(false)}
           onSelectTemplate={(text) => handleSendMessageWrapper(text)}
           developerMode={developerMode}
-        />
-
-        <LiveVoiceModal
-          isOpen={isLiveVoiceOpen}
-          onClose={() => setIsLiveVoiceOpen(false)}
-          systemInstruction={
-            customInstruction.trim() ||
-            userSettings.customInstructions?.trim() ||
-            activeRole.systemInstruction
-          }
-          roleName={activeRole.name}
-          onCommitTurn={appendVoiceTurn}
         />
 
         <WorkspaceMicroSurvey

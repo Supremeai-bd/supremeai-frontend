@@ -190,18 +190,95 @@ html.theme-transitioning *::after {
   animation: theme-preview-drift calc(8s / var(--theme-motion-speed, 1)) ease-in-out infinite;
 }
 
+:root {
+  --aurora-ax1: 32px;
+  --aurora-ay1: -22px;
+  --aurora-ax2: -18px;
+  --aurora-ay2: 34px;
+  --aurora-ax3: 48px;
+  --aurora-ay3: 14px;
+  --aurora-ax4: -26px;
+  --aurora-ay4: -16px;
+  --aurora-bx1: -36px;
+  --aurora-by1: 24px;
+  --aurora-bx2: 22px;
+  --aurora-by2: -32px;
+  --aurora-bx3: -44px;
+  --aurora-by3: -14px;
+  --aurora-bx4: 28px;
+  --aurora-by4: 18px;
+  --aurora-rot-a: 7deg;
+  --aurora-rot-b: -9deg;
+  --aurora-scale-a: 1.16;
+  --aurora-scale-b: 1.2;
+}
+
 @keyframes backdrop-radials-drift {
   0%, 100% {
-    transform: translate3d(0px, 0px, 0) scale(1);
+    transform: translate3d(0px, 0px, 0) rotate(0deg) scale(1);
     opacity: 0.88;
   }
-  33% {
-    transform: translate3d(18px, -12px, 0) scale(1.05);
+  23% {
+    transform: translate3d(22px, -16px, 0) rotate(1.5deg) scale(1.05);
     opacity: 1;
   }
-  66% {
-    transform: translate3d(-16px, 14px, 0) scale(1.03);
+  51% {
+    transform: translate3d(-14px, 24px, 0) rotate(-1.8deg) scale(1.07);
+    opacity: 0.91;
+  }
+  77% {
+    transform: translate3d(-26px, -10px, 0) rotate(0.9deg) scale(1.03);
+    opacity: 0.96;
+  }
+}
+
+@keyframes nebula-radial-drift {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) rotate(0deg) scale(1);
+    opacity: 0.85;
+  }
+  19% {
+    transform: translate3d(34px, -24px, 0) rotate(3.2deg) scale(1.08);
+    opacity: 0.98;
+  }
+  43% {
+    transform: translate3d(16px, 32px, 0) rotate(-2.4deg) scale(1.11);
     opacity: 0.92;
+  }
+  68% {
+    transform: translate3d(-38px, 12px, 0) rotate(-4deg) scale(1.06);
+    opacity: 1;
+  }
+  87% {
+    transform: translate3d(-18px, -28px, 0) rotate(2deg) scale(1.03);
+    opacity: 0.89;
+  }
+}
+
+@keyframes cyberpunk-radial-jitter {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) skewX(0deg) scale(1);
+    opacity: 0.84;
+  }
+  14% {
+    transform: translate3d(-32px, 14px, 0) skewX(-1.4deg) scale(1.06);
+    opacity: 0.99;
+  }
+  31% {
+    transform: translate3d(38px, -22px, 0) skewX(1.2deg) scale(1.02);
+    opacity: 0.78;
+  }
+  53% {
+    transform: translate3d(12px, 28px, 0) skewX(-0.8deg) scale(1.09);
+    opacity: 1;
+  }
+  74% {
+    transform: translate3d(-24px, -26px, 0) skewX(1.6deg) scale(1.04);
+    opacity: 0.86;
+  }
+  89% {
+    transform: translate3d(20px, 8px, 0) skewX(-0.5deg) scale(1.07);
+    opacity: 0.95;
   }
 }
 
@@ -209,6 +286,14 @@ html.theme-transitioning *::after {
   transform-origin: center center;
   will-change: transform, opacity;
   animation: backdrop-radials-drift var(--theme-gradient-duration, 16s) ease-in-out infinite;
+}
+
+[data-live-theme='nebula'] .backdrop-radials-animated {
+  animation: nebula-radial-drift calc(var(--theme-aurora-duration, 18s) * 1.15) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+[data-live-theme='cyberpunk'] .backdrop-radials-animated {
+  animation: cyberpunk-radial-jitter calc(var(--theme-aurora-duration, 10s) * 0.72) cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
 @keyframes photo-ken-burns {
@@ -538,35 +623,213 @@ mark.search-highlight {
   background-size: 32px 32px;
 }
 
-/* Cyber Aurora Plasma Glow Blobs */
-@keyframes cyber-float-cyan {
+/* Randomized Drift Aurora Plasma Glow Blobs (Theme-Parameterized Motion) */
+@keyframes aurora-randomized-drift-a {
   0%, 100% {
-    transform: translate(0px, 0px) scale(1);
+    transform: translate3d(0px, 0px, 0) rotate(0deg) scale(1);
     opacity: 0.28;
   }
-  50% {
-    transform: translate(40px, -25px) scale(1.12);
+  17% {
+    transform: translate3d(var(--aurora-ax1, 32px), var(--aurora-ay1, -22px), 0) rotate(calc(var(--aurora-rot-a, 7deg) * 0.55)) scale(1.09);
     opacity: 0.42;
+  }
+  39% {
+    transform: translate3d(var(--aurora-ax2, -18px), var(--aurora-ay2, 34px), 0) rotate(calc(var(--aurora-rot-a, 7deg) * -0.8)) scale(var(--aurora-scale-a, 1.16));
+    opacity: 0.34;
+  }
+  63% {
+    transform: translate3d(var(--aurora-ax3, 48px), var(--aurora-ay3, 14px), 0) rotate(var(--aurora-rot-a, 7deg)) scale(1.06);
+    opacity: 0.46;
+  }
+  84% {
+    transform: translate3d(var(--aurora-ax4, -26px), var(--aurora-ay4, -16px), 0) rotate(calc(var(--aurora-rot-a, 7deg) * -0.4)) scale(1.13);
+    opacity: 0.31;
   }
 }
 
-@keyframes cyber-float-violet {
+@keyframes aurora-randomized-drift-b {
   0%, 100% {
-    transform: translate(0px, 0px) scale(1);
+    transform: translate3d(0px, 0px, 0) rotate(0deg) scale(1);
+    opacity: 0.24;
+  }
+  21% {
+    transform: translate3d(var(--aurora-bx1, -36px), var(--aurora-by1, 24px), 0) rotate(calc(var(--aurora-rot-b, -9deg) * 0.6)) scale(1.12);
+    opacity: 0.39;
+  }
+  47% {
+    transform: translate3d(var(--aurora-bx2, 22px), var(--aurora-by2, -32px), 0) rotate(var(--aurora-rot-b, -9deg)) scale(var(--aurora-scale-b, 1.2));
+    opacity: 0.31;
+  }
+  71% {
+    transform: translate3d(var(--aurora-bx3, -44px), var(--aurora-by3, -14px), 0) rotate(calc(var(--aurora-rot-b, -9deg) * -0.5)) scale(1.08);
+    opacity: 0.44;
+  }
+  89% {
+    transform: translate3d(var(--aurora-bx4, 28px), var(--aurora-by4, 18px), 0) rotate(calc(var(--aurora-rot-b, -9deg) * 0.35)) scale(1.15);
+    opacity: 0.27;
+  }
+}
+
+/* Nebula: sweeping cosmic orbital drift with slow rotational inhalation */
+@keyframes nebula-aurora-drift-a {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) rotate(0deg) scale(1);
+    opacity: 0.32;
+  }
+  18% {
+    transform: translate3d(var(--aurora-ax1, 56px), var(--aurora-ay1, -34px), 0) rotate(8deg) scale(1.14);
+    opacity: 0.48;
+  }
+  41% {
+    transform: translate3d(var(--aurora-ax2, 82px), var(--aurora-ay2, 36px), 0) rotate(14deg) scale(1.24);
+    opacity: 0.4;
+  }
+  67% {
+    transform: translate3d(var(--aurora-ax3, -42px), var(--aurora-ay3, 52px), 0) rotate(-6deg) scale(1.18);
+    opacity: 0.52;
+  }
+  86% {
+    transform: translate3d(var(--aurora-ax4, -58px), var(--aurora-ay4, -22px), 0) rotate(-11deg) scale(1.06);
+    opacity: 0.36;
+  }
+}
+
+@keyframes nebula-aurora-drift-b {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) rotate(0deg) scale(1);
+    opacity: 0.28;
+  }
+  23% {
+    transform: translate3d(var(--aurora-bx1, -64px), var(--aurora-by1, 28px), 0) rotate(-9deg) scale(1.19);
+    opacity: 0.44;
+  }
+  52% {
+    transform: translate3d(var(--aurora-bx2, -26px), var(--aurora-by2, -56px), 0) rotate(-15deg) scale(1.26);
+    opacity: 0.5;
+  }
+  76% {
+    transform: translate3d(var(--aurora-bx3, 54px), var(--aurora-by3, -30px), 0) rotate(7deg) scale(1.11);
+    opacity: 0.35;
+  }
+  91% {
+    transform: translate3d(var(--aurora-bx4, 34px), var(--aurora-by4, 24px), 0) rotate(4deg) scale(1.04);
+    opacity: 0.31;
+  }
+}
+
+/* Cyberpunk: asymmetrical kinetic neon surges & jagged vector snaps */
+@keyframes cyberpunk-aurora-surge-a {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) skewX(0deg) scale(1);
+    opacity: 0.26;
+  }
+  13% {
+    transform: translate3d(var(--aurora-ax1, 68px), var(--aurora-ay1, -18px), 0) skewX(-4deg) scale(1.12);
+    opacity: 0.54;
+  }
+  29% {
+    transform: translate3d(var(--aurora-ax2, 24px), var(--aurora-ay2, 46px), 0) skewX(3deg) scale(0.95);
     opacity: 0.22;
   }
-  50% {
-    transform: translate(-35px, 30px) scale(1.18);
-    opacity: 0.38;
+  49% {
+    transform: translate3d(var(--aurora-ax3, -54px), var(--aurora-ay3, 28px), 0) skewX(-5deg) scale(1.22);
+    opacity: 0.58;
+  }
+  68% {
+    transform: translate3d(var(--aurora-ax4, -16px), var(--aurora-ay4, -44px), 0) skewX(2deg) scale(1.03);
+    opacity: 0.32;
+  }
+  85% {
+    transform: translate3d(36px, 12px, 0) skewX(-3deg) scale(1.16);
+    opacity: 0.49;
+  }
+}
+
+@keyframes cyberpunk-aurora-surge-b {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) skewY(0deg) scale(1);
+    opacity: 0.24;
+  }
+  16% {
+    transform: translate3d(var(--aurora-bx1, -62px), var(--aurora-by1, -24px), 0) skewY(3deg) scale(1.18);
+    opacity: 0.5;
+  }
+  37% {
+    transform: translate3d(var(--aurora-bx2, 42px), var(--aurora-by2, -38px), 0) skewY(-4deg) scale(0.96);
+    opacity: 0.21;
+  }
+  58% {
+    transform: translate3d(var(--aurora-bx3, 64px), var(--aurora-by3, 30px), 0) skewY(4deg) scale(1.25);
+    opacity: 0.56;
+  }
+  79% {
+    transform: translate3d(var(--aurora-bx4, -34px), var(--aurora-by4, 48px), 0) skewY(-2deg) scale(1.07);
+    opacity: 0.34;
   }
 }
 
 .cyber-aurora-cyan {
-  animation: cyber-float-cyan calc(14s / var(--theme-motion-speed, 1)) ease-in-out infinite;
+  will-change: transform, opacity;
+  animation: aurora-randomized-drift-a calc(14s / var(--theme-motion-speed, 1)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
 
 .cyber-aurora-violet {
-  animation: cyber-float-violet calc(18s / var(--theme-motion-speed, 1)) ease-in-out infinite;
+  will-change: transform, opacity;
+  animation: aurora-randomized-drift-b calc(19s / var(--theme-motion-speed, 1)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+[data-live-theme='nebula'] {
+  --aurora-ax1: 58px;
+  --aurora-ay1: -36px;
+  --aurora-ax2: 86px;
+  --aurora-ay2: 38px;
+  --aurora-ax3: -46px;
+  --aurora-ay3: 54px;
+  --aurora-ax4: -62px;
+  --aurora-ay4: -24px;
+  --aurora-bx1: -66px;
+  --aurora-by1: 30px;
+  --aurora-bx2: -28px;
+  --aurora-by2: -58px;
+  --aurora-bx3: 56px;
+  --aurora-by3: -32px;
+  --aurora-bx4: 36px;
+  --aurora-by4: 26px;
+}
+
+[data-live-theme='nebula'] .cyber-aurora-cyan {
+  animation: nebula-aurora-drift-a calc(21s / var(--theme-motion-speed, 1)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+[data-live-theme='nebula'] .cyber-aurora-violet {
+  animation: nebula-aurora-drift-b calc(27s / var(--theme-motion-speed, 1)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+[data-live-theme='cyberpunk'] {
+  --aurora-ax1: 72px;
+  --aurora-ay1: -20px;
+  --aurora-ax2: 26px;
+  --aurora-ay2: 48px;
+  --aurora-ax3: -58px;
+  --aurora-ay3: 30px;
+  --aurora-ax4: -18px;
+  --aurora-ay4: -46px;
+  --aurora-bx1: -64px;
+  --aurora-by1: -26px;
+  --aurora-bx2: 44px;
+  --aurora-by2: -40px;
+  --aurora-bx3: 66px;
+  --aurora-by3: 32px;
+  --aurora-bx4: -36px;
+  --aurora-by4: 50px;
+}
+
+[data-live-theme='cyberpunk'] .cyber-aurora-cyan {
+  animation: cyberpunk-aurora-surge-a calc(8.5s / var(--theme-motion-speed, 1)) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+[data-live-theme='cyberpunk'] .cyber-aurora-violet {
+  animation: cyberpunk-aurora-surge-b calc(11.5s / var(--theme-motion-speed, 1)) cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
 [data-live-motion='paused'] .cyber-ground-grid-animated,

@@ -2027,7 +2027,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
         </div>
       )}
 
-      {/* 5. NEBULA (3D Flying Starfield & Swirling Cosmic Clouds Canvas) */}
+      {/* 5. NEBULA (3D Flying Starfield & Swirling Cosmic Clouds Canvas + Orbital Aurora Glows) */}
       {liveTheme === 'nebula' && (
         <div
           className="absolute inset-0 transition-colors duration-700"
@@ -2035,6 +2035,22 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
             background: backdropConfig.baseGradient[schemeKey],
           }}
         >
+          <div
+            className="absolute -top-24 -left-20 w-[46vw] h-[46vh] rounded-full blur-3xl pointer-events-none cyber-aurora-cyan"
+            style={{
+              background: isDark
+                ? 'radial-gradient(circle, rgba(139, 92, 246, 0.28), rgba(56, 189, 248, 0.08) 55%, transparent 75%)'
+                : 'radial-gradient(circle, rgba(124, 58, 237, 0.18), rgba(59, 130, 246, 0.06) 55%, transparent 75%)',
+            }}
+          />
+          <div
+            className="absolute -bottom-24 -right-20 w-[50vw] h-[50vh] rounded-full blur-3xl pointer-events-none cyber-aurora-violet"
+            style={{
+              background: isDark
+                ? 'radial-gradient(circle, rgba(56, 189, 248, 0.24), rgba(168, 85, 247, 0.10) 55%, transparent 75%)'
+                : 'radial-gradient(circle, rgba(79, 70, 229, 0.16), rgba(139, 92, 246, 0.06) 55%, transparent 75%)',
+            }}
+          />
           <NebulaCanvas
             isDark={isDark}
             animate={shouldAnimate}
@@ -2047,7 +2063,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
         </div>
       )}
 
-      {/* 6. CYBERPUNK (Matrix Rain Canvas + Neon Glow + Optional CRT Scanline) */}
+      {/* 6. CYBERPUNK (Matrix Rain Canvas + Kinetic Neon Surge Aurora + Optional CRT Scanline) */}
       {liveTheme === 'cyberpunk' && (
         <div
           className="absolute inset-0 transition-colors duration-700"
@@ -2056,19 +2072,19 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
           }}
         >
           <div
-            className="absolute -top-28 -left-24 w-[44vw] h-[44vh] rounded-full blur-3xl"
+            className="absolute -top-28 -left-24 w-[44vw] h-[44vh] rounded-full blur-3xl pointer-events-none cyber-aurora-cyan"
             style={{
               background: isDark
-                ? 'radial-gradient(circle, rgba(34, 255, 136, 0.22), transparent 70%)'
-                : 'radial-gradient(circle, rgba(16, 185, 129, 0.20), transparent 70%)',
+                ? 'radial-gradient(circle, rgba(34, 255, 136, 0.24), transparent 70%)'
+                : 'radial-gradient(circle, rgba(16, 185, 129, 0.22), transparent 70%)',
             }}
           />
           <div
-            className="absolute -bottom-28 -right-24 w-[48vw] h-[48vh] rounded-full blur-3xl"
+            className="absolute -bottom-28 -right-24 w-[48vw] h-[48vh] rounded-full blur-3xl pointer-events-none cyber-aurora-violet"
             style={{
               background: isDark
-                ? 'radial-gradient(circle, rgba(255, 42, 212, 0.24), transparent 70%)'
-                : 'radial-gradient(circle, rgba(217, 70, 239, 0.18), transparent 70%)',
+                ? 'radial-gradient(circle, rgba(255, 42, 212, 0.26), transparent 70%)'
+                : 'radial-gradient(circle, rgba(217, 70, 239, 0.20), transparent 70%)',
             }}
           />
 

@@ -1399,6 +1399,10 @@ export const applyThemeToDom = (
     '--theme-grid-duration',
     `${(backdropConfig.animationSpeed.gridDurationSec / speedRatio).toFixed(2)}s`
   );
+  root.style.setProperty(
+    '--theme-aurora-duration',
+    `${Math.max(4, (backdropConfig.animationSpeed.gradientDurationSec * 0.9) / speedRatio).toFixed(2)}s`
+  );
 };
 
 interface ThemeStoreState {
