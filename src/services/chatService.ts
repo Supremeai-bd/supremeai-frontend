@@ -6,6 +6,7 @@ export interface ChatStreamOptions {
   messages: ChatMessage[];
   systemInstruction?: string;
   groundingContext?: string;
+  deepResearch?: boolean;
   stream?: boolean;
   signal?: AbortSignal;
   onChunk: (text: string) => void;
@@ -20,6 +21,7 @@ export const chatService = {
       messages,
       systemInstruction,
       groundingContext,
+      deepResearch = false,
       stream = true,
       signal,
       onChunk,
@@ -36,6 +38,7 @@ export const chatService = {
           model,
           systemInstruction,
           groundingContext,
+          deepResearch,
           messages: messages.map((m) => ({
             role: m.role,
             content: m.content,

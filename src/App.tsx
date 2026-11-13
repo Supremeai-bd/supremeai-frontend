@@ -284,6 +284,7 @@ export default function App() {
   // Navigation & Layout UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatUtilityMode, setChatUtilityMode] = useState<'chat' | 'task'>('chat');
+  const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const { isDockOpen, toggleDock } = useWorkspaceStore();
   const layoutMode = userSettings.layoutMode || 'sidebar-focus';
@@ -377,7 +378,7 @@ export default function App() {
     setSidebarOpen(false);
     const estimatedTokens = Math.ceil(text.length / 4) + (attachment ? 258 : 0);
     recordTokenUsage(estimatedTokens);
-    await sendMessage(text, attachment, knowledgeDocs);
+    await sendMessage(text, attachment, knowledgeDocs, isDeepResearchActive);
   };
 
   // If user is unauthenticated, show Authentication page
@@ -649,6 +650,8 @@ export default function App() {
                             setActiveTab('user-knowledge');
                           }
                         }}
+                        isDeepResearchActive={isDeepResearchActive}
+                        onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
                       />
                     </div>
                   </div>

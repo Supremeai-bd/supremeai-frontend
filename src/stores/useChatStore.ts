@@ -35,7 +35,7 @@ interface ChatState {
   setIsRoleModalOpen: (open: boolean) => void;
 
   // Inference Actions
-  sendMessage: (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[]) => Promise<void>;
+  sendMessage: (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[], deepResearch?: boolean) => Promise<void>;
   stopStreaming: () => void;
 }
 
@@ -202,7 +202,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     setIsPromptModalOpen: (open: boolean) => set({ isPromptModalOpen: open }),
     setIsRoleModalOpen: (open: boolean) => set({ isRoleModalOpen: open }),
 
-    sendMessage: async (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[]) => {
+    sendMessage: async (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[], deepResearch?: boolean) => {
       const { sessions, activeSessionId, activeModel, activeRole, customInstruction, isStreaming } = get();
       if ((!text.trim() && !attachment) || isStreaming) return;
 
@@ -263,6 +263,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         messages: updatedMessages,
         systemInstruction: customInstruction || activeRole.systemInstruction,
         groundingContext,
+        deepResearch,
         signal: controller.signal,
         onChunk: (chunk) => {
           set((state) => ({ streamingContent: state.streamingContent + chunk }));

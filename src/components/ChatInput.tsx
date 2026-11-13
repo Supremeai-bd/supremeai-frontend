@@ -25,6 +25,8 @@ interface ChatInputProps {
   onOpenPromptLibrary?: () => void;
   isGroundingActive?: boolean;
   onToggleGrounding?: () => void;
+  isDeepResearchActive?: boolean;
+  onToggleDeepResearch?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -36,6 +38,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onOpenPromptLibrary,
   isGroundingActive = false,
   onToggleGrounding,
+  isDeepResearchActive = false,
+  onToggleDeepResearch,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -278,6 +282,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               }`}
             >
               <Database className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Deep Research Mode Toggle */}
+          {onToggleDeepResearch && (
+            <button
+              type="button"
+              onClick={onToggleDeepResearch}
+              title={isDeepResearchActive ? "Deep Research mode active" : "Enable Deep Research mode"}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                isDeepResearchActive
+                  ? "bg-amber-500/20 text-amber-500 border border-amber-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
             </button>
           )}
 
