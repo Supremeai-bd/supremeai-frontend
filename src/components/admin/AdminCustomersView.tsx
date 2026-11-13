@@ -228,7 +228,7 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
           <div className="text-xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">
             {(totalTokens / 1000000).toFixed(1)}M
           </div>
-          <span className="text-[10px] text-slate-400">Gemini tokens consumed</span>
+          <span className="text-[10px] text-slate-400">SupremeAI tokens consumed</span>
         </div>
       </div>
 

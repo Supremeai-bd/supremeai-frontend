@@ -15,7 +15,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { ModelDetail, ChatAttachment, PlanTier } from '../types';
-import { GEMINI_MODELS } from '../data/models';
+import { SUPREMEAI_MODELS } from '../data/models';
 import { usePlatformStore } from '../stores/usePlatformStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
@@ -207,7 +207,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {/* Gemini-style Floating Input Capsule */}
+        {/* SupremeAI Floating Input Capsule */}
         <div className="relative rounded-full sm:rounded-3xl bg-white/85 dark:bg-[#171b26]/82 backdrop-blur-2xl border border-white/75 dark:border-slate-700/75 shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.45)] theme-capsule-focus transition-all p-2.5 flex items-center gap-2">
           {/* Plus (+) Button for Connectors, Recipes, and File Uploads */}
           <div className="relative">
@@ -355,7 +355,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={attachment ? 'Add instructions for attached file...' : 'Ask Gemini or type instructions...'}
+            placeholder={attachment ? 'Add instructions for attached file...' : 'Ask SupremeAI or type instructions...'}
             className="flex-1 max-h-40 bg-transparent resize-none border-none focus:outline-none text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 px-2 py-1 leading-relaxed"
           />
 
@@ -368,7 +368,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onClick={() => setShowModelMenu(!showModelMenu)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200/80 hover:bg-slate-300/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-medium transition-colors cursor-pointer"
               >
-                <span>{activeModel.name.replace('Gemini ', '')}</span>
+                <span>{activeModel.name}</span>
                 <ChevronDown className="w-3 h-3 text-slate-500" />
               </button>
 
@@ -381,9 +381,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   />
                   <div className="absolute right-0 bottom-full mb-2 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-40 p-1.5 space-y-1">
                     <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      Gemini Foundation Models
+                      SupremeAI Foundation Models
                     </div>
-                    {GEMINI_MODELS.map((model) => {
+                    {SUPREMEAI_MODELS.map((model) => {
                       const policy = config.modelPolicies[model.id] || { enabled: true, minTier: 'Free' };
                       const isDisabledByAdmin = !policy.enabled && currentRole !== 'admin';
                       const isTierLocked =

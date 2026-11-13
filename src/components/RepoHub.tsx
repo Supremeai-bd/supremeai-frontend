@@ -110,7 +110,7 @@ export const RepoHub: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Ultra-lightweight React 19 + Tailwind v4 + Express studio frontend designed with zero clutter, real-time Gemini streaming, and role personas.
+            Ultra-lightweight React 19 + Tailwind v4 + Express studio frontend designed with zero clutter, real-time SupremeAI streaming, and role personas.
           </p>
 
           <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 space-y-2 text-xs">
@@ -123,7 +123,7 @@ export const RepoHub: React.FC = () => {
             <div className="flex items-center justify-between text-slate-500">
               <span>AI Integration</span>
               <span className="font-mono text-slate-700 dark:text-slate-300">
-                @google/genai (Server-Side)
+                SupremeAI Gateway Service
               </span>
             </div>
           </div>
@@ -174,9 +174,9 @@ export const RepoHub: React.FC = () => {
           </div>
 
           <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 space-y-1.5">
-            <div className="font-semibold text-slate-900 dark:text-white">3. Gemini Engine</div>
+            <div className="font-semibold text-slate-900 dark:text-white">3. SupremeAI Cognitive Engine</div>
             <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-              @google/genai SDK dynamically routing between gemini-3.8-flash, 3.1-flash-lite, 4-carbon, and 4-argon based on role.
+              Proprietary cognitive mesh dynamically routing between SupremeAI Core, Reason, Spark, and Deep based on intent.
             </p>
           </div>
         </div>

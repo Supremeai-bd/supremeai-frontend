@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles, Play, Copy, Check, ArrowRight, Shield, Cpu, Zap, Code } from 'lucide-react';
 import { RolePersona, ModelDetail } from '../types';
 import { SYSTEM_ROLES } from '../data/roles';
-import { GEMINI_MODELS } from '../data/models';
+import { SUPREMEAI_MODELS } from '../data/models';
 
 interface RoleLabProps {
   onSelectRoleForChat: (role: RolePersona, customInstruction?: string) => void;
@@ -144,7 +144,7 @@ export const RoleLab: React.FC<RoleLabProps> = ({
                     : 'border-slate-100 dark:border-slate-700/60 text-slate-400'
                 }`}
               >
-                Model: {role.suggestedModel.replace('gemini-', '')}
+                Model: {SUPREMEAI_MODELS.find(m => m.id === role.suggestedModel)?.name || role.suggestedModel}
               </div>
             </button>
           );
@@ -166,7 +166,7 @@ export const RoleLab: React.FC<RoleLabProps> = ({
                 onChange={(e) => setTestModel(e.target.value)}
                 className="text-xs py-1 px-2 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-600 focus:outline-none"
               >
-                {GEMINI_MODELS.map((m) => (
+                {SUPREMEAI_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name} ({m.latencyRating})
                   </option>
@@ -260,7 +260,7 @@ export const RoleLab: React.FC<RoleLabProps> = ({
               testResponse
             ) : (
               <div className="text-slate-400 dark:text-slate-500 text-center py-12 font-sans text-xs">
-                Click "Run Test" to execute this role configuration against the selected Gemini model.
+                Click "Run Test" to execute this role configuration against the selected SupremeAI model.
               </div>
             )}
           </div>

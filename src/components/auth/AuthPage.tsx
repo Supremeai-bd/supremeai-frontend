@@ -106,10 +106,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
             <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7">
               <path
                 d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"
-                fill="url(#gemini-logo-gradient)"
+                fill="url(#supreme-logo-gradient)"
               />
               <defs>
-                <linearGradient id="gemini-logo-gradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <linearGradient id="supreme-logo-gradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
                   <stop stopColor="#3B82F6" />
                   <stop offset="0.5" stopColor="#8B5CF6" />
                   <stop offset="1" stopColor="#EC4899" />
@@ -121,7 +121,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
 
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             {mode === 'login'
-              ? 'Sign in to access your workspace, chats, and Gemini reasoning models.'
+              ? 'Sign in to access your workspace, chats, and SupremeAI reasoning models.'
               : 'Create your account to get started with SupremeAI Studio.'}
           </p>
         </div>

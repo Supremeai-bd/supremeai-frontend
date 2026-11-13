@@ -4,7 +4,7 @@ export const INITIAL_PLUGINS: PluginItem[] = [
   {
     id: 'github-sync',
     name: 'GitHub Project Bridge',
-    tagline: 'Sync branches, pull requests, and commit diffs with Gemini',
+    tagline: 'Sync branches, pull requests, and commit diffs with SupremeAI',
     description:
       'Seamlessly links connected GitHub repositories to the chat context, allowing you to ask questions about your codebase, track recent commits, and inspect file trees.',
     category: 'developer',
@@ -28,7 +28,7 @@ export const INITIAL_PLUGINS: PluginItem[] = [
     name: 'Search & Docs Grounding',
     tagline: 'Ground answers in latest web docs and live library releases',
     description:
-      'Augments Gemini responses with real-time documentation for React 19, Tailwind v4, Vite, and external developer packages.',
+      'Augments SupremeAI responses with real-time documentation for React 19, Tailwind v4, Vite, and external developer packages.',
     category: 'ai-grounding',
     isEnabled: true,
     version: '1.8.0',
@@ -86,7 +86,7 @@ export const INITIAL_USER_PROJECTS: UserProject[] = [
     name: 'supremeai-studio',
     repoUrl: 'https://github.com/Supremeai-bd/supremeai-studio',
     branch: 'main',
-    description: 'Ultra-lightweight Gemini-powered developer studio & workspace frontend.',
+    description: 'Ultra-lightweight SupremeAI developer studio & workspace frontend.',
     language: 'TypeScript / React',
     stars: 42,
     lastSynced: Date.now() - 3600000 * 2,
@@ -104,7 +104,7 @@ export const DEFAULT_USER_SETTINGS: UserAccountSettings = {
   emailNotifications: true,
   autoCodeReview: true,
   streamResponses: true,
-  defaultModel: 'gemini-3.8-flash',
+  defaultModel: 'supreme-core',
   layoutMode: 'sidebar-focus',
   contentLayout: 'fluid',
   developerMode: false,

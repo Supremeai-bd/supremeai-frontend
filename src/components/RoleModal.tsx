@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, Sliders, Info, Shield, Cpu, Zap, Code, Sparkles } from 'lucide-react';
 import { RolePersona, ModelDetail } from '../types';
 import { SYSTEM_ROLES } from '../data/roles';
-import { GEMINI_MODELS } from '../data/models';
+import { SUPREMEAI_MODELS } from '../data/models';
 
 interface RoleModalProps {
   isOpen: boolean;
@@ -34,7 +34,7 @@ export const RoleModal: React.FC<RoleModalProps> = ({
     setSelectedRole(role);
     setInstructionText(role.systemInstruction);
     // Find suggested model
-    const matchedModel = GEMINI_MODELS.find((m) => m.id === role.suggestedModel);
+    const matchedModel = SUPREMEAI_MODELS.find((m) => m.id === role.suggestedModel);
     if (matchedModel) {
       onSelectModel(matchedModel);
     }
@@ -115,7 +115,7 @@ export const RoleModal: React.FC<RoleModalProps> = ({
                       </p>
                     </div>
                     <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Model: {role.suggestedModel.replace('gemini-', '')}</span>
+                      <span>Model: {SUPREMEAI_MODELS.find(m => m.id === role.suggestedModel)?.name || role.suggestedModel}</span>
                       {isSelected && <Check className="w-3.5 h-3.5 text-slate-900 dark:text-white" />}
                     </div>
                   </button>
@@ -130,7 +130,7 @@ export const RoleModal: React.FC<RoleModalProps> = ({
               Associated Model
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {GEMINI_MODELS.map((model) => (
+              {SUPREMEAI_MODELS.map((model) => (
                 <button
                   key={model.id}
                   type="button"
@@ -170,7 +170,7 @@ export const RoleModal: React.FC<RoleModalProps> = ({
               className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-400 leading-relaxed"
             />
             <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-              The system instruction directs Gemini's tone, role boundaries, code standards, and response depth.
+              The system instruction directs SupremeAI's tone, role boundaries, code standards, and response depth.
             </p>
           </div>
         </div>

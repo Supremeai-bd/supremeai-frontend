@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Gauge, Lock } from 'lucide-react';
-import { GEMINI_MODELS } from '../data/models';
+import { SUPREMEAI_MODELS } from '../data/models';
 import { ModelDetail, PlanTier } from '../types';
 import { usePlatformStore } from '../stores/usePlatformStore';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -76,16 +76,16 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
     <div className="flex-1 overflow-y-auto px-6 py-8 max-w-6xl mx-auto space-y-8 text-slate-800 dark:text-slate-200">
       <div className="space-y-1.5 border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Gemini Intelligence Matrix
+          SupremeAI Intelligence Matrix
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
-          Specification, governance status, reasoning capabilities, and throughput benchmarks across Gemini foundation models deployed in SupremeAI Studio.
+          Specification, governance status, reasoning capabilities, and throughput benchmarks across SupremeAI foundation models deployed in SupremeAI Studio.
         </p>
       </div>
 
       {/* Model Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {GEMINI_MODELS.map((model) => {
+        {SUPREMEAI_MODELS.map((model) => {
           const isActive = model.id === activeModel.id;
           const pingData = latencyResults[model.id];
           const isPinging = testingModelId === model.id;
@@ -228,7 +228,7 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-sans">
               <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                 <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                  gemini-3.8-flash
+                  supreme-core (SupremeAI Core)
                 </td>
                 <td className="p-3.5 text-slate-600 dark:text-slate-300">
                   General tasks, summarization, proofreading, code assistance
@@ -240,7 +240,7 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
               </tr>
               <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                 <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                  gemini-3.1-flash-lite
+                  supreme-spark (SupremeAI Spark)
                 </td>
                 <td className="p-3.5 text-slate-600 dark:text-slate-300">
                   Tasks that should happen fast: regex, shell commands, syntax conversion
@@ -252,7 +252,7 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
               </tr>
               <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                 <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                  gemini-4-carbon
+                  supreme-reason (SupremeAI Reason)
                 </td>
                 <td className="p-3.5 text-slate-600 dark:text-slate-300">
                   Deep reasoning tasks, root-cause architecture analysis, security invariants
@@ -264,7 +264,7 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
               </tr>
               <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                 <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                  gemini-4-argon
+                  supreme-deep (SupremeAI Deep)
                 </td>
                 <td className="p-3.5 text-slate-600 dark:text-slate-300">
                   Particularly complex interactive tasks, heavy full-stack refactoring

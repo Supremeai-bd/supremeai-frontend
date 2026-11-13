@@ -31,7 +31,7 @@ import {
   TaskQueueJob,
   PlanTier,
 } from '../../types';
-import { GEMINI_MODELS } from '../../data/models';
+import { SUPREMEAI_MODELS } from '../../data/models';
 import { usePlatformStore } from '../../stores/usePlatformStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 
@@ -359,7 +359,7 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
                 <span>Model Access & Tier Governance</span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                Enable/disable Gemini models or enforce minimum subscription tier per model.
+                Enable/disable SupremeAI models or enforce minimum subscription tier per model.
               </p>
             </div>
             <button
@@ -372,7 +372,7 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
           </div>
 
           <div className="space-y-2.5">
-            {GEMINI_MODELS.map((model) => {
+            {SUPREMEAI_MODELS.map((model) => {
               const policy = config.modelPolicies[model.id] || { enabled: true, minTier: 'Free' };
               return (
                 <div

@@ -90,7 +90,7 @@ export const UserBillingView: React.FC<UserBillingViewProps> = ({
           <div className="space-y-1.5 pt-2 border-t border-white/20 text-xs text-blue-50">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-3.5 h-3.5" />
-              <span>Full Gemini 3.8 Flash & 4 Carbon Access</span>
+              <span>Full SupremeAI Core & Reason Access</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="w-3.5 h-3.5" />
@@ -271,7 +271,7 @@ export const UserBillingView: React.FC<UserBillingViewProps> = ({
             ) : (
               <div className="space-y-4">
                 <p className="text-xs text-slate-600 dark:text-slate-300">
-                  Tokens never expire and apply across all Gemini models.
+                  Tokens never expire and apply across all SupremeAI models.
                 </p>
 
                 <div className="space-y-2.5">

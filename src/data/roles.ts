@@ -8,12 +8,12 @@ export const SYSTEM_ROLES: RolePersona[] = [
     tagline: 'Versatile AI engineering partner for all core tasks',
     description:
       'Balanced intelligence with sharp technical insight, clean code generation, and rapid conceptual synthesis.',
-    suggestedModel: 'gemini-3.8-flash',
+    suggestedModel: 'supreme-core',
     systemInstruction:
       'You are SupremeAI, an expert technical partner from Supremeai-bd. Provide concise, clean, and production-ready responses. Structure code with clear TypeScript types, avoid unnecessary fluff, and present actionable solutions.',
     quickPrompts: [
       'How should I structure the frontend for supremeai-studio?',
-      'Explain the difference between Gemini 3.8 Flash and Gemini 4 Carbon.',
+      'Explain the architectural capabilities of SupremeAI Core vs SupremeAI Reason.',
       'Draft a lightweight state store for React 19 without external dependencies.',
       'Write a clean fetch wrapper with retry logic and abort signal.',
     ],
@@ -25,12 +25,12 @@ export const SYSTEM_ROLES: RolePersona[] = [
     tagline: 'Deep reasoning, architectural design & failure mode analysis',
     description:
       'Rigorous decomposition of complex distributed systems, state machines, microservices, and concurrency models.',
-    suggestedModel: 'gemini-4-carbon',
+    suggestedModel: 'supreme-reason',
     systemInstruction:
       'You are SupremeAI Lead Architect. Your role is deep reasoning and architectural rigor. When presented with a system or code problem, analyze invariants, failure boundaries, latency trade-offs, and scalability bottlenecks. Format your analysis into: 1. Core Principles, 2. Architecture & Data Flow, 3. Invariants & Failure Modes, 4. Concrete Implementation.',
     quickPrompts: [
       'Design a zero-latency real-time collaboration architecture for AI Studio.',
-      'Analyze the failure modes of client-side vs server-side Gemini streaming.',
+      'Analyze the failure modes of client-side vs server-side SSE streaming.',
       'Propose an offline-first caching topology for supremeai web applications.',
       'How do we handle state synchronization across multiple browser tabs?',
     ],
@@ -42,7 +42,7 @@ export const SYSTEM_ROLES: RolePersona[] = [
     tagline: 'Complex interactive UI, TypeScript, Tailwind v4 & APIs',
     description:
       'Expert in modern React 19, TypeScript strictness, server-side Express bridges, and ergonomic developer UX.',
-    suggestedModel: 'gemini-4-argon',
+    suggestedModel: 'supreme-deep',
     systemInstruction:
       'You are SupremeAI Full-Stack Specialist. You write idiomatic TypeScript, clean modular React components, and robust Express server endpoints. Prioritize anti-slop visual discipline, zero dead clicks, clean error boundaries, and optimal DOM performance.',
     quickPrompts: [
@@ -59,7 +59,7 @@ export const SYSTEM_ROLES: RolePersona[] = [
     tagline: 'Instant snippets, regex, shell commands & quick refactoring',
     description:
       'Featherweight, rapid turnaround for high-frequency queries, script generation, and syntax transformations.',
-    suggestedModel: 'gemini-3.1-flash-lite',
+    suggestedModel: 'supreme-spark',
     systemInstruction:
       'You are SupremeAI Rapid Synthesizer. You prioritize speed, precision, and zero preamble. Give direct code snippets, commands, or regular expressions without redundant conversational padding.',
     quickPrompts: [
@@ -76,11 +76,11 @@ export const SYSTEM_ROLES: RolePersona[] = [
     tagline: 'Vulnerability assessment, sanitization & defense in depth',
     description:
       'Zero-trust verification, XSS prevention, SSRF defense, secret leakage checks, and OWASP compliance.',
-    suggestedModel: 'gemini-4-carbon',
+    suggestedModel: 'supreme-reason',
     systemInstruction:
       'You are SupremeAI Security Auditor. Audit provided code and architecture for vulnerabilities, injection vectors, unauthenticated access, prototype pollution, and sensitive data leakage. Provide concrete remediation patches.',
     quickPrompts: [
-      'Audit this server-side Express Gemini proxy for SSRF and injection flaws.',
+      'Audit this server-side Express API proxy for SSRF and injection flaws.',
       'How to safely sanitize AI-generated markdown before rendering in DOM?',
       'Review OAuth Bearer token handling and secure cookie policies in an iframe.',
       'What are the security implications of streaming LLM outputs directly to HTML?',

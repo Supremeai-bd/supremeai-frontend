@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { ChatSession, ChatMessage, RolePersona, ModelDetail, ChatAttachment, KnowledgeDoc } from '../types';
 import { SYSTEM_ROLES } from '../data/roles';
-import { GEMINI_MODELS } from '../data/models';
+import { SUPREMEAI_MODELS } from '../data/models';
 import { chatService } from '../services/chatService';
 import { conversationService } from '../services/conversationService';
 import { researchService } from '../services/researchService';
@@ -63,7 +63,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       title: 'SupremeAI Chat',
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      model: 'gemini-3.8-flash',
+      model: 'supreme-core',
       roleId: SYSTEM_ROLES[0].id,
       messages: [],
     };
@@ -75,7 +75,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   return {
     sessions: initialSessions,
     activeSessionId: initialSessions[0]?.id || '',
-    activeModel: GEMINI_MODELS.find((m) => m.id === 'gemini-3.8-flash') || GEMINI_MODELS[0],
+    activeModel: SUPREMEAI_MODELS.find((m) => m.id === 'supreme-core') || SUPREMEAI_MODELS[0],
     activeRole: SYSTEM_ROLES[0],
     customInstruction: '',
     isStreaming: false,
@@ -271,7 +271,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     selectRole: (role: RolePersona, customPrompt?: string) => {
-      const matchedModel = GEMINI_MODELS.find((m) => m.id === role.suggestedModel);
+      const matchedModel = SUPREMEAI_MODELS.find((m) => m.id === role.suggestedModel);
       set((state) => ({
         activeRole: role,
         customInstruction: customPrompt || '',
@@ -402,6 +402,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       await chatService.streamChat({
         model: activeModel.id,
         messages: updatedMessages,
+        sessionId: current.id,
         systemInstruction: effectiveSystemInstruction,
         groundingContext,
         deepResearch,
@@ -507,7 +508,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                 title: rem.title || 'Conversation',
                 createdAt: new Date(rem.created_at).getTime(),
                 updatedAt: new Date(rem.updated_at).getTime(),
-                model: 'gemini-3.8-flash',
+                model: 'supreme-core',
                 roleId: SYSTEM_ROLES[0].id,
                 messages: [],
               });

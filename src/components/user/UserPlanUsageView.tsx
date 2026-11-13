@@ -185,7 +185,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
               <span className="font-mono font-semibold tabular-nums">{data.userMessages}</span>
             </div>
             <div className="flex items-center justify-between text-purple-600 dark:text-purple-400">
-              <span>{developerMode ? 'Gemini Responses:' : 'Assistant Replies:'}</span>
+              <span>{developerMode ? 'SupremeAI Responses:' : 'Assistant Replies:'}</span>
               <span className="font-mono font-semibold tabular-nums">{data.assistantMessages}</span>
             </div>
             <div className="flex items-center justify-between text-slate-500 pt-1 border-t border-slate-100 dark:border-slate-700">
@@ -209,7 +209,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {developerMode
-              ? 'Monitor monthly Gemini quota, 7-day chat telemetry, credit top-ups, and Stripe billing receipts.'
+              ? 'Monitor monthly SupremeAI quota, 7-day chat telemetry, credit top-ups, and Stripe billing receipts.'
               : 'Track your monthly allowance, 7-day activity, credit top-ups, and billing receipts.'}
           </p>
         </div>
@@ -266,7 +266,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
               <div className="space-y-1.5 pt-2 border-t border-white/20 text-xs text-blue-50">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-3.5 h-3.5" />
-                  <span>Gemini 3.8 Flash & High-Speed Models</span>
+                  <span>SupremeAI Core & High-Speed Models</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-3.5 h-3.5" />
@@ -446,7 +446,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {developerMode
-                    ? 'Interactive breakdown of user prompts and Gemini responses.'
+                    ? 'Interactive breakdown of user prompts and SupremeAI responses.'
                     : 'Interactive breakdown of your prompts and assistant replies.'}
                 </p>
               </div>
@@ -482,7 +482,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                   {metricView === 'stacked' ? (
                     <>
                       <Bar dataKey="userMessages" name={developerMode ? 'User Prompts' : 'Your Prompts'} stackId="a" fill="#3B82F6" maxBarSize={44} />
-                      <Bar dataKey="assistantMessages" name={developerMode ? 'Gemini Responses' : 'Assistant Replies'} stackId="a" fill="#8B5CF6" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                      <Bar dataKey="assistantMessages" name={developerMode ? 'SupremeAI Responses' : 'Assistant Replies'} stackId="a" fill="#8B5CF6" radius={[6, 6, 0, 0]} maxBarSize={44} />
                     </>
                   ) : (
                     <Bar dataKey="totalMessages" name="Total Messages" fill="#3B82F6" radius={[6, 6, 0, 0]} maxBarSize={44} />
@@ -581,7 +581,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
             ) : (
               <div className="space-y-4">
                 <p className="text-xs text-slate-600 dark:text-slate-300">
-                  Tokens never expire and apply across all permitted Gemini models.
+                  Tokens never expire and apply across all permitted SupremeAI models.
                 </p>
 
                 <div className="space-y-2.5">

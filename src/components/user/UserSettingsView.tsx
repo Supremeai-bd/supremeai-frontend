@@ -29,7 +29,7 @@ import {
   MessageSquarePlus,
 } from 'lucide-react';
 import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
-import { GEMINI_MODELS } from '../../data/models';
+import { SUPREMEAI_MODELS } from '../../data/models';
 import {
   useThemeStore,
   LIVE_THEMES,
@@ -283,7 +283,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Gauge className="w-4 h-4 text-slate-500" />
-            <span>{devModeActive ? 'Monthly Token Quota (Gemini API)' : 'Monthly Usage Allowance'}</span>
+            <span>{devModeActive ? 'Monthly Token Quota (SupremeAI API)' : 'Monthly Usage Allowance'}</span>
           </h2>
           <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
             {settings.monthlyTokensUsed.toLocaleString()} / {settings.monthlyTokensLimit.toLocaleString()} {devModeActive ? 'tokens' : 'credits'}
@@ -508,14 +508,14 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
 
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Default Gemini Model
+            Default SupremeAI Model
           </label>
           <select
             value={defaultModel}
             onChange={(e) => setDefaultModel(e.target.value)}
             className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-400"
           >
-            {GEMINI_MODELS.map((m) => (
+            {SUPREMEAI_MODELS.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name} ({m.tagline})
               </option>
@@ -532,7 +532,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 <span>Custom Instructions & AI Persona</span>
               </label>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Active Persona: <span className="font-medium text-slate-700 dark:text-slate-200">{activeRole.name}</span>. Override or customize how Gemini responds across your chats.
+                Active Persona: <span className="font-medium text-slate-700 dark:text-slate-200">{activeRole.name}</span>. Override or customize how SupremeAI responds across your chats.
               </p>
             </div>
             <button
@@ -647,7 +647,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 >
                   <PanelLeft className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'sidebar-focus' ? 'theme-accent-text' : 'text-slate-400'}`} />
                   <div>
-                    <div className="text-xs font-semibold">Sidebar Focus (Gemini)</div>
+                    <div className="text-xs font-semibold">Sidebar Focus (Modern)</div>
                     <div className="text-[11px] opacity-80 mt-0.5">
                       Full-height canvas without duplicate top navbar.
                     </div>
@@ -688,7 +688,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                 {devModeActive
-                  ? 'Receive Gemini tokens incrementally in real time.'
+                  ? 'Receive SupremeAI tokens incrementally in real time.'
                   : 'Receive responses word-by-word as they are generated.'}
               </span>
             </div>

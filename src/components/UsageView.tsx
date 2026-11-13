@@ -154,7 +154,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ sessions, darkMode }) => {
             <div className="flex items-center justify-between text-purple-600 dark:text-purple-400">
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
-                Gemini Responses:
+                SupremeAI Responses:
               </span>
               <span className="font-mono font-semibold tabular-nums">{data.assistantMessages}</span>
             </div>
@@ -179,7 +179,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ sessions, darkMode }) => {
             <span>Message Activity & Usage Analytics</span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Real-time token telemetry and interaction volume across Gemini models over the rolling 7-day window.
+            Real-time token telemetry and interaction volume across SupremeAI models over the rolling 7-day window.
           </p>
         </div>
 
@@ -355,7 +355,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ sessions, darkMode }) => {
                   />
                   <Bar
                     dataKey="assistantMessages"
-                    name="Gemini Responses"
+                    name="SupremeAI Responses"
                     stackId="a"
                     fill="#8B5CF6"
                     radius={[6, 6, 0, 0]}
@@ -390,7 +390,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ sessions, darkMode }) => {
               <tr>
                 <th className="p-3.5">Day & Date</th>
                 <th className="p-3.5">User Prompts</th>
-                <th className="p-3.5">Gemini Responses</th>
+                <th className="p-3.5">SupremeAI Responses</th>
                 <th className="p-3.5">Total Exchanges</th>
                 <th className="p-3.5">Est. Tokens</th>
                 <th className="p-3.5">Activity Share</th>

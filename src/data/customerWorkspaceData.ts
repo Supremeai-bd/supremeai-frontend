@@ -77,7 +77,7 @@ export const INITIAL_KNOWLEDGE_DOCS: KnowledgeDoc[] = [
     lastIndexed: 'Today at 09:15',
     isGroundingActive: true,
     contentPreview:
-      '# SupremeAI Core Architecture\nHigh-throughput agent orchestration layer interacting with Gemini 3.8 Flash and Gemini 4 Carbon through WebSocket broker and SSE transport.',
+      '# SupremeAI Core Architecture\nHigh-throughput agent orchestration layer interacting with SupremeAI Core and SupremeAI Reason through WebSocket broker and SSE transport.',
   },
   {
     id: 'doc_mcp_02',
@@ -103,7 +103,7 @@ export const INITIAL_KNOWLEDGE_DOCS: KnowledgeDoc[] = [
     lastIndexed: '3 days ago',
     isGroundingActive: false,
     contentPreview:
-      'TypeScript microservice definitions for auth-token-prober, sse-stream-broker, and gemini-gateway-service with resilient circuit breakers.',
+      'TypeScript microservice definitions for auth-token-prober, sse-stream-broker, and supreme-inference-gateway with resilient circuit breakers.',
   },
   {
     id: 'doc_audit_04',
@@ -199,10 +199,10 @@ export const INITIAL_INVOICES: BillingInvoice[] = [
 ];
 
 export const MODEL_USAGE_BREAKDOWN = [
-  { model: 'Gemini 3.8 Flash', tokens: 680000, percentage: 54, cost: '$0.68', color: '#3b82f6' },
-  { model: 'Gemini 4 Carbon', tokens: 340000, percentage: 27, cost: '$1.70', color: '#8b5cf6' },
-  { model: 'Gemini 3.1 Flash Lite', tokens: 190000, percentage: 15, cost: '$0.15', color: '#10b981' },
-  { model: 'Gemini 4 Argon', tokens: 50000, percentage: 4, cost: '$0.40', color: '#f59e0b' },
+  { model: 'SupremeAI Core', tokens: 680000, percentage: 54, cost: '$0.68', color: '#3b82f6' },
+  { model: 'SupremeAI Reason', tokens: 340000, percentage: 27, cost: '$1.70', color: '#8b5cf6' },
+  { model: 'SupremeAI Spark', tokens: 190000, percentage: 15, cost: '$0.15', color: '#10b981' },
+  { model: 'SupremeAI Deep', tokens: 50000, percentage: 4, cost: '$0.40', color: '#f59e0b' },
 ];
 
 export const INITIAL_PROMPT_TEMPLATES = [
@@ -272,7 +272,7 @@ export const INITIAL_WEBHOOK_DELIVERIES = [
     timestamp: 'Today at 10:48:12',
     statusCode: 200,
     latencyMs: 142,
-    payloadJson: '{"event":"chat.completed","sessionId":"session_108","model":"gemini-3.8-flash","tokens":840}',
+    payloadJson: '{"event":"chat.completed","sessionId":"session_108","model":"supreme-core","tokens":840}',
     success: true,
   },
   {

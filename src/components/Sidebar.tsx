@@ -237,11 +237,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <path
                 d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"
-                fill="url(#sidebar-gemini-gradient)"
+                fill="url(#sidebar-supreme-gradient)"
               />
               <defs>
                 <linearGradient
-                  id="sidebar-gemini-gradient"
+                  id="sidebar-supreme-gradient"
                   x1="2"
                   y1="2"
                   x2="22"

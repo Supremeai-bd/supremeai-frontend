@@ -178,7 +178,7 @@ export const AmbientAura: React.FC<AmbientAuraProps> = ({
         className="absolute inset-4 rounded-full border border-cyan-400/20 dark:border-cyan-400/30 border-t-cyan-400/70 border-r-transparent pointer-events-none"
       />
 
-      {/* 5. Central Frosted Core Node with SupremeAI/Gemini Star */}
+      {/* 5. Central Frosted Core Node with SupremeAI Cognitive Star */}
       <motion.div
         animate={{
           scale: isKeyPulse ? 1.18 : isHovered ? 1.1 : [1, 1.04, 1],

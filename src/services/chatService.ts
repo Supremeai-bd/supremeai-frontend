@@ -4,6 +4,7 @@ import { env } from '../config/env';
 export interface ChatStreamOptions {
   model: string;
   messages: ChatMessage[];
+  sessionId?: string;
   systemInstruction?: string;
   groundingContext?: string;
   deepResearch?: boolean;
@@ -24,6 +25,7 @@ export const chatService = {
     const {
       model,
       messages,
+      sessionId,
       systemInstruction,
       groundingContext,
       deepResearch = false,
@@ -64,13 +66,38 @@ export const chatService = {
         });
       }
 
+      // Extract latest user prompt for backend contract compliance (ChatStreamRequest expects prompt/message)
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      const promptText = lastUserMsg?.content || messages[messages.length - 1]?.content || '';
+
+      // Transparent model resolution from SupremeAI native model to backend provider engine
+      const resolveBackendModel = (id: string): string => {
+        switch (id) {
+          case 'supreme-reason':
+            return 'gemini-2.5-pro';
+          case 'supreme-spark':
+            return 'gemini-2.5-flash';
+          case 'supreme-deep':
+            return 'gemini-2.5-pro';
+          case 'supreme-core':
+          default:
+            return 'auto';
+        }
+      };
+
+      const backendModel = resolveBackendModel(model);
+
       // Live backend route on deployed gateway: /api/v1/stream/chat
       const response = await fetch(`${env.apiBaseUrl}/api/v1/stream/chat`, {
         method: 'POST',
         headers,
         signal,
         body: JSON.stringify({
-          model: model || 'auto',
+          prompt: promptText,
+          message: promptText,
+          session_id: sessionId,
+          model: backendModel,
+          task_type: deepResearch ? 'deep_research' : 'chat',
           messages: formattedMessages,
           stream: true,
           deepResearch,

@@ -277,7 +277,7 @@ export const FileProcessingPreviewModal: React.FC<FileProcessingPreviewModalProp
                   Enable Semantic Grounding in Studio Chat
                 </p>
                 <p className="text-[10px] text-slate-400">
-                  Ground Gemini inferences with this document automatically
+                  Ground SupremeAI inferences with this document automatically
                 </p>
               </div>
             </div>

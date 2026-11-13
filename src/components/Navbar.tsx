@@ -50,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="h-14 border-b border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
-      {/* Zone 1: Sidebar Toggle + Brand Wordmark with Gemini Star */}
+      {/* Zone 1: Sidebar Toggle + Brand Wordmark with SupremeAI Star */}
       <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
         <button
           type="button"
@@ -73,11 +73,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <path
                 d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"
-                fill="url(#gemini-gradient)"
+                fill="url(#supreme-gradient)"
               />
               <defs>
                 <linearGradient
-                  id="gemini-gradient"
+                  id="supreme-gradient"
                   x1="2"
                   y1="2"
                   x2="22"
@@ -315,7 +315,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
           <span className={developerMode || currentRole === 'admin' ? 'font-mono text-[10px]' : 'text-[11px]'}>
-            {activeModel.name.replace('Gemini ', '')}
+            {activeModel.name}
           </span>
         </div>
 

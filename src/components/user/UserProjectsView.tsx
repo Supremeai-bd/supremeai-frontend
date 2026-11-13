@@ -196,7 +196,7 @@ export const UserProjectsView: React.FC<UserProjectsViewProps> = ({
                   className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
                 >
                   <MessageSquare className="w-3 h-3" />
-                  <span>Ask Gemini</span>
+                  <span>Ask SupremeAI</span>
                 </button>
               </div>
             </div>

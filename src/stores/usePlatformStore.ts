@@ -9,13 +9,13 @@ const DEFAULT_CONFIG: PlatformConfig = {
     'SupremeAI Studio is undergoing scheduled database maintenance. Administrators remain online.',
   announcementBanner: {
     active: false,
-    message: 'All Gemini 3.8 Flash and Gemini 4 Carbon routes are operating normally.',
+    message: 'All SupremeAI Core and SupremeAI Reason routes are operating normally.',
     level: 'info',
   },
   allowNewSignups: true,
-  defaultModelId: 'gemini-3.8-flash',
+  defaultModelId: 'supreme-core',
   featureFlags: {
-    enable_gemini_4_reasoning: true,
+    enable_supreme_reason: true,
     enable_multimodal_vision: true,
     enable_rag_grounding: true,
     enable_continuous_agent_swarm: true,
@@ -23,10 +23,10 @@ const DEFAULT_CONFIG: PlatformConfig = {
     maintenance_mode: false,
   },
   modelPolicies: {
-    'gemini-3.8-flash': { enabled: true, minTier: 'Free' },
-    'gemini-3.1-flash-lite': { enabled: true, minTier: 'Free' },
-    'gemini-4-carbon': { enabled: true, minTier: 'Pro' },
-    'gemini-4-argon': { enabled: true, minTier: 'Enterprise' },
+    'supreme-core': { enabled: true, minTier: 'Free' },
+    'supreme-spark': { enabled: true, minTier: 'Free' },
+    'supreme-reason': { enabled: true, minTier: 'Pro' },
+    'supreme-deep': { enabled: true, minTier: 'Enterprise' },
   },
 };
 

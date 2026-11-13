@@ -136,7 +136,7 @@ export const UserKnowledgeBaseView: React.FC<UserKnowledgeBaseViewProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Ground Gemini chat sessions in your custom documentation, engineering specs, and private GitHub codebases.
+            Ground SupremeAI chat sessions in your custom documentation, engineering specs, and private GitHub codebases.
           </p>
         </div>
 
