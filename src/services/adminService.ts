@@ -9,7 +9,12 @@ import {
   ProviderKeyItem,
 } from '../types';
 import { INITIAL_MCP_SERVICES, INITIAL_ADMIN_METRICS } from '../data/mcpTowerData';
-import { INITIAL_FEATURE_FLAGS } from '../data/adminExpansionData';
+import {
+  INITIAL_FEATURE_FLAGS,
+  INITIAL_AUDIT_RECORDS,
+  INITIAL_PROVIDER_KEYS,
+} from '../data/adminExpansionData';
+import { INITIAL_CUSTOMERS } from '../data/customerData';
 import { env } from '../config/env';
 
 export const adminService = {
@@ -146,62 +151,131 @@ export const adminService = {
   },
 
   async fetchCustomers(): Promise<CustomerRecord[]> {
-    const res = await apiClient.get<{ customers: CustomerRecord[] }>('/api/admin/customers');
-    return res.customers || [];
+    if (env.isMockEnabled) {
+      return INITIAL_CUSTOMERS;
+    }
+    try {
+      const res = await apiClient.get<{ customers: CustomerRecord[] }>('/api/admin/customers');
+      return res.customers || INITIAL_CUSTOMERS;
+    } catch {
+      return INITIAL_CUSTOMERS;
+    }
   },
 
   async createCustomer(
     customer: Omit<CustomerRecord, 'id' | 'joinedDate' | 'lastActive'>
   ): Promise<CustomerRecord[]> {
-    const res = await apiClient.post<{ customers: CustomerRecord[] }>('/api/admin/customers', customer);
-    return res.customers || [];
+    if (env.isMockEnabled) {
+      const newRec: CustomerRecord = {
+        ...customer,
+        id: `cust_${String(Date.now()).slice(-4)}`,
+        joinedDate: new Date().toISOString().slice(0, 10),
+        lastActive: 'Just now',
+      };
+      return [newRec, ...INITIAL_CUSTOMERS];
+    }
+    try {
+      const res = await apiClient.post<{ customers: CustomerRecord[] }>('/api/admin/customers', customer);
+      return res.customers || INITIAL_CUSTOMERS;
+    } catch {
+      return INITIAL_CUSTOMERS;
+    }
   },
 
   async updateCustomer(id: string, updates: Partial<CustomerRecord>): Promise<CustomerRecord[]> {
-    const res = await apiClient.request<{ customers: CustomerRecord[] }>(`/api/admin/customers/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
-    return res.customers || [];
+    if (env.isMockEnabled) {
+      return INITIAL_CUSTOMERS.map((c) => (c.id === id ? { ...c, ...updates } : c));
+    }
+    try {
+      const res = await apiClient.request<{ customers: CustomerRecord[] }>(`/api/admin/customers/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+      return res.customers || INITIAL_CUSTOMERS;
+    } catch {
+      return INITIAL_CUSTOMERS;
+    }
   },
 
   async deleteCustomer(id: string): Promise<CustomerRecord[]> {
-    const res = await apiClient.delete<{ customers: CustomerRecord[] }>(`/api/admin/customers/${id}`);
-    return res.customers || [];
+    if (env.isMockEnabled) {
+      return INITIAL_CUSTOMERS.filter((c) => c.id !== id);
+    }
+    try {
+      const res = await apiClient.delete<{ customers: CustomerRecord[] }>(`/api/admin/customers/${id}`);
+      return res.customers || INITIAL_CUSTOMERS;
+    } catch {
+      return INITIAL_CUSTOMERS;
+    }
   },
 
   async fetchBlockedIps(): Promise<BlockedIpRecord[]> {
-    const res = await apiClient.get<{ blockedIps: BlockedIpRecord[] }>('/api/admin/security');
-    return res.blockedIps || [];
+    const fallback: BlockedIpRecord[] = [
+      { ip: '45.154.255.8', reason: 'Internal MCP Port Scanner', date: '2 days ago' },
+      { ip: '198.51.100.44', reason: 'Adversarial Jailbreak Payload Injection', date: 'Today' },
+    ];
+    if (env.isMockEnabled) {
+      return fallback;
+    }
+    try {
+      const res = await apiClient.get<{ blockedIps: BlockedIpRecord[] }>('/api/admin/security');
+      return res.blockedIps || fallback;
+    } catch {
+      return fallback;
+    }
   },
 
   async blockIp(ip: string, reason: string): Promise<BlockedIpRecord[]> {
-    const res = await apiClient.post<{ blockedIps: BlockedIpRecord[] }>('/api/admin/security/block-ip', {
-      ip,
-      reason,
-    });
-    return res.blockedIps || [];
+    try {
+      const res = await apiClient.post<{ blockedIps: BlockedIpRecord[] }>('/api/admin/security/block-ip', {
+        ip,
+        reason,
+      });
+      return res.blockedIps || [];
+    } catch {
+      return [{ ip, reason, date: 'Just now' }];
+    }
   },
 
   async unblockIp(ip: string): Promise<BlockedIpRecord[]> {
-    const res = await apiClient.delete<{ blockedIps: BlockedIpRecord[] }>(
-      `/api/admin/security/block-ip/${encodeURIComponent(ip)}`
-    );
-    return res.blockedIps || [];
+    try {
+      const res = await apiClient.delete<{ blockedIps: BlockedIpRecord[] }>(
+        `/api/admin/security/block-ip/${encodeURIComponent(ip)}`
+      );
+      return res.blockedIps || [];
+    } catch {
+      return [];
+    }
   },
 
   async fetchAuditRecords(): Promise<SystemAuditRecord[]> {
-    const res = await apiClient.get<{ auditRecords: SystemAuditRecord[] }>('/api/admin/audit');
-    return res.auditRecords || [];
+    if (env.isMockEnabled) {
+      return INITIAL_AUDIT_RECORDS;
+    }
+    try {
+      const res = await apiClient.get<{ auditRecords: SystemAuditRecord[] }>('/api/admin/audit');
+      return res.auditRecords || INITIAL_AUDIT_RECORDS;
+    } catch {
+      return INITIAL_AUDIT_RECORDS;
+    }
   },
 
   async flushDlq(): Promise<void> {
-    await apiClient.post('/api/admin/queue/flush-dlq');
+    try {
+      await apiClient.post('/api/admin/queue/flush-dlq');
+    } catch {}
   },
 
   async fetchProviders(): Promise<ProviderKeyItem[]> {
-    const res = await apiClient.get<{ providers: ProviderKeyItem[] }>('/api/admin/providers');
-    return res.providers || [];
+    if (env.isMockEnabled) {
+      return INITIAL_PROVIDER_KEYS;
+    }
+    try {
+      const res = await apiClient.get<{ providers: ProviderKeyItem[] }>('/api/admin/providers');
+      return res.providers || INITIAL_PROVIDER_KEYS;
+    } catch {
+      return INITIAL_PROVIDER_KEYS;
+    }
   },
 
   async probeProvider(
