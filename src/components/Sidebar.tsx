@@ -221,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         aria-hidden="true"
         className="md:hidden fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-[1px]"
       />
-      <aside className="fixed md:static inset-y-0 left-0 z-40 md:z-auto w-64 max-w-[82vw] h-full min-h-0 border-r border-slate-200/70 dark:border-slate-800/70 bg-white/95 md:bg-white/72 dark:bg-[#111520]/95 md:dark:bg-[#111520]/80 backdrop-blur-2xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden shadow-2xl md:shadow-none">
+      <aside className="fixed md:static inset-y-0 left-0 z-40 md:z-auto w-64 max-w-[82vw] h-full min-h-0 border-r theme-sidebar-surface flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden shadow-2xl md:shadow-none">
       {/* Top Studio Brand Header when Top Navbar is hidden (Sidebar Focus mode) */}
       {layoutMode === 'sidebar-focus' && (
         <div className="px-3.5 pt-3.5 pb-1 flex items-center justify-between gap-2">

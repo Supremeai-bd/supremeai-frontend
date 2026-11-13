@@ -11,6 +11,7 @@ export function useOsThemeSync() {
   const themeMode = useThemeStore((s) => s.themeMode);
   const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
   const liveTheme = useThemeStore((s) => s.liveTheme);
+  const surfaceTone = useThemeStore((s) => s.surfaceTone);
   const setOsPrefersDark = useThemeStore((s) => s.setOsPrefersDark);
   const setPrefersReducedMotion = useThemeStore((s) => s.setPrefersReducedMotion);
 
@@ -19,8 +20,8 @@ export function useOsThemeSync() {
 
   // Keep DOM classes & attributes synchronized
   useEffect(() => {
-    applyThemeToDom(resolvedScheme, themeMode, liveTheme);
-  }, [resolvedScheme, themeMode, liveTheme]);
+    applyThemeToDom(resolvedScheme, themeMode, liveTheme, false, surfaceTone);
+  }, [resolvedScheme, themeMode, liveTheme, surfaceTone]);
 
   // Watch OS color scheme & reduced-motion media queries in real time
   useEffect(() => {

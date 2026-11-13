@@ -208,7 +208,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         {/* SupremeAI Floating Input Capsule */}
-        <div className="relative rounded-full sm:rounded-3xl bg-white/85 dark:bg-[#171b26]/82 backdrop-blur-2xl border border-white/75 dark:border-slate-700/75 shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.45)] theme-capsule-focus transition-all p-2.5 flex items-center gap-2">
+        <div className="relative rounded-full sm:rounded-3xl theme-input-surface border shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.45)] theme-capsule-focus transition-all p-2.5 flex items-center gap-2">
           {/* Plus (+) Button for Connectors, Recipes, and File Uploads */}
           <div className="relative">
             <button

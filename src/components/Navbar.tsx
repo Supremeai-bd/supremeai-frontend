@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       : Boolean(storeDeveloperMode && (isDeveloperEligible || currentRole === 'admin'));
 
   return (
-    <header className="h-14 border-b border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
+    <header className="h-14 border-b theme-surface-glass px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
       {/* Zone 1: Sidebar Toggle + Brand Wordmark with SupremeAI Star */}
       <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
         <button

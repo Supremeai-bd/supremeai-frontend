@@ -883,7 +883,7 @@ export default function App() {
           {/* Unified Sub-View Shell with Back / Home / Close Bar & Responsive Containment */}
           {activeTab !== 'chat' && (
             <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-transparent">
-              <div className="shrink-0 px-3 sm:px-6 py-2.5 border-b border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-[#0d111a]/80 backdrop-blur-md flex items-center justify-between gap-3">
+              <div className="shrink-0 px-3 sm:px-6 py-2.5 border-b theme-surface-glass flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {!sidebarOpen && (
                     <button

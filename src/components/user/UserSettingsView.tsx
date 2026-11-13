@@ -35,6 +35,9 @@ import {
   LIVE_THEMES,
   ThemeMode,
   LiveThemeId,
+  SurfaceTone,
+  MotionSpeed,
+  ScrimIntensity,
 } from '../../stores/useThemeStore';
 import { useChatStore } from '../../stores/useChatStore';
 
@@ -106,10 +109,23 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
   const liveTheme = useThemeStore((s) => s.liveTheme);
   const liveMotion = useThemeStore((s) => s.liveMotion);
+  const overrideReducedMotion = useThemeStore((s) => s.overrideReducedMotion);
   const prefersReducedMotion = useThemeStore((s) => s.prefersReducedMotion);
+  const motionSpeed = useThemeStore((s) => s.motionSpeed);
+  const surfaceTone = useThemeStore((s) => s.surfaceTone);
+  const scrimIntensity = useThemeStore((s) => s.scrimIntensity);
+  const themeOptions = useThemeStore((s) => s.themeOptions);
   const setThemeMode = useThemeStore((s) => s.setThemeMode);
   const setLiveTheme = useThemeStore((s) => s.setLiveTheme);
   const setLiveMotion = useThemeStore((s) => s.setLiveMotion);
+  const setOverrideReducedMotion = useThemeStore((s) => s.setOverrideReducedMotion);
+  const setMotionSpeed = useThemeStore((s) => s.setMotionSpeed);
+  const setSurfaceTone = useThemeStore((s) => s.setSurfaceTone);
+  const setScrimIntensity = useThemeStore((s) => s.setScrimIntensity);
+  const updateThemeOptions = useThemeStore((s) => s.updateThemeOptions);
+
+  const isAnimating = liveMotion && (!prefersReducedMotion || overrideReducedMotion);
+  const activeThemeMeta = LIVE_THEMES.find((t) => t.id === liveTheme) || LIVE_THEMES[0];
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,7 +320,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       </div>
 
       {/* Appearance, Automated OS Sync & Live Screen Themes */}
-      <div className="p-5 rounded-2xl bg-white/90 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 space-y-5 shadow-xs">
+      <div className="p-5 rounded-2xl theme-surface-glass border space-y-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -312,12 +328,15 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               <span>Appearance, OS Sync & Live Screens</span>
             </h2>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Automatically watch your OS color scheme or choose a fixed mode and ambient live screen.
+              Real-time animated screens, theme-tinted glass surfaces, and per-theme atmospheric controls.
             </p>
           </div>
 
           <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
-            OS Preference: <span className="font-semibold text-slate-800 dark:text-slate-200">{osPrefersDark ? 'Dark' : 'Light'}</span>
+            OS Preference:{' '}
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              {osPrefersDark ? 'Dark' : 'Light'}
+            </span>
             {themeMode === 'system' && (
               <span className="theme-accent-text"> · Syncing live</span>
             )}
@@ -360,7 +379,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                   className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                     active
                       ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                      : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   <div className={`mt-0.5 shrink-0 ${active ? 'theme-accent-text' : 'text-slate-400'}`}>
@@ -376,33 +395,127 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Live Screen Backdrop
+        {/* Surface Style, Motion Speed & Backdrop Visibility */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              UI Surface Style
             </label>
-            <button
-              type="button"
-              onClick={() => setLiveMotion(!liveMotion)}
-              disabled={prefersReducedMotion}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50 ${
-                liveMotion && !prefersReducedMotion
-                  ? 'theme-accent-active'
-                  : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {liveMotion && !prefersReducedMotion ? (
-                <>
-                  <Pause className="w-3 h-3" />
-                  <span>Live Motion On</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3" />
-                  <span>{prefersReducedMotion ? 'OS Reduced Motion' : 'Static Screen'}</span>
-                </>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  { id: 'adaptive' as SurfaceTone, label: 'Tinted Glass' },
+                  { id: 'monochrome' as SurfaceTone, label: 'Classic B&W' },
+                ]
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSurfaceTone(opt.id)}
+                  className={`py-2 px-2.5 rounded-xl border text-[11px] font-medium cursor-pointer transition-all ${
+                    surfaceTone === opt.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/60 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Animation Speed
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(['calm', 'normal', 'dynamic'] as MotionSpeed[]).map((sp) => (
+                <button
+                  key={sp}
+                  type="button"
+                  onClick={() => setMotionSpeed(sp)}
+                  className={`py-2 px-2 rounded-xl border text-[11px] font-medium capitalize cursor-pointer transition-all ${
+                    motionSpeed === sp
+                      ? 'theme-accent-active'
+                      : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/60 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {sp}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Backdrop Clarity
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  { id: 'subtle' as ScrimIntensity, label: 'Vibrant' },
+                  { id: 'balanced' as ScrimIntensity, label: 'Balanced' },
+                  { id: 'focus' as ScrimIntensity, label: 'Focus' },
+                ]
+              ).map((sc) => (
+                <button
+                  key={sc.id}
+                  type="button"
+                  onClick={() => setScrimIntensity(sc.id)}
+                  className={`py-2 px-2 rounded-xl border text-[11px] font-medium cursor-pointer transition-all ${
+                    scrimIntensity === sc.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/60 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {sc.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Live Animated Backdrop ({LIVE_THEMES.length} Themes)
+            </label>
+            <div className="flex items-center gap-2">
+              {prefersReducedMotion && (
+                <button
+                  type="button"
+                  onClick={() => setOverrideReducedMotion(!overrideReducedMotion)}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    overrideReducedMotion
+                      ? 'theme-accent-active'
+                      : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'
+                  }`}
+                >
+                  {overrideReducedMotion ? 'OS Reduced Motion: Bypassed' : 'OS Reduced Motion Active (Click to Override)'}
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                onClick={() => setLiveMotion(!liveMotion)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer ${
+                  isAnimating
+                    ? 'theme-accent-active'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {isAnimating ? (
+                  <>
+                    <Pause className="w-3 h-3" />
+                    <span>Live Animation On</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3" />
+                    <span>Static Screen</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -412,6 +525,9 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 resolvedScheme === 'dark'
                   ? theme.darkPreviewGradient
                   : theme.lightPreviewGradient;
+              const schemeMismatch =
+                (theme.recommendedScheme === 'dark' && resolvedScheme === 'light') ||
+                (theme.recommendedScheme === 'light' && resolvedScheme === 'dark');
 
               return (
                 <button
@@ -421,11 +537,13 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                   className={`group rounded-xl border overflow-hidden text-left transition-all cursor-pointer ${
                     isSelected
                       ? 'theme-accent-active ring-2 ring-[var(--theme-accent-ring)]'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50/70 dark:bg-slate-800/50'
+                      : 'border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50/70 dark:bg-slate-800/50'
                   }`}
                 >
                   <div
-                    className="h-24 w-full relative overflow-hidden"
+                    className={`h-24 w-full relative overflow-hidden ${
+                      !theme.previewImage && isAnimating ? 'theme-preview-animated' : ''
+                    }`}
                     style={{ background: previewBg }}
                   >
                     {theme.previewImage && (
@@ -441,14 +559,29 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                           filter: theme.isNocturnalPhoto
                             ? resolvedScheme === 'dark'
                               ? 'brightness(0.86) contrast(1.06)'
-                              : 'brightness(1.22) contrast(0.94) saturate(0.88)'
+                              : 'brightness(1.16) contrast(0.95) saturate(0.90)'
                             : resolvedScheme === 'dark'
-                            ? 'brightness(0.45) contrast(1.15) saturate(0.8)'
+                            ? 'brightness(0.54) contrast(1.12) saturate(0.88)'
                             : 'none',
                         }}
                       />
                     )}
                     <div className="absolute inset-x-4 top-5 h-3.5 rounded-full bg-white/80 dark:bg-slate-900/75 backdrop-blur-md border border-white/60 dark:border-white/10 shadow-xs" />
+                    {theme.schemeBadge && (
+                      <span
+                        className={`absolute bottom-1.5 left-2 px-1.5 py-0.5 rounded text-[9px] font-medium backdrop-blur-md ${
+                          schemeMismatch
+                            ? 'bg-amber-500/85 text-slate-950'
+                            : 'bg-slate-950/60 text-white'
+                        }`}
+                      >
+                        {schemeMismatch
+                          ? theme.recommendedScheme === 'dark'
+                            ? 'Best in Dark Mode'
+                            : 'Best in Light Mode'
+                          : theme.schemeBadge}
+                      </span>
+                    )}
                     {isSelected && (
                       <span className="absolute top-2 right-2 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm">
                         <Check className="w-3 h-3" />
@@ -456,8 +589,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                     )}
                   </div>
                   <div className="p-2.5">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white">
-                      {theme.name}
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white flex items-center justify-between gap-1">
+                      <span>{theme.name}</span>
+                      <span className="text-[10px] font-normal theme-accent-text truncate">
+                        {theme.animationLabel}
+                      </span>
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
                       {theme.subtitle}
@@ -467,6 +603,356 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* Active Theme Custom Controls */}
+        <div className="p-4 rounded-xl bg-slate-50/75 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 theme-accent-text" />
+              <span>{activeThemeMeta.name} — Theme-Specific Options</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">
+              {activeThemeMeta.animationLabel}
+            </span>
+          </div>
+
+          {liveTheme === 'alpine-dunes' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">Time of Day Grading</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(['daylight', 'moonlit'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => updateThemeOptions({ alpineTime: opt })}
+                      className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                        (themeOptions.alpineTime || 'daylight') === opt
+                          ? 'theme-accent-active'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt === 'daylight' ? 'Sunlit Snow' : 'Moonlit Night'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">Drifting Snow Intensity</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['gentle', 'brisk', 'off'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => updateThemeOptions({ snowIntensity: opt })}
+                      className={`py-1.5 px-2 rounded-lg border text-[11px] font-medium capitalize cursor-pointer ${
+                        (themeOptions.snowIntensity || 'gentle') === opt
+                          ? 'theme-accent-active'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {liveTheme === 'misty-fjords' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">Lake Water Ripple</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['calm', 'lively', 'off'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => updateThemeOptions({ waterRipple: opt })}
+                      className={`py-1.5 px-2 rounded-lg border text-[11px] font-medium capitalize cursor-pointer ${
+                        (themeOptions.waterRipple || 'lively') === opt
+                          ? 'theme-accent-active'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">Valley Fog Density</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['light', 'lively', 'dense'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => updateThemeOptions({ mistDensity: opt })}
+                      className={`py-1.5 px-2 rounded-lg border text-[11px] font-medium capitalize cursor-pointer ${
+                        (themeOptions.mistDensity || 'lively') === opt
+                          ? 'theme-accent-active'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {liveTheme === 'emerald-highlands' && (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'fireflies', label: 'Forest Fireflies' },
+                  { id: 'rain', label: 'Gentle Rain' },
+                  { id: 'mist', label: 'Valley Mist Only' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateThemeOptions({ forestEffect: opt.id })}
+                  className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    (themeOptions.forestEffect || 'fireflies') === opt.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {liveTheme === 'amber-canyon' && (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'heat-dust', label: 'Golden Dust Motes' },
+                  { id: 'sunbeams', label: 'Canyon Sunbeams' },
+                  { id: 'mist', label: 'Desert Haze Only' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateThemeOptions({ canyonEffect: opt.id })}
+                  className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    (themeOptions.canyonEffect || 'heat-dust') === opt.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {liveTheme === 'midnight-peaks' && (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'shooting-stars', label: 'Shooting Stars' },
+                  { id: 'polar-glow', label: 'Polar Night Glow' },
+                  { id: 'starfield', label: 'Calm Starfield' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateThemeOptions({ midnightSky: opt.id })}
+                  className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    (themeOptions.midnightSky || 'shooting-stars') === opt.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {liveTheme === 'nebula' && (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'warp-stars', label: '3D Warp Starfield' },
+                  { id: 'constellation', label: 'Constellation Web' },
+                  { id: 'drift', label: 'Slow Cosmic Drift' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateThemeOptions({ nebulaEffect: opt.id })}
+                  className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    (themeOptions.nebulaEffect || 'warp-stars') === opt.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {liveTheme === 'cyberpunk' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">Neon Palette</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {(
+                    [
+                      { id: 'neon-emerald', label: 'Green' },
+                      { id: 'cyber-cyan', label: 'Cyan' },
+                      { id: 'synth-amber', label: 'Amber' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => updateThemeOptions({ cyberPalette: opt.id })}
+                      className={`py-1.5 px-1.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                        (themeOptions.cyberPalette || 'neon-emerald') === opt.id
+                          ? 'theme-accent-active'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">Rain Density</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {(['sparse', 'normal', 'overdrive'] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => updateThemeOptions({ cyberDensity: d })}
+                      className={`py-1.5 px-1.5 rounded-lg border text-[11px] font-medium capitalize cursor-pointer ${
+                        (themeOptions.cyberDensity || 'normal') === d
+                          ? 'theme-accent-active'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">CRT Scanlines</div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateThemeOptions({ cyberScanlines: themeOptions.cyberScanlines === false })
+                  }
+                  className={`w-full py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    themeOptions.cyberScanlines !== false
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-500'
+                  }`}
+                >
+                  {themeOptions.cyberScanlines !== false ? 'Enabled' : 'Disabled'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {liveTheme === 'aurora-borealis' && (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'polar-emerald', label: 'Polar Green & Cyan' },
+                  { id: 'cosmic-violet', label: 'Cosmic Violet' },
+                  { id: 'solar-crimson', label: 'Solar Storm Crimson' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateThemeOptions({ auroraPalette: opt.id })}
+                  className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                    (themeOptions.auroraPalette || 'polar-emerald') === opt.id
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {liveTheme === 'oceanic-horizon' && (
+            <div className="grid grid-cols-3 gap-2">
+              {(['calm', 'rolling', 'choppy'] as const).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => updateThemeOptions({ oceanWaveEnergy: opt })}
+                  className={`py-1.5 px-2.5 rounded-lg border text-[11px] font-medium capitalize cursor-pointer ${
+                    (themeOptions.oceanWaveEnergy || 'rolling') === opt
+                      ? 'theme-accent-active'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt} Waves
+                </button>
+              ))}
+            </div>
+          )}
+
+          {liveTheme === 'solar-meadow' && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600 dark:text-slate-300">
+                Volumetric Sweeping Horizon Sunbeams
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  updateThemeOptions({ dawnSunbeams: themeOptions.dawnSunbeams === false })
+                }
+                className={`py-1.5 px-3 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                  themeOptions.dawnSunbeams !== false
+                    ? 'theme-accent-active'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-500'
+                }`}
+              >
+                {themeOptions.dawnSunbeams !== false ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+          )}
+
+          {liveTheme === 'cyber-studio' && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600 dark:text-slate-300">
+                Autonomous Neural Constellation Mesh & Data Pulses
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  updateThemeOptions({ neuralMesh: themeOptions.neuralMesh === false })
+                }
+                className={`py-1.5 px-3 rounded-lg border text-[11px] font-medium cursor-pointer ${
+                  themeOptions.neuralMesh !== false
+                    ? 'theme-accent-active'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-500'
+                }`}
+              >
+                {themeOptions.neuralMesh !== false ? 'Active' : 'Grid Only'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

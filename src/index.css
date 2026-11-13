@@ -15,6 +15,13 @@
   --theme-accent-contrast: #ffffff;
   --theme-accent-gradient: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
   --theme-accent-secondary: #2563eb;
+  --theme-surface-glass: rgba(244, 249, 255, 0.78);
+  --theme-surface-strong: rgba(248, 252, 255, 0.92);
+  --theme-surface-sidebar: rgba(238, 246, 253, 0.74);
+  --theme-surface-input: rgba(255, 255, 255, 0.86);
+  --theme-surface-border: rgba(148, 197, 232, 0.45);
+  --theme-scrim-overlay: rgba(235, 245, 255, 0.56);
+  --theme-card-shadow: 0 8px 30px -6px rgba(2, 132, 199, 0.14);
 }
 
 .dark {
@@ -25,6 +32,13 @@
   --theme-accent-contrast: #062033;
   --theme-accent-gradient: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
   --theme-accent-secondary: #818cf8;
+  --theme-surface-glass: rgba(11, 22, 42, 0.76);
+  --theme-surface-strong: rgba(14, 27, 50, 0.92);
+  --theme-surface-sidebar: rgba(9, 18, 36, 0.78);
+  --theme-surface-input: rgba(15, 29, 54, 0.84);
+  --theme-surface-border: rgba(56, 189, 248, 0.22);
+  --theme-scrim-overlay: rgba(7, 15, 30, 0.64);
+  --theme-card-shadow: 0 8px 30px -6px rgba(14, 165, 233, 0.18);
 }
 
 html,
@@ -123,6 +137,48 @@ html.theme-transitioning *::after {
   box-shadow:
     0 16px 48px rgba(15, 23, 42, 0.14),
     0 0 0 3px var(--theme-accent-soft);
+}
+
+/* Adaptive Theme-Tinted Glass Surfaces */
+.theme-surface-glass {
+  background-color: var(--theme-surface-glass);
+  border-color: var(--theme-surface-border);
+  box-shadow: var(--theme-card-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.theme-surface-strong {
+  background-color: var(--theme-surface-strong);
+  border-color: var(--theme-surface-border);
+  box-shadow: var(--theme-card-shadow);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.theme-sidebar-surface {
+  background-color: var(--theme-surface-sidebar);
+  border-color: var(--theme-surface-border);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.theme-input-surface {
+  background-color: var(--theme-surface-input);
+  border-color: var(--theme-surface-border);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+@keyframes theme-preview-drift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.theme-preview-animated {
+  background-size: 180% 180% !important;
+  animation: theme-preview-drift 8s ease-in-out infinite;
 }
 
 /* Nebula Cosmic Theme CSS Variable Aesthetic */
@@ -410,18 +466,27 @@ mark.search-highlight {
    ======================================================== */
 
 /* Perspective Cyber Grid */
+@keyframes cyber-grid-scroll {
+  0% { background-position: 0px 0px, 0px 0px; }
+  100% { background-position: 36px 36px, 36px 36px; }
+}
+
 .cyber-ground-grid {
   background-image: 
-    linear-gradient(to right, rgba(6, 182, 212, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(6, 182, 212, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.06) 1px, transparent 1px);
   background-size: 36px 36px;
-  mask-image: radial-gradient(ellipse 85% 65% at 50% 35%, black 40%, transparent 95%);
+  mask-image: radial-gradient(ellipse 88% 72% at 50% 42%, black 42%, transparent 96%);
+}
+
+.cyber-ground-grid-animated {
+  animation: cyber-grid-scroll 6s linear infinite;
 }
 
 .dark .cyber-ground-grid {
   background-image: 
-    linear-gradient(to right, rgba(0, 240, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 240, 255, 0.07) 1px, transparent 1px);
+    linear-gradient(to right, rgba(0, 240, 255, 0.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.10) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
@@ -456,20 +521,21 @@ mark.search-highlight {
   animation: cyber-float-violet 18s ease-in-out infinite;
 }
 
-/* Frosted Cyber Glassmorphism */
+/* Frosted Cyber Glassmorphism (Adaptive to Active Theme) */
 .cyber-hud-glass {
-  background-color: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(6, 182, 212, 0.18);
+  background-color: var(--theme-surface-glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--theme-surface-border);
+  box-shadow: var(--theme-card-shadow);
 }
 
 .dark .cyber-hud-glass {
-  background-color: rgba(11, 15, 25, 0.82);
+  background-color: var(--theme-surface-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 240, 255, 0.16);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--theme-surface-border);
+  box-shadow: var(--theme-card-shadow);
 }
 
 /* Mouse-Tracking Interactive Spotlight Card */
