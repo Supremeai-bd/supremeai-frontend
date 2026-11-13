@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { useThemeStore, LIVE_THEMES } from '../../stores/useThemeStore';
+import { useThemeStore, LIVE_THEMES, LiveThemeId } from '../../stores/useThemeStore';
 
 interface LiveScreenBackdropProps {
   isEmpty?: boolean;
@@ -172,6 +172,318 @@ const MatrixRainCanvas: React.FC<{ isDark: boolean; animate: boolean }> = ({
   );
 };
 
+/**
+ * Real-time scanline water ripple & specular caustic shimmer canvas for Misty Fjords.
+ * Renders the lower lake portion of the photograph with progressive sinusoidal wave
+ * displacement + gentle light glints at 30fps using a compact offscreen-sized buffer.
+ */
+const FjordWaterRippleCanvas: React.FC<{
+  photoSrc: string;
+  isDark: boolean;
+  animate: boolean;
+}> = ({ photoSrc, isDark, animate }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let rafId = 0;
+    let isCancelled = false;
+    const img = new Image();
+    img.src = photoSrc;
+
+    const W = 720;
+    const H = 260;
+    canvas.width = W;
+    canvas.height = H;
+
+    // Precomputed caustic shimmer bands
+    const glints = Array.from({ length: 18 }, (_, i) => ({
+      x: ((i * 137) % W),
+      y: 16 + ((i * 41) % (H - 32)),
+      len: 42 + ((i * 23) % 85),
+      speed: (i % 2 === 0 ? 1 : -1) * (10 + (i % 5) * 4),
+      phase: i * 0.9,
+      thickness: 1.2 + (i % 3) * 0.7,
+    }));
+
+    const renderFrame = (tSec: number) => {
+      if (!img.complete || img.naturalWidth === 0) return;
+
+      const vw = Math.max(window.innerWidth, 1);
+      const vh = Math.max(window.innerHeight, 1);
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const viewAspect = vw / vh;
+
+      // Compute exact object-cover crop rectangle in source image coordinates
+      let cropW = img.naturalWidth;
+      let cropH = img.naturalHeight;
+      let cropX = 0;
+      let cropY = 0;
+      if (viewAspect > imgAspect) {
+        cropH = img.naturalWidth / viewAspect;
+        cropY = (img.naturalHeight - cropH) * 0.5;
+      } else {
+        cropW = img.naturalHeight * viewAspect;
+        cropX = (img.naturalWidth - cropW) * 0.5;
+      }
+
+      // Sample lower 44% (top 56% -> 100%)
+      const waterStartSrcY = cropY + cropH * 0.56;
+      const waterSrcH = cropH * 0.44;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Draw horizontal 2px scanline wave strips with perspective-scaled ripple amplitude
+      const stripH = 2;
+      for (let dy = 0; dy < H; dy += stripH) {
+        const ny = dy / H; // 0 at shoreline -> 1 at bottom foreground
+        const wavePrimary = Math.sin(ny * 42 - tSec * 2.15) * (0.9 + ny * 6.5);
+        const waveSecondary = Math.cos(ny * 23 + tSec * 1.35) * (0.5 + ny * 2.8);
+        const dx = wavePrimary + waveSecondary;
+
+        const sy = waterStartSrcY + ny * waterSrcH;
+        const sh = Math.max(1, (stripH / H) * waterSrcH);
+
+        ctx.drawImage(
+          img,
+          cropX,
+          sy,
+          cropW,
+          sh,
+          dx - 10,
+          dy,
+          W + 20,
+          stripH + 0.5
+        );
+      }
+
+      // Overlay soft moving water caustic glints
+      ctx.save();
+      for (const g of glints) {
+        const ny = g.y / H;
+        const gx = ((g.x + tSec * g.speed) % (W + g.len * 2)) - g.len;
+        const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(tSec * 1.4 + g.phase));
+        const alpha = (isDark ? 0.16 : 0.28) * pulse * (0.4 + ny * 0.6);
+
+        const grad = ctx.createLinearGradient(gx, g.y, gx + g.len, g.y);
+        const color = isDark ? `rgba(125, 211, 252, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.5, color);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(gx, g.y, g.len, g.thickness * (0.7 + ny * 0.8));
+      }
+      ctx.restore();
+    };
+
+    const onLoad = () => {
+      if (!isCancelled) renderFrame(0);
+    };
+    img.addEventListener('load', onLoad);
+    if (img.complete) renderFrame(0);
+
+    if (!animate) {
+      return () => {
+        isCancelled = true;
+        img.removeEventListener('load', onLoad);
+      };
+    }
+
+    let lastFrame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (isCancelled) return;
+      if (now - lastFrame >= 33) {
+        lastFrame = now;
+        renderFrame((now - start) / 1000);
+      }
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    rafId = window.requestAnimationFrame(tick);
+    return () => {
+      isCancelled = true;
+      img.removeEventListener('load', onLoad);
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [photoSrc, isDark, animate]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="block w-full h-full pointer-events-none"
+      style={{
+        filter: isDark
+          ? 'brightness(0.56) contrast(1.14) saturate(0.85)'
+          : 'brightness(1.02) contrast(1.03) saturate(1.04)',
+      }}
+    />
+  );
+};
+
+interface MistPreset {
+  yMin: number;
+  yMax: number;
+  speedScale: number;
+  opacityLight: number;
+  opacityDark: number;
+  rgbLight: string;
+  rgbDark: string;
+  count: number;
+}
+
+const MIST_PRESETS: Partial<Record<LiveThemeId, MistPreset>> = {
+  'misty-fjords': {
+    yMin: 0.28,
+    yMax: 0.60,
+    speedScale: 1.0,
+    opacityLight: 0.52,
+    opacityDark: 0.30,
+    rgbLight: '245, 250, 255',
+    rgbDark: '186, 230, 253',
+    count: 14,
+  },
+  'alpine-dunes': {
+    yMin: 0.42,
+    yMax: 0.82,
+    speedScale: 1.15,
+    opacityLight: 0.44,
+    opacityDark: 0.24,
+    rgbLight: '255, 255, 255',
+    rgbDark: '191, 219, 254',
+    count: 12,
+  },
+  'emerald-highlands': {
+    yMin: 0.34,
+    yMax: 0.70,
+    speedScale: 0.9,
+    opacityLight: 0.50,
+    opacityDark: 0.26,
+    rgbLight: '240, 253, 248',
+    rgbDark: '167, 243, 208',
+    count: 14,
+  },
+  'amber-canyon': {
+    yMin: 0.36,
+    yMax: 0.72,
+    speedScale: 0.95,
+    opacityLight: 0.36,
+    opacityDark: 0.22,
+    rgbLight: '255, 244, 224',
+    rgbDark: '251, 146, 60',
+    count: 10,
+  },
+  'midnight-peaks': {
+    yMin: 0.50,
+    yMax: 0.80,
+    speedScale: 0.85,
+    opacityLight: 0.44,
+    opacityDark: 0.34,
+    rgbLight: '241, 245, 249',
+    rgbDark: '165, 180, 252',
+    count: 14,
+  },
+};
+
+/**
+ * Lightweight GPU-friendly procedural mist & drifting fog canvas.
+ * Draws layered soft cloud wisps gliding continuously across mountains & valleys.
+ */
+const AtmosphericMistCanvas: React.FC<{
+  themeId: LiveThemeId;
+  isDark: boolean;
+  animate: boolean;
+}> = ({ themeId, isDark, animate }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const preset = MIST_PRESETS[themeId];
+
+  useEffect(() => {
+    if (!preset) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = 640;
+    const H = 360;
+    canvas.width = W;
+    canvas.height = H;
+
+    const puffs = Array.from({ length: preset.count }, (_, i) => {
+      const layer = i % 3; // 0: far slow, 1: mid, 2: near faster
+      const yFrac = preset.yMin + ((i * 0.29) % 1) * (preset.yMax - preset.yMin);
+      return {
+        baseX: (i / preset.count) * (W + 280) - 140,
+        baseY: yFrac * H,
+        rx: (110 + ((i * 37) % 110)) * (layer === 2 ? 1.15 : 0.9),
+        ry: 16 + ((i * 13) % 24),
+        speed: (14 + layer * 9 + (i % 4) * 3) * preset.speedScale * (i % 5 === 0 ? -0.65 : 1),
+        bobAmp: 4 + (i % 4) * 2,
+        phase: i * 1.17,
+        alphaMul: 0.55 + ((i * 19) % 45) / 100,
+      };
+    });
+
+    const drawMist = (tSec: number) => {
+      ctx.clearRect(0, 0, W, H);
+      const rgb = isDark ? preset.rgbDark : preset.rgbLight;
+      const baseAlpha = isDark ? preset.opacityDark : preset.opacityLight;
+
+      for (const p of puffs) {
+        const span = W + p.rx * 2.4;
+        const rawX = p.baseX + tSec * p.speed;
+        const wrappedX = ((((rawX + p.rx * 1.2) % span) + span) % span) - p.rx * 1.2;
+        const cy = p.baseY + Math.sin(tSec * 0.45 + p.phase) * p.bobAmp;
+        const alpha = baseAlpha * p.alphaMul * (0.78 + 0.22 * Math.sin(tSec * 0.6 + p.phase));
+
+        ctx.save();
+        ctx.translate(wrappedX, cy);
+        ctx.scale(1, p.ry / p.rx);
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, p.rx);
+        grad.addColorStop(0, `rgba(${rgb}, ${alpha.toFixed(3)})`);
+        grad.addColorStop(0.45, `rgba(${rgb}, ${(alpha * 0.52).toFixed(3)})`);
+        grad.addColorStop(1, `rgba(${rgb}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.rx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    };
+
+    drawMist(0);
+    if (!animate) return;
+
+    let rafId = 0;
+    let lastFrame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (now - lastFrame >= 33) {
+        lastFrame = now;
+        drawMist((now - start) / 1000);
+      }
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    rafId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [preset, isDark, animate]);
+
+  if (!preset) return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full pointer-events-none"
+    />
+  );
+};
+
 export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
   isEmpty = true,
   isChatView = true,
@@ -236,7 +548,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
       ? 'brightness(0.84) contrast(1.08) saturate(1.02)'
       : 'brightness(1.22) contrast(0.95) saturate(0.86)'
     : isDark
-    ? 'brightness(0.44) contrast(1.16) saturate(0.8)'
+    ? 'brightness(0.46) contrast(1.16) saturate(0.84)'
     : 'brightness(1) contrast(1.02) saturate(1.03)';
 
   return (
@@ -264,9 +576,9 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
                       opacity: 1,
                       x: px,
                       y: py,
-                      scale: [1.05, 1.075, 1.05],
+                      scale: [1.03, 1.055, 1.03],
                     }
-                  : { opacity: 1, x: 0, y: 0, scale: 1.02 }
+                  : { opacity: 1, x: 0, y: 0, scale: 1.01 }
               }
               transition={
                 shouldAnimate
@@ -274,11 +586,11 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
                       opacity: { duration: 0.5 },
                       x: { type: 'spring', stiffness: 35, damping: 24 },
                       y: { type: 'spring', stiffness: 35, damping: 24 },
-                      scale: { duration: 24, repeat: Infinity, ease: 'easeInOut' },
+                      scale: { duration: 22, repeat: Infinity, ease: 'easeInOut' },
                     }
                   : { duration: 0.4 }
               }
-              className="absolute inset-[-3%] will-change-transform"
+              className="absolute inset-[-2%] will-change-transform"
             >
               <img
                 src={photoSrc}
@@ -299,10 +611,36 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
               className="absolute inset-0 transition-opacity duration-700"
               style={{
                 background:
-                  'linear-gradient(180deg, rgba(241, 245, 249, 0.48) 0%, rgba(248, 250, 252, 0.25) 55%, rgba(241, 245, 249, 0.42) 100%)',
+                  'linear-gradient(180deg, rgba(241, 245, 249, 0.44) 0%, rgba(248, 250, 252, 0.22) 55%, rgba(241, 245, 249, 0.38) 100%)',
               }}
             />
           )}
+
+          {/* Real-Time Scanline Water Ripples & Shimmer for Misty Fjords (lower 44% lake surface) */}
+          {liveTheme === 'misty-fjords' && !imgFailed && (
+            <div
+              className="absolute inset-x-0 top-[56%] bottom-0 overflow-hidden"
+              style={{
+                WebkitMaskImage:
+                  'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.88) 14%, rgba(0,0,0,1) 100%)',
+                maskImage:
+                  'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.88) 14%, rgba(0,0,0,1) 100%)',
+              }}
+            >
+              <FjordWaterRippleCanvas
+                photoSrc={photoSrc}
+                isDark={isDark}
+                animate={shouldAnimate}
+              />
+            </div>
+          )}
+
+          {/* Live Procedural Drifting Mist & Valley Fog Canvas */}
+          <AtmosphericMistCanvas
+            themeId={liveTheme}
+            isDark={isDark}
+            animate={shouldAnimate}
+          />
 
           {/* Nocturnal moonlit veil & stars when OS switches to Dark */}
           <div
@@ -311,8 +649,8 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
             }`}
             style={{
               background: isNocturnalPhoto
-                ? 'radial-gradient(circle at 75% 18%, rgba(129, 140, 248, 0.16), transparent 45%), linear-gradient(180deg, rgba(5, 8, 20, 0.34) 0%, rgba(15, 23, 42, 0.18) 55%, rgba(5, 8, 20, 0.48) 100%)'
-                : 'radial-gradient(circle at 75% 18%, rgba(147, 197, 253, 0.16), transparent 45%), linear-gradient(180deg, rgba(6, 13, 28, 0.58) 0%, rgba(12, 23, 44, 0.28) 55%, rgba(8, 13, 24, 0.55) 100%)',
+                ? 'radial-gradient(circle at 75% 18%, rgba(129, 140, 248, 0.16), transparent 45%), linear-gradient(180deg, rgba(5, 8, 20, 0.32) 0%, rgba(15, 23, 42, 0.16) 55%, rgba(5, 8, 20, 0.44) 100%)'
+                : 'radial-gradient(circle at 75% 18%, rgba(147, 197, 253, 0.16), transparent 45%), linear-gradient(180deg, rgba(6, 13, 28, 0.52) 0%, rgba(12, 23, 44, 0.24) 55%, rgba(8, 13, 24, 0.50) 100%)',
             }}
           >
             {STAR_POSITIONS.map((star, idx) => (
@@ -340,25 +678,6 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
               />
             ))}
           </div>
-
-          {/* Horizon atmospheric mist drift */}
-          <motion.div
-            animate={
-              shouldAnimate
-                ? {
-                    opacity: isDark ? [0.1, 0.18, 0.1] : [0.22, 0.42, 0.22],
-                    x: ['-3%', '3%', '-3%'],
-                  }
-                : { opacity: isDark ? 0.12 : 0.25 }
-            }
-            transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute inset-x-0 top-[35%] h-64 blur-3xl"
-            style={{
-              background: isDark
-                ? 'radial-gradient(ellipse 70% 50% at 50% 50%, rgba(56, 189, 248, 0.14), transparent 75%)'
-                : 'radial-gradient(ellipse 75% 55% at 52% 50%, rgba(255, 248, 235, 0.48), transparent 75%)',
-            }}
-          />
 
           {/* Subtle floating atmospheric motes */}
           {shouldAnimate &&
@@ -439,6 +758,22 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
             }}
           />
 
+          {/* Arctic Valley Mist */}
+          <motion.div
+            animate={
+              shouldAnimate
+                ? { x: ['-9%', '9%', '-9%'], opacity: isDark ? [0.22, 0.42, 0.22] : [0.28, 0.5, 0.28] }
+                : { opacity: 0.22 }
+            }
+            transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-x-[-10%] bottom-[16%] h-36 blur-2xl will-change-transform"
+            style={{
+              background: isDark
+                ? 'radial-gradient(ellipse 65% 55% at 50% 50%, rgba(94, 234, 212, 0.22), transparent 75%)'
+                : 'radial-gradient(ellipse 65% 55% at 50% 50%, rgba(255, 255, 255, 0.6), transparent 75%)',
+            }}
+          />
+
           {/* Crisp Arctic Horizon Silhouette */}
           <svg
             viewBox="0 0 1440 320"
@@ -468,7 +803,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
         </div>
       )}
 
-      {/* 3. PACIFIC HORIZON (Living Ocean Swells) */}
+      {/* 3. PACIFIC HORIZON (Living Ocean Swells + Specular Shimmer) */}
       {liveTheme === 'oceanic-horizon' && (
         <div
           className="absolute inset-0 transition-colors duration-700"
@@ -490,6 +825,22 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
             }}
           />
 
+          {/* Coastal Sea Mist */}
+          <motion.div
+            animate={
+              shouldAnimate
+                ? { x: ['-8%', '8%', '-8%'], opacity: isDark ? [0.18, 0.34, 0.18] : [0.28, 0.5, 0.28] }
+                : { opacity: 0.22 }
+            }
+            transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-x-[-10%] top-[44%] h-28 blur-2xl will-change-transform"
+            style={{
+              background: isDark
+                ? 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(125, 211, 252, 0.22), transparent 76%)'
+                : 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255, 255, 255, 0.65), transparent 76%)',
+            }}
+          />
+
           {/* Living Layered Wave Horizons */}
           <svg
             viewBox="0 0 1440 420"
@@ -508,7 +859,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
                     }
                   : {}
               }
-              transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
               d="M0,120 C320,75 620,165 960,115 C1180,82 1320,110 1440,125 L1440,420 L0,420 Z"
               fill={isDark ? 'rgba(14, 116, 144, 0.24)' : 'rgba(125, 211, 252, 0.35)'}
             />
@@ -524,7 +875,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
                     }
                   : {}
               }
-              transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
               d="M0,190 C360,230 720,145 1080,195 C1260,220 1360,185 1440,175 L1440,420 L0,420 Z"
               fill={isDark ? 'rgba(15, 23, 42, 0.68)' : 'rgba(241, 245, 249, 0.65)'}
             />
@@ -533,10 +884,27 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
               fill={isDark ? 'rgba(8, 13, 24, 0.88)' : 'rgba(248, 250, 252, 0.82)'}
             />
           </svg>
+
+          {/* Ocean Surface Caustic Shimmer Glint */}
+          <motion.div
+            animate={
+              shouldAnimate
+                ? { x: ['-10%', '10%', '-10%'], opacity: isDark ? [0.16, 0.34, 0.16] : [0.24, 0.48, 0.24] }
+                : { opacity: 0.2 }
+            }
+            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-x-[-10%] bottom-[12%] h-24 blur-xl will-change-transform"
+            style={{
+              mixBlendMode: 'soft-light',
+              background: isDark
+                ? 'radial-gradient(ellipse 46% 50% at 50% 50%, rgba(56, 189, 248, 0.36), transparent 72%)'
+                : 'radial-gradient(ellipse 46% 50% at 50% 50%, rgba(255, 255, 255, 0.75), transparent 72%)',
+            }}
+          />
         </div>
       )}
 
-      {/* 4. GOLDEN DAWN (Warm Horizon Rays & Light Motes) */}
+      {/* 4. GOLDEN DAWN (Warm Horizon Rays, Valley Mist & Light Motes) */}
       {liveTheme === 'solar-meadow' && (
         <div
           className="absolute inset-0 transition-colors duration-700"
@@ -559,6 +927,22 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
               background: isDark
                 ? 'radial-gradient(circle, rgba(245, 158, 11, 0.24), rgba(244, 63, 94, 0.12) 55%, transparent 80%)'
                 : 'radial-gradient(circle, rgba(254, 240, 138, 0.75), rgba(253, 186, 116, 0.35) 55%, transparent 80%)',
+            }}
+          />
+
+          {/* Soft Morning Valley Mist */}
+          <motion.div
+            animate={
+              shouldAnimate
+                ? { x: ['-8%', '8%', '-8%'], opacity: isDark ? [0.16, 0.32, 0.16] : [0.3, 0.54, 0.3] }
+                : { opacity: 0.22 }
+            }
+            transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-x-[-10%] bottom-[18%] h-36 blur-2xl will-change-transform"
+            style={{
+              background: isDark
+                ? 'radial-gradient(ellipse 62% 55% at 48% 50%, rgba(251, 191, 36, 0.2), transparent 75%)'
+                : 'radial-gradient(ellipse 62% 55% at 48% 50%, rgba(255, 251, 235, 0.76), transparent 75%)',
             }}
           />
 
@@ -801,8 +1185,8 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
             needsContentScrim
               ? 'bg-white/65 dark:bg-[#080b11]/75 backdrop-blur-[3px]'
               : isDark
-              ? 'bg-slate-950/20'
-              : 'bg-white/5'
+              ? 'bg-slate-950/15'
+              : 'bg-transparent'
           }`}
         />
       )}

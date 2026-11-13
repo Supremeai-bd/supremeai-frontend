@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import alpineDunesBg from '../assets/images/bg_alpine_dunes_clean_1794595839927.jpg';
 import mistyFjordsBg from '../assets/images/bg_misty_fjords_1794588925307.jpg';
 import emeraldHighlandsBg from '../assets/images/bg_emerald_highlands_1794588925886.jpg';
 import amberCanyonBg from '../assets/images/bg_amber_canyon_1794588925843.jpg';
@@ -48,8 +49,8 @@ export const LIVE_THEMES: LiveThemeDefinition[] = [
   {
     id: 'alpine-dunes',
     name: 'Alpine Dunes',
-    subtitle: 'Sunlit snow dunes by day · Moonlit ridge by night',
-    previewImage: '/assets/aistudio/image_09edce9c.png',
+    subtitle: 'Sunlit snow dunes & drifting spindrift mist',
+    previewImage: alpineDunesBg,
     lightPreviewGradient: 'linear-gradient(160deg, #9ec5df 0%, #dfeaf2 48%, #f2e5d4 100%)',
     darkPreviewGradient: 'linear-gradient(160deg, #0b162c 0%, #172a4a 52%, #1f293d 100%)',
     accentHex: '#0284c7',

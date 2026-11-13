@@ -4,7 +4,6 @@ import {
   PanelRight,
   Download,
   Trash2,
-  Search,
   Share2,
   GitFork,
   AlertTriangle,
@@ -16,13 +15,13 @@ import {
   ArrowLeft,
   Home,
 } from 'lucide-react';
-import { ChatSearchBar } from './components/chat/ChatSearchBar';
 import { WorkspaceTipBar, WorkspaceMicroSurvey } from './components/chat/WorkspaceTipsAndSurvey';
 import { shareService } from './services/shareService';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ChatThread } from './components/ChatThread';
 import { ChatEmptyState } from './components/chat/ChatEmptyState';
+import { ChatHistoryView } from './components/chat/ChatHistoryView';
 import { ChatInput } from './components/ChatInput';
 import { RoleModal } from './components/RoleModal';
 import { RoleLab } from './components/RoleLab';
@@ -72,7 +71,6 @@ import { useTabRouter } from './hooks/useTabRouter';
 import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { useOsThemeSync } from './hooks/useOsThemeSync';
 import { LiveScreenBackdrop } from './components/theme/LiveScreenBackdrop';
-import { ThemeControlPopover } from './components/theme/ThemeControlPopover';
 import { UserProject, ChatAttachment } from './types';
 
 const ADMIN_ONLY_TABS = new Set([
@@ -98,6 +96,7 @@ const DEV_ONLY_TABS = new Set([
 ]);
 
 const SUBVIEW_TITLES: Record<string, string> = {
+  'chat-history': 'All Conversations',
   'user-projects': 'My Projects',
   'user-api-keys': 'API Keys & Hooks',
   'user-knowledge': 'Knowledge Base',
@@ -246,9 +245,6 @@ export default function App() {
   const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
   const [isSurveyForceOpen, setIsSurveyForceOpen] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
-  const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [chatRoleFilter, setChatRoleFilter] = useState<'all' | 'user' | 'assistant'>('all');
   const [dangerConfirm, setDangerConfirm] = useState<{
     action: string;
     title: string;
@@ -359,16 +355,6 @@ export default function App() {
   useMcpTelemetry(currentRole === 'admin');
 
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
-
-  const filteredChatMessages = React.useMemo(() => {
-    const msgs = currentSession?.messages || [];
-    if (!isChatSearchOpen) return msgs;
-    return msgs.filter((m) => {
-      const matchesRole = chatRoleFilter === 'all' || m.role === chatRoleFilter;
-      const matchesText = !chatSearchQuery.trim() || m.content.toLowerCase().includes(chatSearchQuery.toLowerCase());
-      return matchesRole && matchesText;
-    });
-  }, [currentSession?.messages, isChatSearchOpen, chatRoleFilter, chatSearchQuery]);
 
   const prevSessionMsgRef = useRef<{ sessionId: string; count: number }>({
     sessionId: currentSession?.id || '',
@@ -659,19 +645,6 @@ export default function App() {
                   }`}
                 >
                   <div className="pointer-events-auto flex items-center gap-1.5 flex-wrap justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsChatSearchOpen((prev) => !prev)}
-                      title="Search messages"
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors cursor-pointer shadow-xs ${
-                        isChatSearchOpen
-                          ? 'bg-cyan-500 text-white'
-                          : 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Search className="w-3 h-3" />
-                      <span className="hidden md:inline">Search</span>
-                    </button>
 
                     {(currentSession?.messages?.length || 0) > 0 && (
                       <>
@@ -777,8 +750,6 @@ export default function App() {
                       </>
                     )}
 
-                    <ThemeControlPopover onOpenSettings={() => setActiveTab('user-settings')} />
-
                     {layoutMode === 'sidebar-focus' && (developerMode || currentRole === 'admin') && (
                       <button
                         type="button"
@@ -797,18 +768,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {isChatSearchOpen && (
-                  <ChatSearchBar
-                    searchQuery={chatSearchQuery}
-                    onSearchChange={setChatSearchQuery}
-                    roleFilter={chatRoleFilter}
-                    onRoleFilterChange={setChatRoleFilter}
-                    totalMatches={filteredChatMessages.length}
-                    totalMessages={currentSession?.messages?.length || 0}
-                    onClear={() => setChatSearchQuery('')}
-                  />
-                )}
-
                 {isChatEmpty ? (
                   <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-4 py-6 flex flex-col">
                     <div className="my-auto w-full flex flex-col items-center">
@@ -817,7 +776,6 @@ export default function App() {
                         activeModel={activeModel}
                         userName={authUser?.name}
                         developerMode={developerMode}
-                        onSelectPrompt={(prompt) => handleSendMessageWrapper(prompt)}
                       />
                       <div className="workspace-input-container mt-2">
                         <ChatInput
@@ -864,7 +822,7 @@ export default function App() {
                 ) : (
                   <div className="relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden">
                     <ChatThread
-                      messages={filteredChatMessages}
+                      messages={currentSession?.messages || []}
                       activeRole={activeRole}
                       activeModel={activeModel}
                       isStreaming={isStreaming}
@@ -951,10 +909,6 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <ThemeControlPopover
-                    compact
-                    onOpenSettings={() => setActiveTab('user-settings')}
-                  />
                   <button
                     type="button"
                     onClick={() => setActiveTab('chat')}
@@ -969,6 +923,22 @@ export default function App() {
               </div>
 
               <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
+
+          {/* All Conversations / Chat History View */}
+          {activeTab === 'chat-history' && (
+            <ChatHistoryView
+              sessions={sessions}
+              activeSessionId={currentSession?.id || ''}
+              onSelectSession={selectSession}
+              onDeleteSession={deleteSession}
+              onRenameSession={renameSession}
+              onTogglePinSession={togglePinSession}
+              onBranchSession={branchSession}
+              onNewSession={createNewSession}
+              onOpenChat={() => setActiveTab('chat')}
+              developerMode={developerMode}
+            />
+          )}
 
           {/* 2. Customer Workspace Views */}
           {activeTab === 'user-projects' && (

@@ -3,7 +3,6 @@ import { PanelLeft, PanelRight, ShieldCheck, LogOut, ChevronDown, Laptop, Code2 
 import { ModelDetail, UserRole, AuthUser } from '../types';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
-import { ThemeControlPopover } from './theme/ThemeControlPopover';
 
 interface NavbarProps {
   activeTab: string;
@@ -126,6 +125,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => onSelectTab('chat-history')}
+              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                activeTab === 'chat-history'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                  : 'hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              History
+            </button>
+            <button
+              type="button"
               onClick={() => onSelectTab('customers')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
                 activeTab === 'customers'
@@ -186,6 +196,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab('chat-history')}
+              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                activeTab === 'chat-history'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                  : 'hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              History
             </button>
             <button
               type="button"
@@ -321,11 +342,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="hidden sm:inline">Workspace</span>
           </button>
         )}
-
-        <ThemeControlPopover
-          compact
-          onOpenSettings={() => onSelectTab('user-settings')}
-        />
 
         {/* User Account & Sign Out Dropdown */}
         <div className="relative">

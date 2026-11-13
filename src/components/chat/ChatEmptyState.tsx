@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { PenLine, Bug, FileText, Layers, Lightbulb, Compass } from 'lucide-react';
 import { RolePersona, ModelDetail } from '../../types';
 import { useThemeStore } from '../../stores/useThemeStore';
 
@@ -9,79 +8,13 @@ interface ChatEmptyStateProps {
   activeModel: ModelDetail;
   userName?: string;
   developerMode?: boolean;
-  onSelectPrompt?: (prompt: string) => void;
 }
-
-const DEV_STARTER_PROMPTS = [
-  {
-    id: 'draft',
-    title: 'Draft & Edit',
-    subtitle: 'Write clear specs, emails, or release notes',
-    prompt: 'Help me draft a concise, structured technical product update for our engineering team and customers.',
-    icon: PenLine,
-  },
-  {
-    id: 'debug',
-    title: 'Debug Code',
-    subtitle: 'Find root causes and TypeScript fixes',
-    prompt: 'Analyze a tricky async race condition in React/TypeScript state management and show me a clean, leak-free fix.',
-    icon: Bug,
-  },
-  {
-    id: 'summarize',
-    title: 'Summarize Docs',
-    subtitle: 'Extract key decisions and action items',
-    prompt: 'Summarize complex technical architecture notes into executive bullet points, risks, and next action items.',
-    icon: FileText,
-  },
-  {
-    id: 'architect',
-    title: 'Architecture Plan',
-    subtitle: 'Design scalable APIs and data flows',
-    prompt: 'Design a resilient multi-tenant API architecture with rate limiting, caching, and zero-downtime deployment.',
-    icon: Layers,
-  },
-];
-
-const NON_DEV_STARTER_PROMPTS = [
-  {
-    id: 'draft-everyday',
-    title: 'Draft & Edit',
-    subtitle: 'Write clear emails, proposals, or articles',
-    prompt: 'Help me write a clear, friendly, and persuasive email update for my clients and team.',
-    icon: PenLine,
-  },
-  {
-    id: 'summarize-insights',
-    title: 'Summarize & Insights',
-    subtitle: 'Turn long notes or PDFs into key takeaways',
-    prompt: 'Summarize my meeting notes into clear key points, decisions made, and next action steps.',
-    icon: FileText,
-  },
-  {
-    id: 'brainstorm',
-    title: 'Brainstorm Ideas',
-    subtitle: 'Explore fresh angles, plans, or campaigns',
-    prompt: 'Help me brainstorm 5 practical campaign ideas and a simple 2-week launch plan for our product.',
-    icon: Lightbulb,
-  },
-  {
-    id: 'explain-simply',
-    title: 'Explain Simply',
-    subtitle: 'Break down complex topics into plain language',
-    prompt: 'Explain a complex topic step by step in simple everyday language with relatable examples.',
-    icon: Compass,
-  },
-];
 
 export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   activeRole,
   activeModel,
   userName = 'Ziaul',
-  developerMode = false,
-  onSelectPrompt,
 }) => {
-  const starterPrompts = developerMode ? DEV_STARTER_PROMPTS : NON_DEV_STARTER_PROMPTS;
   const [isKeyPulse, setIsKeyPulse] = useState(false);
   const liveTheme = useThemeStore((s) => s.liveTheme);
   const isScenic = liveTheme !== 'cyber-studio';
@@ -177,38 +110,6 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         <span aria-hidden="true">·</span>
         <span className="theme-accent-text font-medium">SupremeAI Studio</span>
       </motion.div>
-
-      {/* 4 Clickable Starter Prompt Cards */}
-      {onSelectPrompt && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.22, duration: 0.35 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 w-full mt-6 text-left"
-        >
-          {starterPrompts.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelectPrompt(item.prompt)}
-                className="group p-3.5 rounded-xl bg-white/75 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:border-[var(--theme-accent)] transition-all cursor-pointer text-left flex flex-col justify-between gap-2 shadow-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="w-3.5 h-3.5 theme-accent-text shrink-0" />
-                  <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                    {item.title}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
-                  {item.subtitle}
-                </p>
-              </button>
-            );
-          })}
-        </motion.div>
-      )}
     </div>
   );
 };

@@ -143,7 +143,6 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
             activeModel={activeModel}
             userName={userName}
             developerMode={developerMode}
-            onSelectPrompt={onSendPrompt}
           />
         ) : (
           <div className="workspace-chat-container space-y-4">
