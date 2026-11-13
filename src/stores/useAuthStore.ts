@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AuthUser, UserRole, CustomerRecord } from '../types';
 import { authService } from '../services/authService';
+import { env } from '../config/env';
 import { useCustomerStore } from './useCustomerStore';
 import { toast } from './useToastStore';
 
@@ -22,6 +23,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string, plan?: string, isDeveloperEligible?: boolean) => Promise<boolean>;
   logout: () => void;
+  restoreSession: () => Promise<void>;
   verify2FA: (payload: {
     token?: string;
     biometricSignature?: string;
@@ -45,19 +47,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const saved = localStorage.getItem(AUTH_USER_KEY);
       if (saved) return JSON.parse(saved);
     } catch {}
-    // Seed default admin user for initial access
-    return {
-      id: 'usr_admin_01',
-      name: 'Ziaul Haq (Admin)',
-      email: 'njelmedia@gmail.com',
-      avatar: 'Z',
-      role: 'admin',
-      isAdminEligible: true,
-      isDeveloperEligible: true,
-      adminUserId: 'admin_root_001',
-      plan: 'Enterprise',
-      createdAt: '2026-01-15',
-    };
+    // Integration plan Phase 1: never seed a default admin identity here.
+    // A stored identity is provisional until restoreSession() validates it
+    // against GET /api/v1/auth/me.
+    return null;
   };
 
   const getInitialRole = (): UserRole => {
@@ -85,6 +78,44 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isTwoFactorModalOpen: false,
     isAdminAuthModalOpen: false,
     isLoading: false,
+
+    restoreSession: async () => {
+      // Integration plan Phase 1: validate any stored session against the
+      // deployed API before trusting it. Mock mode keeps local state by design.
+      if (env.isMockEnabled) return;
+
+      const token = localStorage.getItem('supremeai_access_token');
+      if (!token) {
+        // No token: any locally stored user identity is not authenticated.
+        if (localStorage.getItem(AUTH_USER_KEY)) {
+          localStorage.removeItem(AUTH_USER_KEY);
+          localStorage.setItem(ROLE_KEY, 'user');
+          set({ authUser: null, currentRole: 'user' });
+        }
+        return;
+      }
+
+      set({ isLoading: true });
+      try {
+        const user = await authService.getMe();
+        if (user) {
+          localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+          const role: UserRole = user.isAdminEligible && user.role === 'admin' ? 'admin' : 'user';
+          localStorage.setItem(ROLE_KEY, role);
+          set({ authUser: user, currentRole: role, isLoading: false });
+        } else {
+          // Expired or invalid credentials: clear the session fail-closed.
+          localStorage.removeItem(AUTH_USER_KEY);
+          localStorage.removeItem('supremeai_access_token');
+          localStorage.setItem(ROLE_KEY, 'user');
+          set({ authUser: null, currentRole: 'user', isLoading: false });
+        }
+      } catch {
+        // Network failure: keep the provisional session but stop loading.
+        // Authorization remains enforced server-side on every request.
+        set({ isLoading: false });
+      }
+    },
 
     login: async (email: string, password: string) => {
       set({ isLoading: true });
