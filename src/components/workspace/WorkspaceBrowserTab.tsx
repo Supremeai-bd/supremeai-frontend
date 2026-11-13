@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Globe,
   ArrowLeft,
@@ -10,8 +10,15 @@ import {
   AlertCircle,
   Link2,
   Eye,
+  Camera,
+  Play,
+  Pause,
+  MousePointer,
+  HandMetal,
+  Type,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { browserService } from '../../services/browserService';
 
 export const WorkspaceBrowserTab: React.FC = () => {
   const {
@@ -34,7 +41,15 @@ export const WorkspaceBrowserTab: React.FC = () => {
   } = useWorkspaceStore();
 
   const [urlInput, setUrlInput] = useState(browserUrl);
-  const [viewMode, setViewMode] = useState<'rendered' | 'agent-dom'>('rendered');
+  const [viewMode, setViewMode] = useState<'rendered' | 'agent-dom' | 'screencast'>('rendered');
+  
+  // Operator Takeover State (Phase 3 - Task C1)
+  const [isTakeoverActive, setIsTakeoverActive] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [screencastFrame, setScreencastFrame] = useState<string | null>(null);
+  const [selectorInput, setSelectorInput] = useState('');
+  const [valueInput, setValueInput] = useState('');
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   useEffect(() => {
     setUrlInput(browserUrl);
@@ -53,6 +68,71 @@ export const WorkspaceBrowserTab: React.FC = () => {
     navigateBrowser(urlInput);
   };
 
+  // Toggle Operator Takeover
+  const handleToggleTakeover = async () => {
+    if (!isTakeoverActive) {
+      setIsTakeoverActive(true);
+      await browserService.pauseAutomation();
+      if (!sessionId) {
+        const sess = await browserService.createSession('Operator Takeover', browserUrl);
+        setSessionId(sess.session_id);
+      }
+    } else {
+      setIsTakeoverActive(false);
+      await browserService.resumeAutomation();
+    }
+  };
+
+  // Capture Live Screenshot Frame
+  const handleCaptureScreenshot = useCallback(async () => {
+    if (!sessionId) return;
+    setActionInProgress(true);
+    try {
+      const res = await browserService.executeAction(sessionId, 'screenshot');
+      if (res.screenshot) {
+        setScreencastFrame(`data:image/png;base64,${res.screenshot}`);
+        setViewMode('screencast');
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setActionInProgress(false);
+    }
+  }, [sessionId]);
+
+  // Manual Operator Click Action
+  const handleManualClick = async () => {
+    if (!sessionId || !selectorInput.trim()) return;
+    setActionInProgress(true);
+    try {
+      await browserService.executeAction(sessionId, 'click', { selector: selectorInput.trim() });
+      await handleCaptureScreenshot();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Click action failed';
+      alert(`Takeover Click Error: ${msg}`);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  // Manual Operator Fill Action
+  const handleManualFill = async () => {
+    if (!sessionId || !selectorInput.trim()) return;
+    setActionInProgress(true);
+    try {
+      await browserService.executeAction(sessionId, 'fill', {
+        selector: selectorInput.trim(),
+        value: valueInput,
+      });
+      await handleCaptureScreenshot();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Type/Fill action failed';
+      alert(`Takeover Fill Error: ${msg}`);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
   const canGoBack = browserHistoryIndex > 0;
   const canGoForward = browserHistoryIndex < browserHistoryStack.length - 1;
 
@@ -65,6 +145,109 @@ export const WorkspaceBrowserTab: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-[#070a12]">
+      {/* Operator Takeover Control Banner */}
+      <div className={`px-3 py-1.5 border-b text-xs flex items-center justify-between gap-3 transition-colors ${
+        isTakeoverActive
+          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+          : 'bg-cyan-500/5 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+      }`}>
+        <div className="flex items-center gap-2 font-mono">
+          {isTakeoverActive ? (
+            <>
+              <HandMetal className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
+              <span className="font-bold text-amber-400">OPERATOR TAKEOVER ACTIVE</span>
+              <span className="text-[10px] text-amber-400/80 hidden sm:inline">(Agent paused · Manual control enabled)</span>
+            </>
+          ) : (
+            <>
+              <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="text-slate-700 dark:text-slate-300 font-semibold">Autonomous Browser Stream</span>
+              <span className="text-[10px] text-slate-400 hidden sm:inline">(L4/L5 Cascade Ready)</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isTakeoverActive && (
+            <button
+              type="button"
+              onClick={handleCaptureScreenshot}
+              disabled={actionInProgress}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-mono text-[10px] font-semibold cursor-pointer disabled:opacity-50"
+            >
+              <Camera className="w-3 h-3" />
+              <span>Capture Frame</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleToggleTakeover}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg font-mono text-[10px] font-bold transition-all cursor-pointer ${
+              isTakeoverActive
+                ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-sm'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-cyan-400 hover:bg-cyan-500/10 border border-slate-300 dark:border-slate-700'
+            }`}
+          >
+            {isTakeoverActive ? (
+              <>
+                <Play className="w-3 h-3 fill-current" />
+                <span>Resume Autonomous Mode</span>
+              </>
+            ) : (
+              <>
+                <Pause className="w-3 h-3" />
+                <span>Operator Takeover</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Manual Action Injection Strip (when Takeover is active) */}
+      {isTakeoverActive && (
+        <div className="px-3 py-2 bg-amber-500/5 border-b border-amber-500/20 flex flex-wrap items-center gap-2 text-xs font-mono">
+          <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+            <MousePointer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <input
+              type="text"
+              value={selectorInput}
+              onChange={(e) => setSelectorInput(e.target.value)}
+              placeholder="CSS / XPath Selector (e.g. button#submit, //a)..."
+              className="w-full px-2 py-1 text-[11px] rounded bg-white dark:bg-slate-900 border border-amber-500/30 text-slate-800 dark:text-slate-100 outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
+            <Type className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <input
+              type="text"
+              value={valueInput}
+              onChange={(e) => setValueInput(e.target.value)}
+              placeholder="Value to type/fill..."
+              className="w-full px-2 py-1 text-[11px] rounded bg-white dark:bg-slate-900 border border-amber-500/30 text-slate-800 dark:text-slate-100 outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={handleManualClick}
+              disabled={actionInProgress || !selectorInput.trim()}
+              className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-[10px] cursor-pointer"
+            >
+              Click
+            </button>
+            <button
+              type="button"
+              onClick={handleManualFill}
+              disabled={actionInProgress || !selectorInput.trim()}
+              className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-[10px] cursor-pointer"
+            >
+              Fill
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Browser Address & Controls Bar */}
       <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800/90 bg-white/90 dark:bg-[#0b101b] space-y-2">
         <div className="flex items-center gap-2">
@@ -116,26 +299,40 @@ export const WorkspaceBrowserTab: React.FC = () => {
             </button>
           </form>
 
-          {/* View Mode Toggle: Visual vs Web Agent DOM */}
+          {/* View Mode Toggle */}
           <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shrink-0 text-[11px] font-mono">
             <button
               type="button"
               onClick={() => setViewMode('rendered')}
               className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors cursor-pointer ${
                 viewMode === 'rendered'
-                  ? 'bg-white dark:bg-slate-800 text-cyan-500 font-semibold shadow-xs'
+                  ? 'bg-cyan-500 text-slate-950 font-semibold'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
               <Eye className="w-3 h-3" />
-              <span className="hidden sm:inline">View</span>
+              <span className="hidden sm:inline">Render</span>
             </button>
+            {screencastFrame && (
+              <button
+                type="button"
+                onClick={() => setViewMode('screencast')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                  viewMode === 'screencast'
+                    ? 'bg-cyan-500 text-slate-950 font-semibold'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <Camera className="w-3 h-3" />
+                <span className="hidden sm:inline">Frame</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setViewMode('agent-dom')}
               className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors cursor-pointer ${
                 viewMode === 'agent-dom'
-                  ? 'bg-white dark:bg-slate-800 text-cyan-500 font-semibold shadow-xs'
+                  ? 'bg-cyan-500 text-slate-950 font-semibold'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
@@ -194,6 +391,14 @@ export const WorkspaceBrowserTab: React.FC = () => {
             >
               Retry Connection
             </button>
+          </div>
+        ) : viewMode === 'screencast' && screencastFrame ? (
+          <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950">
+            <img
+              src={screencastFrame}
+              alt="Playwright Screencast Frame"
+              className="max-w-full max-h-full rounded-lg border border-cyan-500/40 shadow-2xl object-contain"
+            />
           </div>
         ) : viewMode === 'rendered' ? (
           <div className="flex-1 relative bg-white dark:bg-[#090d16]">
@@ -281,7 +486,9 @@ export const WorkspaceBrowserTab: React.FC = () => {
                 : 'Idle'}
             </span>
           </div>
-          <span className="shrink-0 text-slate-500">Sandbox Proxy Active</span>
+          <span className="shrink-0 text-slate-500">
+            {isTakeoverActive ? 'Manual Override Active' : 'Autonomous Cascade Engine'}
+          </span>
         </div>
       </div>
     </div>
