@@ -6,17 +6,18 @@ import { ThemeControlPopover } from '../theme/ThemeControlPopover';
 import { usePlatformStore } from '../../stores/usePlatformStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useCustomerStore } from '../../stores/useCustomerStore';
+import { authService } from '../../services/authService';
 import { env } from '../../config/env';
 
 interface AuthPageProps {
-  onLoginSuccess: (user: AuthUser, token: string) => void;
+  onLoginSuccess: (user: AuthUser, token?: string) => void;
   darkMode?: boolean;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('njelmedia@gmail.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [plan, setPlan] = useState<'Free' | 'Pro' | 'Enterprise'>('Pro');
   const [rememberMe, setRememberMe] = useState(true);
@@ -36,50 +37,41 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
-    const payload =
-      mode === 'login'
-        ? { email, password }
-        : {
-            name,
-            email,
-            password,
-            plan,
-            isDeveloperEligible: false,
-            workspaceFocus: 'everyday',
-          };
-
     try {
-      const res = await fetch(`${env.apiBaseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Authentication failed. Please check your credentials.');
-      }
-
-      if (data.token) {
-        localStorage.setItem('supremeai_access_token', data.token);
-      }
-      if (data.user) {
-        localStorage.setItem('supremeai_auth_user', JSON.stringify(data.user));
-        const role = data.user.isAdminEligible && data.user.role === 'admin' ? 'admin' : 'user';
+      if (mode === 'login') {
+        const res = await authService.login(email.trim(), password);
+        if (!res.success || !res.user) {
+          throw new Error('Authentication failed. Please check your credentials.');
+        }
+        const role = res.user.isAdminEligible && res.user.role === 'admin' ? 'admin' : 'user';
         localStorage.setItem('supremeai_studio_user_role', role);
-        useAuthStore.setState({ authUser: data.user, currentRole: role });
+        localStorage.setItem('supremeai_auth_user', JSON.stringify(res.user));
+        useAuthStore.setState({ authUser: res.user, currentRole: role });
         useCustomerStore.getState().updateSettings({
-          name: data.user.name,
-          email: data.user.email,
-          plan: data.user.plan,
+          name: res.user.name,
+          email: res.user.email,
+          plan: res.user.plan,
           developerMode: false,
         });
+        onLoginSuccess(res.user, res.token);
+      } else {
+        const res = await authService.signup(name.trim(), email.trim(), password, plan, false);
+        if (!res.success || !res.user) {
+          throw new Error('Registration failed. Please check your input.');
+        }
+        localStorage.setItem('supremeai_studio_user_role', res.user.role);
+        localStorage.setItem('supremeai_auth_user', JSON.stringify(res.user));
+        useAuthStore.setState({ authUser: res.user, currentRole: res.user.role });
+        useCustomerStore.getState().updateSettings({
+          name: res.user.name,
+          email: res.user.email,
+          plan: res.user.plan,
+          developerMode: false,
+        });
+        onLoginSuccess(res.user, res.token);
       }
-
-      onLoginSuccess(data.user, data.token);
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
+      setErrorMessage(err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
