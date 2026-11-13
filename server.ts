@@ -19,26 +19,26 @@ const portArgIndex = process.argv.indexOf('--port');
 const PORT = portArgIndex !== -1 ? Number(process.argv[portArgIndex + 1]) || 3000 : 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Supported Gemini models as specified in requirements
+// Supported SupremeAI native models
 const SUPPORTED_MODELS: Record<string, { name: string; description: string; tier: 'standard' | 'advanced' }> = {
-  'gemini-3.8-flash': {
-    name: 'Gemini 3.8 Flash',
-    description: 'General tasks, balanced latency & intelligence (Recommended)',
+  'supreme-core': {
+    name: 'SupremeAI Core',
+    description: 'Flagship multimodal foundation model for general tasks, synthesis & coding',
     tier: 'standard',
   },
-  'gemini-3.1-flash-lite': {
-    name: 'Gemini 3.1 Flash Lite',
-    description: 'Fast tasks, low-latency synthesis & quick responses',
+  'supreme-spark': {
+    name: 'SupremeAI Spark',
+    description: 'Ultra-low latency model for high-frequency queries and streaming',
     tier: 'standard',
   },
-  'gemini-4-carbon': {
-    name: 'Gemini 4 Carbon',
-    description: 'Deep reasoning, architectural decisions & complex debugging',
+  'supreme-reason': {
+    name: 'SupremeAI Reason',
+    description: 'Deep analytical and architectural reasoning engine',
     tier: 'advanced',
   },
-  'gemini-4-argon': {
-    name: 'Gemini 4 Argon',
-    description: 'Particularly complex interactive tasks, logic & code generation',
+  'supreme-deep': {
+    name: 'SupremeAI Deep',
+    description: 'Complex multi-step logic, code synthesis and autonomous tasks',
     tier: 'advanced',
   },
 };
@@ -92,16 +92,16 @@ async function startServer() {
   app.get('/api/models', (_req: Request, res: Response) => {
     res.json({
       models: SUPPORTED_MODELS,
-      defaultModel: 'gemini-3.8-flash',
+      defaultModel: 'supreme-core',
     });
   });
 
   // --- MCP Tower Services & Health Orchestration Endpoints ---
   let mcpClusterServices = [
     {
-      id: 'gemini-gateway-service',
-      name: 'gemini-gateway-service',
-      displayName: 'Gemini Gateway Broker',
+      id: 'supreme-gateway-service',
+      name: 'supreme-gateway-service',
+      displayName: 'SupremeAI Gateway Broker',
       category: 'core',
       port: 8081,
       status: 'healthy',
@@ -118,8 +118,8 @@ async function startServer() {
           id: 'gw-log-1',
           timestamp: new Date().toLocaleTimeString(),
           level: 'INFO',
-          message: 'Active route pool healthy. 4 Gemini models registered with live streaming hooks.',
-          details: 'Endpoints: gemini-3.8-flash, gemini-3.1-flash-lite, gemini-4-carbon, gemini-4-argon',
+          message: 'Active route pool healthy. 4 SupremeAI models registered with live streaming hooks.',
+          details: 'Endpoints: supreme-core, supreme-spark, supreme-reason, supreme-deep',
         },
       ],
     },
@@ -485,7 +485,7 @@ async function startServer() {
 
   // --- Admin Platform Control Endpoints & Central Governance State ---
   let runtimeFeatureFlags: Record<string, boolean> = {
-    enable_gemini_4_reasoning: true,
+    enable_supreme_reason: true,
     enable_multimodal_vision: true,
     enable_rag_grounding: true,
     enable_continuous_agent_swarm: true,
@@ -501,16 +501,16 @@ async function startServer() {
     maintenanceMessage: 'SupremeAI Studio is undergoing scheduled database maintenance. Administrators remain online.',
     announcementBanner: {
       active: false,
-      message: 'All Gemini 3.8 Flash and Gemini 4 Carbon routes are operating normally.',
+      message: 'All SupremeAI Core and SupremeAI Reason routes are operating normally.',
       level: 'info' as 'info' | 'warning' | 'critical',
     },
     allowNewSignups: true,
-    defaultModelId: 'gemini-3.8-flash',
+    defaultModelId: 'supreme-core',
     modelPolicies: {
-      'gemini-3.8-flash': { enabled: true, minTier: 'Free' as PlanTier },
-      'gemini-3.1-flash-lite': { enabled: true, minTier: 'Free' as PlanTier },
-      'gemini-4-carbon': { enabled: true, minTier: 'Pro' as PlanTier },
-      'gemini-4-argon': { enabled: true, minTier: 'Enterprise' as PlanTier },
+      'supreme-core': { enabled: true, minTier: 'Free' as PlanTier },
+      'supreme-spark': { enabled: true, minTier: 'Free' as PlanTier },
+      'supreme-reason': { enabled: true, minTier: 'Pro' as PlanTier },
+      'supreme-deep': { enabled: true, minTier: 'Enterprise' as PlanTier },
     } as Record<string, { enabled: boolean; minTier: PlanTier }>,
   };
 
@@ -557,8 +557,8 @@ async function startServer() {
       timestamp: 'Apr 10, 2026',
       actor: 'admin@supremeai.bd',
       action: 'FAILOVER_RULE_UPDATE',
-      resource: 'LLM Gateway / gemini-3.8-flash',
-      details: 'Configured automated fallback to gemini-3.1-flash-lite on 503 high demand.',
+      resource: 'LLM Gateway / supreme-core',
+      details: 'Configured automated fallback to supreme-spark on 503 high demand.',
       ipAddress: '10.0.4.12',
     },
   ];
@@ -1446,19 +1446,19 @@ async function startServer() {
     if (target.id === 'prov_google_ai') {
       if (!hasLiveKey) {
         probeStatus = 'untested';
-        message = 'GEMINI_API_KEY is not set in server environment; local fallback engine is handling requests.';
+        message = 'Gateway key is not set in server environment; local fallback engine is handling requests.';
       } else {
         try {
           const clientAi = new GoogleGenAI({ apiKey: activeKey });
           await clientAi.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
+            model: 'gemini-2.5-flash',
             contents: 'OK',
           });
           probeStatus = 'healthy';
-          message = 'Live Gemini API handshake succeeded.';
+          message = 'Live SupremeAI gateway handshake succeeded.';
         } catch (probeErr: unknown) {
           probeStatus = 'degraded';
-          message = probeErr instanceof Error ? probeErr.message : 'Upstream Gemini probe failed.';
+          message = probeErr instanceof Error ? probeErr.message : 'Upstream intelligence probe failed.';
         }
       }
     } else {
@@ -1535,7 +1535,7 @@ async function startServer() {
       }
 
       const {
-        model = platformConfig.defaultModelId || 'gemini-3.8-flash',
+        model = platformConfig.defaultModelId || 'supreme-core',
         messages = [],
         systemInstruction,
         groundingContext,
@@ -1575,7 +1575,8 @@ async function startServer() {
         return;
       }
 
-      const validatedModel = SUPPORTED_MODELS[model] ? model : 'gemini-3.8-flash';
+      const validatedModel = SUPPORTED_MODELS[model] ? model : 'supreme-core';
+      const upstreamModel = validatedModel === 'supreme-reason' || validatedModel === 'supreme-deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
 
       // Enforce Model Policy (enabled & minTier)
       const modelPolicy = platformConfig.modelPolicies[validatedModel];
@@ -1663,11 +1664,11 @@ async function startServer() {
           return;
         }
 
-        // Stream with 15s timeout protection and 503 high-demand resilience
+        // Stream with 15s timeout protection and resilient fallback
         const executeStream = async () => {
           try {
             return await clientAi.models.generateContentStream({
-              model: validatedModel,
+              model: upstreamModel,
               contents,
               config: {
                 systemInstruction: activeSystemInstruction,
@@ -1677,13 +1678,13 @@ async function startServer() {
             const errStr = String(streamErr instanceof Error ? streamErr.message : streamErr);
             if (
               (errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('high demand')) &&
-              validatedModel !== 'gemini-3.1-flash-lite'
+              upstreamModel !== 'gemini-2.5-flash'
             ) {
               console.warn(
-                `Model ${validatedModel} experiencing temporary 503 high demand. Resilient fallback to gemini-3.1-flash-lite.`
+                `Model ${validatedModel} experiencing temporary 503 high demand. Resilient fallback to fast tier.`
               );
               return await clientAi.models.generateContentStream({
-                model: 'gemini-3.1-flash-lite',
+                model: 'gemini-2.5-flash',
                 contents,
                 config: {
                   systemInstruction: activeSystemInstruction,
@@ -1720,7 +1721,7 @@ async function startServer() {
           const executeGenerate = async () => {
             try {
               return await clientAi.models.generateContent({
-                model: validatedModel,
+                model: upstreamModel,
                 contents,
                 config: {
                   systemInstruction: activeSystemInstruction,
@@ -1730,13 +1731,13 @@ async function startServer() {
               const errStr = String(genErr instanceof Error ? genErr.message : genErr);
               if (
                 (errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('high demand')) &&
-                validatedModel !== 'gemini-3.1-flash-lite'
+                upstreamModel !== 'gemini-2.5-flash'
               ) {
                 console.warn(
-                  `Model ${validatedModel} experiencing temporary 503 high demand. Resilient fallback to gemini-3.1-flash-lite.`
+                  `Model ${validatedModel} experiencing temporary 503 high demand. Resilient fallback to fast tier.`
                 );
                 return await clientAi.models.generateContent({
-                  model: 'gemini-3.1-flash-lite',
+                  model: 'gemini-2.5-flash',
                   contents,
                   config: {
                     systemInstruction: activeSystemInstruction,
@@ -1763,7 +1764,7 @@ async function startServer() {
 
       // If GEMINI_API_KEY is not yet injected into the environment:
       const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')?.content || 'Inquiry';
-      const fallbackResponse = `### SupremeAI Studio Intelligence Engine\n\n**Model**: \`${validatedModel}\` · **Role**: Active Persona\n\nReceived prompt:\n> ${lastUserMessage}\n\n#### Architectural Insight\nSupremeAI Studio has processed your request through the ${validatedModel} pipeline. Here is the recommended technical approach for your \`supremeai-studio\` frontend and \`supremeai\` architecture:\n\n\`\`\`typescript\n// SupremeAI Core Pipeline Invariant\nexport interface StudioOrchestrator {\n  model: '${validatedModel}';\n  systemInstruction: string;\n  status: 'active';\n  latencyMode: 'low-latency';\n}\n\`\`\`\n\n*Note: To stream live inference directly from Google servers, ensure your GEMINI_API_KEY is active in the AI Studio environment.*`;
+      const fallbackResponse = `### SupremeAI Studio Intelligence Engine\n\n**Model**: \`${validatedModel}\` · **Role**: Active Persona\n\nReceived prompt:\n> ${lastUserMessage}\n\n#### Architectural Insight\nSupremeAI Studio has processed your request through the ${validatedModel} pipeline. Here is the recommended technical approach for your \`supremeai-studio\` frontend and \`supremeai\` architecture:\n\n\`\`\`typescript\n// SupremeAI Core Pipeline Invariant\nexport interface StudioOrchestrator {\n  model: '${validatedModel}';\n  systemInstruction: string;\n  status: 'active';\n  latencyMode: 'low-latency';\n}\n\`\`\`\n\n*Note: To stream live inference directly, ensure your gateway connection is active.*`;
 
       if (stream) {
         res.setHeader('Content-Type', 'text/event-stream');
@@ -1788,9 +1789,9 @@ async function startServer() {
       }
     } catch (err: unknown) {
       console.error('Error in /api/chat:', err);
-      let errorMessage = err instanceof Error ? err.message : 'Unknown server error during Gemini inference';
+      let errorMessage = err instanceof Error ? err.message : 'Unknown server error during SupremeAI inference';
 
-      // Parse JSON formatted error messages from Gemini SDK for clean client display
+      // Parse JSON formatted error messages for clean client display
       try {
         const parsed = JSON.parse(errorMessage);
         if (parsed.error?.message) {
@@ -1804,10 +1805,10 @@ async function startServer() {
         res.status(500).json({
           error: errorMessage,
           hint: errorMessage.includes('API_KEY')
-            ? 'Please ensure your GEMINI_API_KEY is configured in the environment.'
+            ? 'Please ensure your gateway credentials are configured in the environment.'
             : errorMessage.includes('demand')
-            ? 'Model is under temporary high demand. Try gemini-3.1-flash-lite for faster throughput.'
-            : 'Gemini inference failed.',
+            ? 'Model is under temporary high demand. Try SupremeAI Spark for faster throughput.'
+            : 'SupremeAI inference failed.',
         });
       } else {
         res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
@@ -1879,7 +1880,7 @@ async function startServer() {
             status: 'healthy',
             app: 'SupremeAI Studio',
             port: PORT,
-            geminiConfigured: Boolean(apiKey),
+            gatewayConfigured: Boolean(apiKey),
             uptimeSec: Math.round(process.uptime()),
             memoryRssMb: Math.round(process.memoryUsage().rss / (1024 * 1024)),
           },
