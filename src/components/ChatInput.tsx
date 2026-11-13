@@ -13,6 +13,7 @@ import {
   BookOpen,
   Database,
   Lock,
+  AudioLines,
 } from 'lucide-react';
 import { ModelDetail, ChatAttachment, PlanTier } from '../types';
 import { SUPREMEAI_MODELS } from '../data/models';
@@ -33,6 +34,7 @@ interface ChatInputProps {
   onToggleDeepResearch?: () => void;
   developerMode?: boolean;
   enableKnowledgeGrounding?: boolean;
+  onOpenLiveVoice?: () => void;
 }
 
 const TIER_RANK: Record<PlanTier, number> = {
@@ -54,6 +56,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onToggleDeepResearch,
   developerMode: developerModeProp,
   enableKnowledgeGrounding = false,
+  onOpenLiveVoice,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -440,6 +443,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               type="button"
               onClick={toggleListening}
               aria-label="Voice input"
+              title="Voice dictation"
               className={`p-1.5 rounded-full hover:bg-slate-200/80 dark:hover:bg-slate-700/80 transition-colors cursor-pointer ${
                 isListening
                   ? 'text-rose-600 bg-rose-100 dark:bg-rose-950 animate-pulse'
@@ -448,6 +452,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             >
               <Mic className="w-4 h-4" />
             </button>
+
+            {/* Real-time Voice Conversation (Gemini Live API) */}
+            {onOpenLiveVoice && (
+              <button
+                type="button"
+                onClick={onOpenLiveVoice}
+                aria-label="Live Voice Conversation"
+                title="Start real-time voice conversation (gemini-3.8-live)"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full theme-accent-active border text-xs font-medium hover:brightness-105 transition-all cursor-pointer shrink-0"
+              >
+                <AudioLines className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Voice</span>
+              </button>
+            )}
 
             {/* Submit / Stop button */}
             {isStreaming ? (

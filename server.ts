@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import http from 'http';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -7,7 +8,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const execAsync = promisify(exec);
 dotenv.config();
@@ -2100,7 +2102,240 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  // Create HTTP server & mount /api/live WebSocket bridge for Gemini Live API (gemini-3.8-live)
+  const server = http.createServer(app);
+  const liveWss = new WebSocketServer({ noServer: true });
+  const VALID_LIVE_VOICES = new Set(['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr']);
+
+  server.on('upgrade', (request, socket, head) => {
+    try {
+      const reqUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+      if (reqUrl.pathname === '/api/live') {
+        liveWss.handleUpgrade(request, socket, head, (ws) => {
+          liveWss.emit('connection', ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    } catch {
+      socket.destroy();
+    }
+  });
+
+  liveWss.on('connection', (clientWs: WebSocket, req: http.IncomingMessage) => {
+    const forwardedHeader = req.headers['x-forwarded-for'];
+    const clientIp =
+      typeof forwardedHeader === 'string' && forwardedHeader.trim()
+        ? forwardedHeader.split(',')[0].trim()
+        : req.socket.remoteAddress || '127.0.0.1';
+
+    if (blockedIps.some((entry) => entry.ip === clientIp)) {
+      clientWs.send(JSON.stringify({ type: 'error', message: 'Access blocked by platform WAF firewall.' }));
+      clientWs.close(1008, 'Blocked');
+      return;
+    }
+
+    if (platformConfig.maintenanceMode) {
+      clientWs.send(
+        JSON.stringify({
+          type: 'error',
+          message: platformConfig.maintenanceMessage || 'Platform is currently in maintenance mode.',
+        })
+      );
+      clientWs.close(1013, 'Maintenance');
+      return;
+    }
+
+    const activeApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+    if (!activeApiKey || activeApiKey === 'MY_GEMINI_API_KEY') {
+      clientWs.send(
+        JSON.stringify({
+          type: 'error',
+          message: 'API key is not configured. Please check the key in the Settings > Secrets panel.',
+        })
+      );
+      clientWs.close(1011, 'API key missing');
+      return;
+    }
+
+    let sessionPromise: Promise<Awaited<ReturnType<GoogleGenAI['live']['connect']>>> | null = null;
+    let isClientClosed = false;
+
+    const sendToClient = (payload: Record<string, unknown>) => {
+      if (!isClientClosed && clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(JSON.stringify(payload));
+      }
+    };
+
+    const startLiveSession = (voiceRaw?: string, systemInstructionRaw?: string) => {
+      if (sessionPromise) return;
+
+      const voiceName = voiceRaw && VALID_LIVE_VOICES.has(voiceRaw) ? voiceRaw : 'Zephyr';
+      const baseInstruction =
+        'You are SupremeAI Live, a real-time conversational voice engineering partner in SupremeAI Studio. Respond naturally, concisely, and clearly in spoken dialogue without markdown formatting symbols.';
+      const effectiveSystemInstruction = systemInstructionRaw?.trim()
+        ? `${baseInstruction}\n\nActive Persona Context:\n${systemInstructionRaw.trim()}`
+        : baseInstruction;
+
+      const liveAi = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: {
+          apiVersion: 'v1beta',
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      sessionPromise = liveAi.live.connect({
+        model: 'gemini-3.8-live',
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName },
+            },
+          },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+          systemInstruction: effectiveSystemInstruction,
+        },
+        callbacks: {
+          onopen: () => {
+            sendToClient({
+              type: 'connected',
+              model: 'gemini-3.8-live',
+              voice: voiceName,
+            });
+          },
+          onmessage: (message: LiveServerMessage) => {
+            if (message.setupComplete) {
+              sendToClient({ type: 'setup_complete', model: 'gemini-3.8-live', voice: voiceName });
+            }
+
+            const serverContent = message.serverContent;
+            if (!serverContent) return;
+
+            if (serverContent.inputTranscription?.text) {
+              sendToClient({
+                type: 'input_transcript',
+                text: serverContent.inputTranscription.text,
+              });
+            }
+
+            if (serverContent.outputTranscription?.text) {
+              sendToClient({
+                type: 'output_transcript',
+                text: serverContent.outputTranscription.text,
+              });
+            }
+
+            for (const part of serverContent.modelTurn?.parts ?? []) {
+              if (part.inlineData?.data) {
+                sendToClient({
+                  type: 'audio',
+                  data: part.inlineData.data,
+                  mimeType: part.inlineData.mimeType || 'audio/pcm;rate=24000',
+                });
+              }
+            }
+
+            if (serverContent.interrupted) {
+              sendToClient({ type: 'interrupted' });
+            }
+
+            if (serverContent.turnComplete) {
+              sendToClient({ type: 'turn_complete' });
+            }
+          },
+          onerror: (event: any) => {
+            const msg = event?.message || event?.error?.message || 'Live API WebSocket error.';
+            sendToClient({ type: 'error', message: msg });
+          },
+          onclose: (event: any) => {
+            if (!isClientClosed) {
+              sendToClient({
+                type: 'closed',
+                reason: event?.reason || 'Live API session ended.',
+              });
+              if (clientWs.readyState === WebSocket.OPEN) {
+                clientWs.close();
+              }
+            }
+          },
+        },
+      });
+
+      sessionPromise.catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Failed to connect to Gemini Live API.';
+        sendToClient({ type: 'error', message: msg });
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.close(1011, 'Live API connection failed');
+        }
+      });
+    };
+
+    clientWs.on('message', (raw) => {
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw.toString());
+      } catch {
+        return;
+      }
+
+      if (parsed?.type === 'init') {
+        startLiveSession(parsed.voiceName, parsed.systemInstruction);
+        return;
+      }
+
+      if (!sessionPromise) {
+        startLiveSession(parsed?.voiceName, parsed?.systemInstruction);
+      }
+
+      if (parsed?.type === 'audio' && typeof parsed.data === 'string' && parsed.data.length > 0) {
+        sessionPromise
+          ?.then((session) => {
+            if (!isClientClosed) {
+              session.sendRealtimeInput({
+                audio: { data: parsed.data, mimeType: 'audio/pcm;rate=16000' },
+              });
+            }
+          })
+          .catch(() => {});
+      } else if (parsed?.type === 'audio_end') {
+        sessionPromise
+          ?.then((session) => {
+            if (!isClientClosed) {
+              session.sendRealtimeInput({ audioStreamEnd: true });
+            }
+          })
+          .catch(() => {});
+      } else if (parsed?.type === 'text' && typeof parsed.text === 'string' && parsed.text.trim()) {
+        sessionPromise
+          ?.then((session) => {
+            if (!isClientClosed) {
+              session.sendRealtimeInput({ text: parsed.text.trim() });
+            }
+          })
+          .catch(() => {});
+      }
+    });
+
+    clientWs.on('close', () => {
+      isClientClosed = true;
+      sessionPromise
+        ?.then((session) => {
+          try {
+            session.close();
+          } catch {
+            // Ignore close errors
+          }
+        })
+        .catch(() => {});
+    });
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`SupremeAI Studio Server listening on http://0.0.0.0:${PORT}`);
   });
 }

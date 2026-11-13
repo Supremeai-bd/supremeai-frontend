@@ -23,6 +23,7 @@ import { Sidebar } from './components/Sidebar';
 import { ChatThread } from './components/ChatThread';
 import { ChatEmptyState } from './components/chat/ChatEmptyState';
 import { ChatHistoryView } from './components/chat/ChatHistoryView';
+import { LiveVoiceModal } from './components/chat/LiveVoiceModal';
 import { ChatInput } from './components/ChatInput';
 import { RoleModal } from './components/RoleModal';
 import { RoleLab } from './components/RoleLab';
@@ -169,6 +170,7 @@ export default function App() {
     setIsPromptModalOpen,
     setIsRoleModalOpen,
     sendMessage,
+    appendVoiceTurn,
     stopStreaming,
   } = useChatStore();
 
@@ -244,6 +246,7 @@ export default function App() {
     typeof window !== 'undefined' ? window.innerWidth >= 900 : true
   );
   const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
+  const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState<boolean>(false);
   const [isSurveyForceOpen, setIsSurveyForceOpen] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [dangerConfirm, setDangerConfirm] = useState<{
@@ -816,6 +819,7 @@ export default function App() {
                           onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
                           developerMode={developerMode}
                           enableKnowledgeGrounding={enableKnowledgeGrounding}
+                          onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
                         />
                       </div>
                       <WorkspaceTipBar
@@ -871,6 +875,7 @@ export default function App() {
                       onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
                       developerMode={developerMode}
                       enableKnowledgeGrounding={enableKnowledgeGrounding}
+                      onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
                     />
                   </div>
                 )}
@@ -1249,6 +1254,18 @@ export default function App() {
           onClose={() => setIsPromptModalOpen(false)}
           onSelectTemplate={(text) => handleSendMessageWrapper(text)}
           developerMode={developerMode}
+        />
+
+        <LiveVoiceModal
+          isOpen={isLiveVoiceOpen}
+          onClose={() => setIsLiveVoiceOpen(false)}
+          systemInstruction={
+            customInstruction.trim() ||
+            userSettings.customInstructions?.trim() ||
+            activeRole.systemInstruction
+          }
+          roleName={activeRole.name}
+          onCommitTurn={appendVoiceTurn}
         />
 
         <WorkspaceMicroSurvey

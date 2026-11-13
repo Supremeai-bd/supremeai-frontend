@@ -43,6 +43,7 @@ interface ChatState {
 
   // Inference Actions
   sendMessage: (text: string, attachment?: ChatAttachment, groundingDocs?: KnowledgeDoc[], deepResearch?: boolean) => Promise<void>;
+  appendVoiceTurn: (userText: string, assistantText: string, voiceName?: string) => void;
   stopStreaming: () => void;
 }
 
@@ -491,6 +492,57 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       set({ isStreaming: false, streamingContent: '' });
       toast.info('Generation Stopped', 'Model inference paused by user.');
+    },
+
+    appendVoiceTurn: (userText: string, assistantText: string, voiceName?: string) => {
+      const cleanUser = userText.trim();
+      const cleanAssistant = assistantText.trim();
+      if (!cleanUser && !cleanAssistant) return;
+
+      const { sessions, activeSessionId, activeRole } = get();
+      const current = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+      if (!current) return;
+
+      const newMessages: ChatMessage[] = [];
+      const now = Date.now();
+      if (cleanUser) {
+        newMessages.push({
+          id: `voice_u_${now}`,
+          role: 'user',
+          content: cleanUser,
+          timestamp: now,
+        });
+      }
+      if (cleanAssistant) {
+        newMessages.push({
+          id: `voice_a_${now + 1}`,
+          role: 'assistant',
+          content: cleanAssistant,
+          timestamp: now + 1,
+          model: 'gemini-3.8-live',
+          roleName: voiceName ? `${activeRole.name} (${voiceName} Voice)` : 'SupremeAI Live',
+        });
+      }
+
+      const isFirstUserMessage = current.messages.filter((m) => m.role === 'user').length === 0;
+      const sessionTitle =
+        isFirstUserMessage && cleanUser
+          ? cleanUser.slice(0, 32).trim() + (cleanUser.length > 32 ? '...' : '')
+          : current.title;
+
+      const updatedSessions = sessions.map((s) =>
+        s.id === current.id
+          ? {
+              ...s,
+              title: sessionTitle,
+              messages: [...s.messages, ...newMessages],
+              updatedAt: now,
+            }
+          : s
+      );
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
+      set({ sessions: updatedSessions });
     },
 
     syncRemoteSessions: async () => {
