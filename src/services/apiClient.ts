@@ -25,6 +25,9 @@ export class ApiError extends Error {
 class ApiClient {
   private getAuthToken(): string | null {
     try {
+      const directToken = localStorage.getItem('supremeai_access_token');
+      if (directToken) return directToken;
+
       const userRaw = localStorage.getItem('supremeai_auth_user');
       if (userRaw) {
         const user = JSON.parse(userRaw);

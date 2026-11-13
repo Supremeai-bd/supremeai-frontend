@@ -39,7 +39,29 @@ export const authService = {
       };
     }
 
-    return apiClient.post<LoginResponse>('/api/auth/login', { email, password });
+    const data = await apiClient.post<any>('/api/v1/auth/login', { username: email, email, password });
+    const token = data.access_token || data.token || '';
+    const isAdmin = data.role === 'admin' || (data.user && data.user.role === 'admin');
+    const user: AuthUser = data.user || {
+      id: data.user_id || `usr_${Date.now()}`,
+      name: email.split('@')[0],
+      email: email,
+      role: isAdmin ? 'admin' : 'user',
+      isAdminEligible: isAdmin,
+      adminUserId: isAdmin ? data.user_id : undefined,
+      plan: isAdmin ? 'Enterprise' : 'Pro',
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+
+    if (token) {
+      localStorage.setItem('supremeai_access_token', token);
+    }
+
+    return {
+      success: true,
+      user,
+      token,
+    };
   },
 
   async signup(name: string, email: string, password: string, plan: string = 'Pro'): Promise<LoginResponse> {
@@ -61,7 +83,59 @@ export const authService = {
       };
     }
 
-    return apiClient.post<LoginResponse>('/api/auth/signup', { name, email, password, plan });
+    const data = await apiClient.post<any>('/api/v1/auth/register', { username: email, email, password, name });
+    const token = data.access_token || data.token || '';
+    const isAdmin = data.role === 'admin' || (data.user && data.user.role === 'admin');
+    const user: AuthUser = data.user || {
+      id: data.user_id || `usr_${Date.now()}`,
+      name: name || email.split('@')[0],
+      email: email,
+      role: isAdmin ? 'admin' : 'user',
+      isAdminEligible: isAdmin,
+      adminUserId: isAdmin ? data.user_id : undefined,
+      plan: (plan as any) || (isAdmin ? 'Enterprise' : 'Pro'),
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+
+    if (token) {
+      localStorage.setItem('supremeai_access_token', token);
+    }
+
+    return {
+      success: true,
+      user,
+      token,
+    };
+  },
+
+  async getMe(): Promise<AuthUser | null> {
+    try {
+      const data = await apiClient.get<any>('/api/v1/auth/me');
+      if (!data) return null;
+      const isAdmin = data.role === 'admin';
+      return {
+        id: data.user_id || 'usr_unknown',
+        name: (data.email || 'user').split('@')[0],
+        email: data.email || '',
+        role: isAdmin ? 'admin' : 'user',
+        isAdminEligible: isAdmin,
+        adminUserId: isAdmin ? data.user_id : undefined,
+        plan: isAdmin ? 'Enterprise' : 'Pro',
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async logout(): Promise<void> {
+    try {
+      if (!env.isMockEnabled) {
+        await apiClient.post('/api/v1/auth/logout');
+      }
+    } catch {}
+    localStorage.removeItem('supremeai_access_token');
+    localStorage.removeItem('supremeai_auth_user');
   },
 
   async verify2FA(payload: {

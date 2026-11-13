@@ -124,7 +124,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logout: () => {
+      authService.logout();
       localStorage.removeItem(AUTH_USER_KEY);
+      localStorage.removeItem('supremeai_access_token');
       localStorage.setItem(ROLE_KEY, 'user');
       sessionStorage.removeItem('supremeai_admin_authed');
       set({
