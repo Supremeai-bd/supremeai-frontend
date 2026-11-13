@@ -641,6 +641,14 @@ export default function App() {
                         activeModel={activeModel}
                         onSelectModel={selectModel}
                         onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+                        isGroundingActive={knowledgeDocs.some((d) => d.isGroundingActive)}
+                        onToggleGrounding={() => {
+                          if (knowledgeDocs.length > 0) {
+                            toggleKnowledgeGrounding(knowledgeDocs[0].id);
+                          } else {
+                            setActiveTab('user-knowledge');
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -664,6 +672,14 @@ export default function App() {
                       activeModel={activeModel}
                       onSelectModel={selectModel}
                       onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+                      isGroundingActive={knowledgeDocs.some((d) => d.isGroundingActive)}
+                      onToggleGrounding={() => {
+                        if (knowledgeDocs.length > 0) {
+                          toggleKnowledgeGrounding(knowledgeDocs[0].id);
+                        } else {
+                          setActiveTab('user-knowledge');
+                        }
+                      }}
                     />
                   </div>
                 )}

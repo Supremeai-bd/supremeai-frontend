@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   X,
   BookOpen,
+  Database,
 } from 'lucide-react';
 import { ModelDetail, ChatAttachment } from '../types';
 import { GEMINI_MODELS } from '../data/models';
@@ -22,6 +23,8 @@ interface ChatInputProps {
   activeModel: ModelDetail;
   onSelectModel: (model: ModelDetail) => void;
   onOpenPromptLibrary?: () => void;
+  isGroundingActive?: boolean;
+  onToggleGrounding?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -31,6 +34,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   activeModel,
   onSelectModel,
   onOpenPromptLibrary,
+  isGroundingActive = false,
+  onToggleGrounding,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -259,6 +264,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           >
             <Paperclip className="w-3.5 h-3.5" />
           </button>
+
+          {/* RAG Knowledge Grounding Toggle */}
+          {onToggleGrounding && (
+            <button
+              type="button"
+              onClick={onToggleGrounding}
+              title={isGroundingActive ? "Knowledge Base Grounding Active (Click to disable)" : "Enable Knowledge Base Grounding (RAG)"}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                isGroundingActive
+                  ? "bg-cyan-500/20 text-cyan-500 border border-cyan-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60"
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           {/* Text Area (Ask Gemini / Type @ for connectors) */}
           <textarea
