@@ -15,12 +15,40 @@ export const adminService = {
     return apiClient.get('/api/admin/overview');
   },
 
+  mapTowerService(raw: any): McpTowerService {
+    return {
+      id: raw.id,
+      name: raw.name || raw.id,
+      displayName: raw.displayName || raw.name || raw.id,
+      category: raw.category || 'core',
+      port: typeof raw.port === 'number' ? raw.port : 0,
+      status: raw.status || 'healthy',
+      uptime: raw.uptime || '—',
+      latencyMs: typeof raw.latencyMs === 'number' ? raw.latencyMs : 0,
+      cpuPercent: typeof raw.cpuPercent === 'number' ? raw.cpuPercent : 0,
+      memoryMb: typeof raw.memoryMb === 'number' ? raw.memoryMb : 0,
+      lastChecked: raw.lastChecked || 'Just now',
+      version: raw.version || raw.deployStatus || 'live',
+      endpoint: raw.endpoint || '',
+      errorCount: typeof raw.errorCount === 'number' ? raw.errorCount : 0,
+      logs: Array.isArray(raw.logs) ? raw.logs : [],
+      deployStatus: raw.deployStatus,
+      monthlyBuildMinutes: raw.monthlyBuildMinutes,
+      freeLimitRemainingMinutes: raw.freeLimitRemainingMinutes,
+      freeLimitExhausted: raw.freeLimitExhausted,
+      deployAgeDays: raw.deployAgeDays,
+      commitSha: raw.commitSha,
+      freshness: raw.freshness,
+    };
+  },
+
   async fetchMcpServices(): Promise<McpTowerService[]> {
     if (env.isMockEnabled) {
       return INITIAL_MCP_SERVICES;
     }
-    const data = await apiClient.get<{ services: McpTowerService[] }>('/api/mcp-tower/services');
-    return data.services || INITIAL_MCP_SERVICES;
+    const data = await apiClient.get<{ services: any[] }>('/api/mcp-tower/services');
+    const mapped = (data.services || []).map((s) => this.mapTowerService(s));
+    return mapped.length > 0 ? mapped : INITIAL_MCP_SERVICES;
   },
 
   async rebootMcpService(serviceId: string): Promise<McpTowerService> {

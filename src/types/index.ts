@@ -151,6 +151,14 @@ export interface McpTowerService {
   endpoint: string;
   errorCount: number;
   logs: McpServiceLog[];
+  // Live Tower telemetry (optional, honest)
+  deployStatus?: string;
+  monthlyBuildMinutes?: number;
+  freeLimitRemainingMinutes?: number;
+  freeLimitExhausted?: boolean;
+  deployAgeDays?: number;
+  commitSha?: string;
+  freshness?: 'live-current' | 'live-stale' | 'deploying' | 'failed';
 }
 
 // --- Customer Workspace Expansion Types ---

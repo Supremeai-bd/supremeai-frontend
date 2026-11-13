@@ -121,12 +121,13 @@ export const useAdminStore = create<AdminState>((set, get) => {
           localStorage.setItem(MCP_SERVICES_KEY, JSON.stringify(services));
           set({ mcpServices: services });
         }
-      } catch {
-        // Quietly maintain local telemetry
+      } catch (err) {
+        console.warn('MCP tower fetch failed, using cached/mock telemetry:', err);
       }
     },
 
     rebootService: async (serviceId: string) => {
+      const prev = get().mcpServices;
       set((state) => ({
         mcpServices: state.mcpServices.map((s) => (s.id === serviceId ? { ...s, status: 'rebooting' } : s)),
       }));
@@ -142,40 +143,13 @@ export const useAdminStore = create<AdminState>((set, get) => {
           toast.success('Service Rebooted', `${serviceId} successfully recovered.`);
           return;
         }
+        throw new Error('Reboot returned no service');
       } catch (err) {
-        console.warn('Backend reboot fallback triggered:', err);
+        console.warn('Backend reboot failed:', err);
+        // Restore truthful state from backend instead of faking success.
+        try { await get().fetchMcpServices(); } catch {}
+        toast.error('Reboot Failed', `${serviceId} could not be restarted: ${(err as Error)?.message || err}`);
       }
-
-      // Local graceful fallback
-      setTimeout(() => {
-        set((state) => {
-          const updated = state.mcpServices.map((s) => {
-            if (s.id === serviceId) {
-              const rebootLog = {
-                id: `reboot-${Date.now()}`,
-                timestamp: new Date().toLocaleTimeString(),
-                level: 'INFO' as const,
-                message: 'Graceful reboot via SupremeAI Admin Dashboard. Memory GC executed, connection pool reset.',
-                details: 'PID reset. Cold boot latency: 28ms.',
-              };
-              return {
-                ...s,
-                status: 'healthy' as const,
-                errorCount: 0,
-                latencyMs: s.id === 'code-auditor-worker' ? 38 : s.id === 'sse-stream-broker' ? 26 : Math.max(12, Math.round(s.latencyMs * 0.4)),
-                cpuPercent: 2.1,
-                uptime: '100%',
-                lastChecked: 'Just now (Clean reboot)',
-                logs: [rebootLog, ...s.logs],
-              };
-            }
-            return s;
-          });
-          localStorage.setItem(MCP_SERVICES_KEY, JSON.stringify(updated));
-          return { mcpServices: updated };
-        });
-        toast.success('Service Recovered', `${serviceId} daemon restarted.`);
-      }, 500);
     },
 
     rebootAllServices: async () => {
@@ -193,38 +167,12 @@ export const useAdminStore = create<AdminState>((set, get) => {
           toast.success('Cluster Recovered', 'All degraded services brought back online.');
           return;
         }
+        throw new Error('Cluster reboot returned no services');
       } catch (err) {
-        console.warn('Backend cluster reboot fallback triggered:', err);
+        console.warn('Backend cluster reboot failed:', err);
+        try { await get().fetchMcpServices(); } catch {}
+        toast.error('Cluster Reboot Failed', (err as Error)?.message || String(err));
       }
-
-      setTimeout(() => {
-        set((state) => {
-          const updated = state.mcpServices.map((s) => {
-            if (s.status === 'unhealthy' || s.status === 'degraded' || s.status === 'rebooting') {
-              const rebootLog = {
-                id: `reboot-all-${Date.now()}-${s.id}`,
-                timestamp: new Date().toLocaleTimeString(),
-                level: 'INFO' as const,
-                message: 'Cluster recovery sweep completed. All service health checks verified.',
-              };
-              return {
-                ...s,
-                status: 'healthy' as const,
-                errorCount: 0,
-                latencyMs: 24,
-                cpuPercent: 2.4,
-                uptime: '100%',
-                lastChecked: 'Just now (Cluster reboot)',
-                logs: [rebootLog, ...s.logs],
-              };
-            }
-            return s;
-          });
-          localStorage.setItem(MCP_SERVICES_KEY, JSON.stringify(updated));
-          return { mcpServices: updated };
-        });
-        toast.success('Cluster Synchronized', 'All services rebooted and telemetry normalized.');
-      }, 600);
     },
 
     probeCluster: async () => {
@@ -236,15 +184,9 @@ export const useAdminStore = create<AdminState>((set, get) => {
           set({ mcpServices: services });
           toast.info('Cluster Health Probed', 'Active ping latency and memory stats updated.');
         }
-      } catch {
-        set((state) => {
-          const updated = state.mcpServices.map((s) => ({
-            ...s,
-            lastChecked: 'Just now (Active probe)',
-          }));
-          return { mcpServices: updated };
-        });
-        toast.info('Probe Completed', 'Telemetry confirmed across local node processes.');
+      } catch (err) {
+        console.warn('Probe failed:', err);
+        toast.error('Probe Failed', (err as Error)?.message || String(err));
       } finally {
         setTimeout(() => set({ isProbingCluster: false }), 500);
       }
