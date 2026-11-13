@@ -14,6 +14,7 @@ import {
   Megaphone,
   ArrowLeft,
   Home,
+  Pin,
 } from 'lucide-react';
 import { WorkspaceTipBar, WorkspaceMicroSurvey } from './components/chat/WorkspaceTipsAndSurvey';
 import { shareService } from './services/shareService';
@@ -648,6 +649,24 @@ export default function App() {
 
                     {(currentSession?.messages?.length || 0) > 0 && (
                       <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentSession?.id) {
+                              togglePinSession(currentSession.id);
+                            }
+                          }}
+                          title={currentSession?.isPinned ? 'Unpin from Sidebar' : 'Pin chat to Sidebar'}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium backdrop-blur-md border transition-colors cursor-pointer shadow-xs ${
+                            currentSession?.isPinned
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400'
+                              : 'bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-500'
+                          }`}
+                        >
+                          <Pin className="w-3 h-3" />
+                          <span className="hidden md:inline">{currentSession?.isPinned ? 'Pinned' : 'Pin'}</span>
+                        </button>
+
                         {developerMode && (
                           <button
                             type="button"

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Plus,
-  MessageSquare,
   Sliders,
   Cpu,
   FolderGit2,
@@ -24,7 +23,6 @@ import {
   LogOut,
   PanelLeft,
   Palette,
-  Search,
   Pin,
   LayoutDashboard,
   History,
@@ -100,7 +98,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const activeThemeMeta = LIVE_THEMES.find((t) => t.id === liveTheme) || LIVE_THEMES[0];
 
   const pinnedSessions = sessions.filter((s) => s.isPinned);
-  const recentSessions = sessions.filter((s) => !s.isPinned);
 
   const usagePercent = Math.min(100, Math.round((tokensUsed / Math.max(1, tokensLimit)) * 100));
 
@@ -308,19 +305,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <LayoutDashboard className="w-4 h-4 text-cyan-500" />
               <span>Command Center</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('chat')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'chat'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 text-slate-500" />
-              <span>Studio Chat</span>
             </button>
 
             <button
@@ -565,19 +549,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              onClick={() => onSelectTab('chat')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'chat'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 text-slate-500" />
-              <span>Studio Chat</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => onSelectTab('chat-history')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'chat-history'
@@ -732,37 +703,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Divider */}
       <div className="my-2 mx-3 border-t border-slate-200/70 dark:border-slate-800/70" />
 
-      {/* Threads List (Pinned + Recent) */}
+      {/* Pinned Chats List */}
       <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-2 pb-2">
-        {pinnedSessions.length > 0 && (
-          <div className="space-y-0.5">
-            <div className="px-2 py-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              <span>Pinned</span>
-              <span className="font-mono tabular-nums">{pinnedSessions.length}</span>
-            </div>
-            {pinnedSessions.map(renderSessionRow)}
-          </div>
-        )}
-
         <div className="space-y-0.5">
           <div className="px-2 py-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            <span>Recent</span>
-            <button
-              type="button"
-              onClick={() => onSelectTab('chat-history')}
-              title="Search all conversations"
-              className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-[var(--theme-accent)] transition-colors cursor-pointer normal-case tracking-normal"
-            >
-              <Search className="w-3 h-3" />
-              <span>All ({sessions.length})</span>
-            </button>
+            <span className="inline-flex items-center gap-1.5">
+              <Pin className="w-3 h-3 text-amber-500" />
+              <span>Pinned Chats</span>
+            </span>
+            <span className="font-mono tabular-nums">{pinnedSessions.length}</span>
           </div>
-          {recentSessions.length === 0 ? (
-            <div className="px-3 py-2 text-[11px] text-slate-400">
-              No recent chats.
+
+          {pinnedSessions.length === 0 ? (
+            <div className="mx-1 px-3 py-2.5 rounded-xl border border-dashed border-slate-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
+              <p className="leading-relaxed">
+                No pinned chats yet. Pin any chat to keep quick access here.
+              </p>
+              <button
+                type="button"
+                onClick={() => onSelectTab('chat-history')}
+                className="text-[11px] font-medium theme-accent-text hover:underline cursor-pointer"
+              >
+                Pin from All Conversations →
+              </button>
             </div>
           ) : (
-            recentSessions.map(renderSessionRow)
+            pinnedSessions.map(renderSessionRow)
           )}
         </div>
       </div>

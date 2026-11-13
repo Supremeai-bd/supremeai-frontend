@@ -357,7 +357,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onTogglePinSession(session.id)}
-                        title={session.isPinned ? 'Unpin conversation' : 'Pin conversation'}
+                        title={session.isPinned ? 'Unpin from Sidebar' : 'Pin to Sidebar'}
                         className={`p-2 rounded-lg transition-colors cursor-pointer ${
                           session.isPinned
                             ? 'text-amber-500 bg-amber-500/10'
