@@ -459,7 +459,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={onOpenLiveVoice}
                 aria-label="Live Voice Conversation"
-                title="Start real-time voice conversation (gemini-3.8-live)"
+                title="Start real-time voice conversation (SupremeAI Live Voice)"
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full theme-accent-active border text-xs font-medium hover:brightness-105 transition-all cursor-pointer shrink-0"
               >
                 <AudioLines className="w-3.5 h-3.5" />
