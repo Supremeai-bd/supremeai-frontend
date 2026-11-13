@@ -7,7 +7,12 @@ import {
   Download,
   Trash2,
   Database,
+  Search,
+  Share2,
+  GitFork,
 } from 'lucide-react';
+import { ChatSearchBar } from './components/chat/ChatSearchBar';
+import { shareService } from './services/shareService';
 import { motion } from 'motion/react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -213,6 +218,7 @@ export default function App() {
     deleteSession,
     renameSession,
     createNewSession,
+    branchSession,
     clearCurrentThread,
     exportThread,
     selectModel,
@@ -288,6 +294,9 @@ export default function App() {
   const [chatUtilityMode, setChatUtilityMode] = useState<'chat' | 'task'>('chat');
   const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [chatRoleFilter, setChatRoleFilter] = useState<'all' | 'user' | 'assistant'>('all');
   const { isDockOpen, toggleDock } = useWorkspaceStore();
   const layoutMode = userSettings.layoutMode || 'sidebar-focus';
 
@@ -329,6 +338,17 @@ export default function App() {
 
   // Active session lookup
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+
+  // In-session search filtering
+  const filteredChatMessages = React.useMemo(() => {
+    const msgs = currentSession?.messages || [];
+    if (!isChatSearchOpen) return msgs;
+    return msgs.filter((m) => {
+      const matchesRole = chatRoleFilter === 'all' || m.role === chatRoleFilter;
+      const matchesText = !chatSearchQuery.trim() || m.content.toLowerCase().includes(chatSearchQuery.toLowerCase());
+      return matchesRole && matchesText;
+    });
+  }, [currentSession?.messages, isChatSearchOpen, chatRoleFilter, chatSearchQuery]);
 
   // Auto-hide left sidebar whenever a user sends a message or streaming starts
   const prevSessionMsgRef = useRef<{ sessionId: string; count: number }>({
@@ -562,9 +582,60 @@ export default function App() {
                       <span className="hidden md:inline">{activeRole.name}</span>
                     </button>
 
-                    {/* Export & Clear when messages exist */}
+                    {/* In-chat search toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsChatSearchOpen((prev) => !prev)}
+                      title="Search messages"
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors cursor-pointer shadow-xs ${
+                        isChatSearchOpen
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Search className="w-3 h-3" />
+                      <span className="hidden md:inline">Search</span>
+                    </button>
+
+                    {/* Export, Branch, Share & Clear when messages exist */}
                     {(currentSession?.messages?.length || 0) > 0 && (
                       <>
+                        {/* Branch conversation button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentSession?.id) {
+                              branchSession(currentSession.id);
+                            }
+                          }}
+                          title="Branch into new conversation"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <GitFork className="w-3 h-3" />
+                          <span className="hidden md:inline">Branch</span>
+                        </button>
+
+                        {/* Share link button */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (currentSession?.id) {
+                              try {
+                                const res = await shareService.generateShareLink(currentSession.id);
+                                await navigator.clipboard.writeText(res.share_url);
+                                toast.success('Share Link Copied', res.share_url);
+                              } catch {
+                                toast.error('Share Failed', 'Could not generate share link');
+                              }
+                            }
+                          }}
+                          title="Generate public share link"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <Share2 className="w-3 h-3" />
+                          <span className="hidden md:inline">Share</span>
+                        </button>
+
                         <div className="relative">
                           <button
                             type="button"
@@ -638,6 +709,19 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Inline In-Conversation Search Bar */}
+                {isChatSearchOpen && (
+                  <ChatSearchBar
+                    searchQuery={chatSearchQuery}
+                    onSearchChange={setChatSearchQuery}
+                    roleFilter={chatRoleFilter}
+                    onRoleFilterChange={setChatRoleFilter}
+                    totalMatches={filteredChatMessages.length}
+                    totalMessages={currentSession?.messages?.length || 0}
+                    onClear={() => setChatSearchQuery('')}
+                  />
+                )}
+
                 {isChatEmpty ? (
                   <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center overflow-y-auto px-4 pb-8">
                     <ChatEmptyState
@@ -669,7 +753,7 @@ export default function App() {
                 ) : (
                   <div className="relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden">
                     <ChatThread
-                      messages={currentSession?.messages || []}
+                      messages={filteredChatMessages}
                       activeRole={activeRole}
                       activeModel={activeModel}
                       isStreaming={isStreaming}
@@ -694,6 +778,8 @@ export default function App() {
                           setActiveTab('user-knowledge');
                         }
                       }}
+                      isDeepResearchActive={isDeepResearchActive}
+                      onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
                     />
                   </div>
                 )}

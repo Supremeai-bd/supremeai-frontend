@@ -24,6 +24,7 @@ interface ChatState {
   deleteSession: (id: string) => void;
   renameSession: (id: string, newTitle: string) => void;
   createNewSession: () => void;
+  branchSession: (sourceSessionId?: string, upToMessageId?: string) => string;
   clearCurrentThread: () => void;
   exportThread: (format: 'markdown' | 'json') => void;
 
@@ -135,6 +136,45 @@ export const useChatStore = create<ChatState>((set, get) => {
         activeSessionId: newSession.id,
         inferenceError: null,
       });
+    },
+
+    branchSession: (sourceSessionId?: string, upToMessageId?: string): string => {
+      const { sessions, activeSessionId } = get();
+      const targetId = sourceSessionId || activeSessionId;
+      const source = sessions.find((s) => s.id === targetId) || sessions[0];
+      if (!source) return '';
+
+      let inheritedMessages = [...source.messages];
+      if (upToMessageId) {
+        const idx = source.messages.findIndex((m) => m.id === upToMessageId);
+        if (idx !== -1) {
+          inheritedMessages = source.messages.slice(0, idx + 1);
+        }
+      }
+
+      const newBranch: ChatSession = {
+        id: `branch_${Date.now()}`,
+        title: `${source.title} (Branch)`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        model: source.model,
+        roleId: source.roleId,
+        customSystemInstruction: source.customSystemInstruction,
+        messages: inheritedMessages,
+        projectId: source.projectId,
+        parentSessionId: source.id,
+      };
+
+      const updated = [newBranch, ...sessions];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      set({
+        sessions: updated,
+        activeSessionId: newBranch.id,
+        inferenceError: null,
+      });
+
+      toast.success('Session Branched', `Created new branch "${newBranch.title}".`);
+      return newBranch.id;
     },
 
     clearCurrentThread: () => {

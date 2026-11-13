@@ -46,6 +46,7 @@ export interface ChatSession {
   customSystemInstruction?: string;
   messages: ChatMessage[];
   projectId?: string;
+  parentSessionId?: string;
 }
 
 export interface RolePersona {
