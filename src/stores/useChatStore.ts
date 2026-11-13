@@ -3,6 +3,7 @@ import { ChatSession, ChatMessage, RolePersona, ModelDetail, ChatAttachment, Kno
 import { SYSTEM_ROLES } from '../data/roles';
 import { GEMINI_MODELS } from '../data/models';
 import { chatService } from '../services/chatService';
+import { conversationService } from '../services/conversationService';
 import { toast } from './useToastStore';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
@@ -335,6 +336,10 @@ export const useChatStore = create<ChatState>((set, get) => {
             streamingContent: '',
           });
           abortController = null;
+
+          // Asynchronously sync exchange to remote Supabase persistence
+          conversationService.syncMessage(current.id, 'user', text).catch(() => {});
+          conversationService.syncMessage(current.id, 'assistant', fullText).catch(() => {});
         },
         onError: (err) => {
           set({
