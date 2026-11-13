@@ -613,6 +613,7 @@ async function startServer() {
     passwordHash: string;
     role: 'admin' | 'user';
     isAdminEligible: boolean;
+    isDeveloperEligible: boolean;
     adminUserId?: string;
     plan: PlanTier;
     createdAt: string;
@@ -633,6 +634,7 @@ async function startServer() {
     lastActive: string;
     githubHandle?: string;
     region: string;
+    isDeveloperEligible: boolean;
   }
 
   let usersDb: ServerUser[] = [
@@ -643,6 +645,7 @@ async function startServer() {
       passwordHash: 'admin123',
       role: 'admin',
       isAdminEligible: true,
+      isDeveloperEligible: true,
       adminUserId: 'admin_root_001',
       plan: 'Enterprise',
       createdAt: '2026-01-15',
@@ -655,6 +658,7 @@ async function startServer() {
       passwordHash: 'admin123',
       role: 'admin',
       isAdminEligible: true,
+      isDeveloperEligible: true,
       adminUserId: 'admin_root_001',
       plan: 'Enterprise',
       createdAt: '2026-02-01',
@@ -667,6 +671,7 @@ async function startServer() {
       passwordHash: 'password123',
       role: 'user',
       isAdminEligible: false,
+      isDeveloperEligible: true,
       plan: 'Pro',
       createdAt: '2026-03-10',
       avatar: 'S',
@@ -678,6 +683,7 @@ async function startServer() {
       passwordHash: 'password123',
       role: 'user',
       isAdminEligible: false,
+      isDeveloperEligible: false,
       plan: 'Free',
       createdAt: '2026-04-01',
       avatar: 'A',
@@ -699,6 +705,7 @@ async function startServer() {
       lastActive: 'Just now',
       githubHandle: 'ziaulhaquezia01',
       region: 'Asia/Dhaka',
+      isDeveloperEligible: true,
     },
     {
       id: 'cust_sarah',
@@ -714,6 +721,7 @@ async function startServer() {
       lastActive: '5 mins ago',
       githubHandle: 'sarah-fintech',
       region: 'US/West',
+      isDeveloperEligible: true,
     },
     {
       id: 'cust_alex',
@@ -729,6 +737,7 @@ async function startServer() {
       lastActive: '1 hour ago',
       githubHandle: 'alexj-partner',
       region: 'Europe/London',
+      isDeveloperEligible: false,
     },
     {
       id: 'cust_002',
@@ -744,6 +753,7 @@ async function startServer() {
       lastActive: '12 mins ago',
       githubHandle: 'rahim-techscale',
       region: 'Asia/Singapore',
+      isDeveloperEligible: true,
     },
     {
       id: 'cust_003',
@@ -759,6 +769,7 @@ async function startServer() {
       lastActive: '45 mins ago',
       githubHandle: 'sjenkins-ai',
       region: 'US/East',
+      isDeveloperEligible: true,
     },
     {
       id: 'cust_004',
@@ -774,6 +785,7 @@ async function startServer() {
       lastActive: '2 hours ago',
       githubHandle: 'tanvir-ahmed',
       region: 'Asia/Dhaka',
+      isDeveloperEligible: true,
     },
     {
       id: 'cust_005',
@@ -789,6 +801,7 @@ async function startServer() {
       lastActive: '5 hours ago',
       githubHandle: 'elena-novasoft',
       region: 'Europe/Berlin',
+      isDeveloperEligible: false,
     },
     {
       id: 'cust_006',
@@ -804,6 +817,7 @@ async function startServer() {
       lastActive: '1 day ago',
       githubHandle: 'mbrody',
       region: 'US/West',
+      isDeveloperEligible: false,
     },
     {
       id: 'cust_007',
@@ -819,6 +833,7 @@ async function startServer() {
       lastActive: '3 hours ago',
       githubHandle: 'fatima-cloud',
       region: 'MiddleEast/Dubai',
+      isDeveloperEligible: true,
     },
     {
       id: 'cust_010',
@@ -834,6 +849,7 @@ async function startServer() {
       lastActive: '7 days ago',
       githubHandle: 'zhaodavid',
       region: 'Asia/Tokyo',
+      isDeveloperEligible: false,
     },
   ];
 
@@ -911,6 +927,10 @@ async function startServer() {
       ADMIN_EMAILS.has(user.email.toLowerCase()) ||
       (user.adminUserId && ADMIN_USER_IDS.has(user.adminUserId));
 
+    const isDeveloperEligible =
+      Boolean(isAdminEligible) ||
+      Boolean(customerRec?.isDeveloperEligible ?? user.isDeveloperEligible);
+
     const safeUser = {
       id: user.id,
       name: user.name,
@@ -918,6 +938,7 @@ async function startServer() {
       avatar: user.avatar,
       role: user.role,
       isAdminEligible: !!isAdminEligible,
+      isDeveloperEligible,
       adminUserId: user.adminUserId,
       plan: customerRec?.tier || user.plan,
       createdAt: user.createdAt,
@@ -937,7 +958,7 @@ async function startServer() {
       return;
     }
 
-    const { name, email, username, password, plan = 'Pro' } = req.body || {};
+    const { name, email, username, password, plan = 'Pro', isDeveloperEligible, workspaceFocus } = req.body || {};
     const rawEmail = email || username;
     const cleanName = String(name || (rawEmail ? String(rawEmail).split('@')[0] : '')).trim();
     if (!cleanName || !rawEmail || !password) {
@@ -953,6 +974,7 @@ async function startServer() {
     }
 
     const isAdmin = ADMIN_EMAILS.has(cleanEmail);
+    const devEligible = isAdmin || Boolean(isDeveloperEligible) || workspaceFocus === 'developer';
     const assignedPlan: PlanTier = (plan === 'Free' || plan === 'Pro' || plan === 'Enterprise') ? plan : 'Pro';
     const newUser: ServerUser = {
       id: `usr_${Date.now()}`,
@@ -961,6 +983,7 @@ async function startServer() {
       passwordHash: String(password),
       role: isAdmin ? 'admin' : 'user',
       isAdminEligible: isAdmin,
+      isDeveloperEligible: devEligible,
       adminUserId: isAdmin ? 'admin_root_001' : undefined,
       plan: assignedPlan,
       createdAt: new Date().toISOString().slice(0, 10),
@@ -983,10 +1006,11 @@ async function startServer() {
         joinedDate: newUser.createdAt,
         lastActive: 'Just now',
         region: 'Global',
+        isDeveloperEligible: devEligible,
       });
     }
 
-    recordAudit(cleanEmail, 'USER_SIGNUP', `Customer: ${cleanEmail}`, `Registered under ${assignedPlan} tier`, req);
+    recordAudit(cleanEmail, 'USER_SIGNUP', `Customer: ${cleanEmail}`, `Registered under ${assignedPlan} tier (${devEligible ? 'Developer' : 'Standard'})`, req);
 
     const safeUser = {
       id: newUser.id,
@@ -995,6 +1019,7 @@ async function startServer() {
       avatar: newUser.avatar,
       role: newUser.role,
       isAdminEligible: newUser.isAdminEligible,
+      isDeveloperEligible: newUser.isDeveloperEligible,
       adminUserId: newUser.adminUserId,
       plan: newUser.plan,
       createdAt: newUser.createdAt,
@@ -1010,6 +1035,43 @@ async function startServer() {
   app.post('/api/v1/auth/register', handleSignupRequest);
   app.post('/api/v1/auth/logout', (_req: Request, res: Response) => {
     res.json({ success: true });
+  });
+
+  // Product Micro-Survey & User Feedback store
+  const feedbackSubmissions: Array<{
+    id: string;
+    rating: 'great' | 'good' | 'okay' | 'needs_work';
+    suggestion: string;
+    userEmail: string;
+    developerMode: boolean;
+    createdAt: string;
+  }> = [];
+
+  app.get('/api/feedback', (_req: Request, res: Response) => {
+    res.json({ feedback: feedbackSubmissions });
+  });
+
+  app.post('/api/feedback', (req: Request, res: Response) => {
+    const body = req.body || {};
+    const validRatings = new Set(['great', 'good', 'okay', 'needs_work']);
+    const rating = validRatings.has(body.rating) ? body.rating : 'good';
+    const entry = {
+      id: `fb_${Date.now()}`,
+      rating,
+      suggestion: String(body.suggestion || '').trim().slice(0, 1000),
+      userEmail: String(body.userEmail || 'anonymous@user.local').trim(),
+      developerMode: Boolean(body.developerMode),
+      createdAt: new Date().toISOString(),
+    };
+    feedbackSubmissions.unshift(entry);
+    recordAudit(
+      entry.userEmail,
+      'PRODUCT_FEEDBACK',
+      `Survey (${rating})`,
+      entry.suggestion || 'Quick pulse rating submitted',
+      req
+    );
+    res.json({ success: true, entry });
   });
 
   // POST /api/auth/verify-2fa (TOTP token or Fingerprint Biometric with 7-day browser trust)
@@ -1275,6 +1337,7 @@ async function startServer() {
       lastActive: 'Just now',
       githubHandle: body.githubHandle,
       region: body.region || 'Global',
+      isDeveloperEligible: Boolean(body.isDeveloperEligible),
     };
     customerDirectory.unshift(newCust);
     recordAudit('admin@supremeai.bd', 'CUSTOMER_CREATE', `Customer: ${newCust.email}`, `Created ${newCust.tier} account (${newCust.status})`, req);
@@ -1290,6 +1353,14 @@ async function startServer() {
     }
     const updates = req.body || {};
     customerDirectory[idx] = { ...customerDirectory[idx], ...updates };
+    if (typeof updates.isDeveloperEligible === 'boolean') {
+      const targetEmail = customerDirectory[idx].email.toLowerCase();
+      usersDb = usersDb.map((u) =>
+        u.email.toLowerCase() === targetEmail
+          ? { ...u, isDeveloperEligible: updates.isDeveloperEligible }
+          : u
+      );
+    }
     recordAudit(
       'admin@supremeai.bd',
       'CUSTOMER_UPDATE',

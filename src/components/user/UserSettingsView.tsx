@@ -23,6 +23,10 @@ import {
   Minimize2,
   Terminal,
   MessageSquareCode,
+  Code2,
+  Database,
+  Lightbulb,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
 import { GEMINI_MODELS } from '../../data/models';
@@ -40,9 +44,15 @@ interface UserSettingsViewProps {
   onSwitchRole: (newRole: UserRole) => void;
   currentRole: UserRole;
   isAdminEligible?: boolean;
+  isDeveloperEligible?: boolean;
+  effectiveDeveloperMode?: boolean;
+  onToggleDeveloperMode?: () => void;
+  onToggleDeveloperEligibility?: (eligible: boolean) => void;
   trustedUntil?: number | null;
   onRevokeTrustedBrowser?: () => void;
   onSignOut?: () => void;
+  onOpenFeedbackSurvey?: () => void;
+  onOpenKnowledgeBase?: () => void;
 }
 
 export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
@@ -51,17 +61,28 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   onSwitchRole,
   currentRole,
   isAdminEligible = false,
+  isDeveloperEligible = false,
+  effectiveDeveloperMode,
+  onToggleDeveloperMode,
+  onToggleDeveloperEligibility,
   trustedUntil = null,
   onRevokeTrustedBrowser,
   onSignOut,
+  onOpenFeedbackSurvey,
+  onOpenKnowledgeBase,
 }) => {
   const [name, setName] = useState(settings.name);
   const [email, setEmail] = useState(settings.email);
   const [emailNotifications, setEmailNotifications] = useState(settings.emailNotifications);
   const [autoCodeReview, setAutoCodeReview] = useState(settings.autoCodeReview);
   const [streamResponses, setStreamResponses] = useState(settings.streamResponses);
+  const [enableKnowledgeGrounding, setEnableKnowledgeGrounding] = useState(
+    Boolean(settings.enableKnowledgeGrounding)
+  );
+  const [showWorkspaceTips, setShowWorkspaceTips] = useState(
+    settings.showWorkspaceTips !== false
+  );
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
-  const [developerMode, setDeveloperMode] = useState(Boolean(settings.developerMode));
   const [customInstructions, setCustomInstructions] = useState(settings.customInstructions || '');
   const [layoutMode, setLayoutMode] = useState<'sidebar-focus' | 'classic'>(
     settings.layoutMode || 'sidebar-focus'
@@ -70,6 +91,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     settings.contentLayout || 'fluid'
   );
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const devModeActive =
+    effectiveDeveloperMode !== undefined
+      ? effectiveDeveloperMode
+      : Boolean(settings.developerMode && (isDeveloperEligible || currentRole === 'admin'));
 
   const setChatCustomInstruction = useChatStore((s) => s.setCustomInstruction);
   const setIsRoleModalOpen = useChatStore((s) => s.setIsRoleModalOpen);
@@ -93,10 +119,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       emailNotifications,
       autoCodeReview,
       streamResponses,
+      enableKnowledgeGrounding,
+      showWorkspaceTips,
       defaultModel,
       layoutMode,
       contentLayout,
-      developerMode,
       customInstructions,
     });
     setChatCustomInstruction(customInstructions);
@@ -118,9 +145,79 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           Account & Workspace Settings
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Manage your profile, AI persona instructions, workspace appearance, and optional developer tools.
+          {devModeActive
+            ? 'Manage your profile, AI persona instructions, workspace appearance, and developer tools.'
+            : 'Manage your profile, assistant preferences, and workspace appearance.'}
         </p>
       </div>
+
+      {/* Workspace Mode & Developer Access Card */}
+      {currentRole === 'user' && (isDeveloperEligible ? (
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-cyan-50/80 to-slate-50/80 dark:from-slate-900 dark:to-slate-900/90 border border-cyan-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs">
+              <Code2 className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span className="font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+                Workspace Experience
+              </span>
+              <span aria-hidden="true" className="text-slate-400">·</span>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {devModeActive ? 'Developer Studio' : 'Standard Workspace'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {devModeActive
+                ? 'Developer tools are active: API Keys, Knowledge & RAG, Repositories, Plugins, and the split Workspace Dock.'
+                : 'Streamlined workspace active for writing, research, and chat without technical clutter.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            {onToggleDeveloperEligibility && (
+              <button
+                type="button"
+                onClick={() => onToggleDeveloperEligibility(false)}
+                className="text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer whitespace-nowrap"
+              >
+                Hide Developer Tools
+              </button>
+            )}
+            {onToggleDeveloperMode && (
+              <button
+                type="button"
+                onClick={onToggleDeveloperMode}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+              >
+                <span>{devModeActive ? 'Switch to Standard Mode' : 'Switch to Developer Mode'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        onToggleDeveloperEligibility && (
+          <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-2.5">
+              <Terminal className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-semibold text-slate-900 dark:text-white">
+                  Need API keys, repositories, or code tools?
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Your account is currently in clean Standard Mode. Enable developer access anytime to unlock the Standard / Developer switch.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onToggleDeveloperEligibility(true)}
+              className="px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-cyan-500 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              Enable Developer Access
+            </button>
+          </div>
+        )
+      ))}
 
       {/* Role Workspace Switcher Card - Only visible when Admin User ID is matched */}
       {(isAdminEligible || currentRole === 'admin') && (
@@ -186,10 +283,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Gauge className="w-4 h-4 text-slate-500" />
-            <span>Monthly Token Quota (Gemini API)</span>
+            <span>{devModeActive ? 'Monthly Token Quota (Gemini API)' : 'Monthly Usage Allowance'}</span>
           </h2>
           <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-            {settings.monthlyTokensUsed.toLocaleString()} / {settings.monthlyTokensLimit.toLocaleString()} tokens
+            {settings.monthlyTokensUsed.toLocaleString()} / {settings.monthlyTokensLimit.toLocaleString()} {devModeActive ? 'tokens' : 'credits'}
           </span>
         </div>
 
@@ -454,159 +551,145 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               setCustomInstructions(e.target.value);
               setChatCustomInstruction(e.target.value);
             }}
-            placeholder="Example: Always answer concisely with bullet points. Prefer TypeScript examples over JavaScript."
+            placeholder={
+              devModeActive
+                ? 'Example: Always answer concisely with bullet points. Prefer TypeScript examples over JavaScript.'
+                : 'Example: Always keep answers brief with clear bullet points and simple language.'
+            }
             className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[var(--theme-accent)]"
           />
         </div>
 
-        {/* Workspace Content Width Layout Switcher (Compact / Fluid / Maximized) */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Workspace Layout
-            </label>
-            <span className="text-[11px] font-mono text-slate-400">
-              {contentLayout === 'compact'
-                ? '800px focused column'
-                : contentLayout === 'fluid'
-                ? '1088px balanced width'
-                : '100% full-bleed canvas'}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {(
-              [
-                {
-                  id: 'compact' as WorkspaceContentLayout,
-                  title: 'Compact',
-                  desc: 'Narrow reading column for distraction-free focus (~800px).',
-                  icon: <Minimize2 className="w-4 h-4" />,
-                },
-                {
-                  id: 'fluid' as WorkspaceContentLayout,
-                  title: 'Fluid',
-                  desc: 'Balanced adaptive container across chats and views (~1088px).',
-                  icon: <Columns3 className="w-4 h-4" />,
-                },
-                {
-                  id: 'maximized' as WorkspaceContentLayout,
-                  title: 'Maximized',
-                  desc: 'Edge-to-edge full workspace width for wide monitors (100%).',
-                  icon: <Maximize2 className="w-4 h-4" />,
-                },
-              ]
-            ).map((opt) => {
-              const active = contentLayout === opt.id;
-              return (
+        {devModeActive && (
+          <>
+            {/* Workspace Content Width Layout Switcher (Compact / Fluid / Maximized) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Workspace Layout
+                </label>
+                <span className="text-[11px] font-mono text-slate-400">
+                  {contentLayout === 'compact'
+                    ? '800px focused column'
+                    : contentLayout === 'fluid'
+                    ? '1088px balanced width'
+                    : '100% full-bleed canvas'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {(
+                  [
+                    {
+                      id: 'compact' as WorkspaceContentLayout,
+                      title: 'Compact',
+                      desc: 'Narrow reading column for distraction-free focus (~800px).',
+                      icon: <Minimize2 className="w-4 h-4" />,
+                    },
+                    {
+                      id: 'fluid' as WorkspaceContentLayout,
+                      title: 'Fluid',
+                      desc: 'Balanced adaptive container across chats and views (~1088px).',
+                      icon: <Columns3 className="w-4 h-4" />,
+                    },
+                    {
+                      id: 'maximized' as WorkspaceContentLayout,
+                      title: 'Maximized',
+                      desc: 'Edge-to-edge full workspace width for wide monitors (100%).',
+                      icon: <Maximize2 className="w-4 h-4" />,
+                    },
+                  ]
+                ).map((opt) => {
+                  const active = contentLayout === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setContentLayout(opt.id);
+                        onUpdateSettings({ contentLayout: opt.id });
+                      }}
+                      className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        active
+                          ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className={`mt-0.5 shrink-0 ${active ? 'theme-accent-text' : 'text-slate-400'}`}>
+                        {opt.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold">{opt.title}</div>
+                        <div className="text-[11px] opacity-80 mt-0.5">{opt.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Workspace Navigation Layout Mode Segmented Selector */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Workspace Navigation Layout
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
-                  key={opt.id}
                   type="button"
                   onClick={() => {
-                    setContentLayout(opt.id);
-                    onUpdateSettings({ contentLayout: opt.id });
+                    setLayoutMode('sidebar-focus');
+                    onUpdateSettings({ layoutMode: 'sidebar-focus' });
                   }}
                   className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    active
+                    layoutMode === 'sidebar-focus'
                       ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
                       : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
-                  <div className={`mt-0.5 shrink-0 ${active ? 'theme-accent-text' : 'text-slate-400'}`}>
-                    {opt.icon}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold">{opt.title}</div>
-                    <div className="text-[11px] opacity-80 mt-0.5">{opt.desc}</div>
+                  <PanelLeft className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'sidebar-focus' ? 'theme-accent-text' : 'text-slate-400'}`} />
+                  <div>
+                    <div className="text-xs font-semibold">Sidebar Focus (Gemini)</div>
+                    <div className="text-[11px] opacity-80 mt-0.5">
+                      Full-height canvas without duplicate top navbar.
+                    </div>
                   </div>
                 </button>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Workspace Navigation Layout Mode Segmented Selector */}
-        <div>
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Workspace Navigation Layout
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setLayoutMode('sidebar-focus');
-                onUpdateSettings({ layoutMode: 'sidebar-focus' });
-              }}
-              className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                layoutMode === 'sidebar-focus'
-                  ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
-                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <PanelLeft className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'sidebar-focus' ? 'theme-accent-text' : 'text-slate-400'}`} />
-              <div>
-                <div className="text-xs font-semibold">Sidebar Focus (Gemini)</div>
-                <div className="text-[11px] opacity-80 mt-0.5">
-                  Full-height canvas without duplicate top navbar.
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setLayoutMode('classic');
-                onUpdateSettings({ layoutMode: 'classic' });
-              }}
-              className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                layoutMode === 'classic'
-                  ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
-                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <LayoutGrid className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'classic' ? 'theme-accent-text' : 'text-slate-400'}`} />
-              <div>
-                <div className="text-xs font-semibold">Top Navigation (Classic)</div>
-                <div className="text-[11px] opacity-80 mt-0.5">
-                  Traditional top header bar with quick tabs and profile menu.
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Toggles including Developer Mode */}
-        <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <label className="flex items-center justify-between cursor-pointer p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60">
-            <div className="flex items-start gap-2.5">
-              <Terminal className="w-4 h-4 theme-accent-text mt-0.5 shrink-0" />
-              <div>
-                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block">
-                  Developer Mode (Show Technical Tools)
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                  Reveal Knowledge & RAG, My Projects, API Keys & Hooks, Plugins, and the split Workspace Dock.
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLayoutMode('classic');
+                    onUpdateSettings({ layoutMode: 'classic' });
+                  }}
+                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    layoutMode === 'classic'
+                      ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <LayoutGrid className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'classic' ? 'theme-accent-text' : 'text-slate-400'}`} />
+                  <div>
+                    <div className="text-xs font-semibold">Top Navigation (Classic)</div>
+                    <div className="text-[11px] opacity-80 mt-0.5">
+                      Traditional top header bar with quick tabs and profile menu.
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
-            <input
-              type="checkbox"
-              checked={developerMode}
-              onChange={(e) => {
-                const next = e.target.checked;
-                setDeveloperMode(next);
-                onUpdateSettings({ developerMode: next });
-              }}
-              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0 ml-3"
-            />
-          </label>
+          </>
+        )}
 
+        {/* Toggles */}
+        <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
           <label className="flex items-center justify-between cursor-pointer">
             <div>
               <span className="text-xs font-medium text-slate-900 dark:text-slate-100 block">
-                Stream Responses (SSE)
+                {devModeActive ? 'Stream Responses (SSE)' : 'Real-time Typing Responses'}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                Receive Gemini tokens incrementally in real time.
+                {devModeActive
+                  ? 'Receive Gemini tokens incrementally in real time.'
+                  : 'Receive responses word-by-word as they are generated.'}
               </span>
             </div>
             <input
@@ -617,20 +700,80 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
             />
           </label>
 
-          <label className="flex items-center justify-between cursor-pointer">
+          {devModeActive && (
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <span className="text-xs font-medium text-slate-900 dark:text-slate-100 block">
+                  Automatic Pull Request Review
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                  Trigger automated AI code audits when branches are pushed.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={autoCodeReview}
+                onChange={(e) => setAutoCodeReview(e.target.checked)}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+            </label>
+          )}
+
+          <label className="flex items-center justify-between gap-4 cursor-pointer">
             <div>
-              <span className="text-xs font-medium text-slate-900 dark:text-slate-100 block">
-                Automatic Pull Request Review
+              <span className="text-xs font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Knowledge Base Grounding (RAG) in Chat</span>
               </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                Trigger automated AI code audits when branches are pushed.
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                Show document grounding controls in the chat bar and answer from your uploaded Knowledge Base files.
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {enableKnowledgeGrounding && onOpenKnowledgeBase && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onOpenKnowledgeBase();
+                  }}
+                  className="text-[11px] font-medium theme-accent-text hover:underline cursor-pointer whitespace-nowrap"
+                >
+                  Manage Docs
+                </button>
+              )}
+              <input
+                type="checkbox"
+                checked={enableKnowledgeGrounding}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setEnableKnowledgeGrounding(next);
+                  onUpdateSettings({ enableKnowledgeGrounding: next });
+                }}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+            </div>
+          </label>
+
+          <label className="flex items-center justify-between gap-4 cursor-pointer">
+            <div>
+              <span className="text-xs font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                <span>Workspace Discovery Tips</span>
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                Show helpful rotating tips in Chat for shortcuts, research tools, and developer options.
               </span>
             </div>
             <input
               type="checkbox"
-              checked={autoCodeReview}
-              onChange={(e) => setAutoCodeReview(e.target.checked)}
-              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              checked={showWorkspaceTips}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setShowWorkspaceTips(next);
+                onUpdateSettings({ showWorkspaceTips: next });
+              }}
+              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
             />
           </label>
 
@@ -672,65 +815,89 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
         </div>
       </form>
 
-      {/* Security & 2-Step Authentication & Trusted Browser Card */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-cyan-500" />
-          <span>Security, 2-Step Verification & Trusted Devices</span>
-        </h2>
+      {/* Security & 2-Step Authentication & Trusted Browser Card (Admin-Eligible only) */}
+      {(isAdminEligible || currentRole === 'admin') && (
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-cyan-500" />
+            <span>Security, 2-Step Verification & Trusted Devices</span>
+          </h2>
 
-        <div className="space-y-3 divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-          <div className="flex items-center justify-between pt-1">
-            <div>
-              <span className="font-semibold text-slate-900 dark:text-slate-100 block">
-                Two-Factor Authentication (TOTP / Biometric)
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                Enforces secondary verification when activating Admin Studio.
-              </span>
-            </div>
-            <span className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-              ENFORCED
-            </span>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
-            <div>
-              <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                <Laptop className="w-4 h-4 text-cyan-500" />
-                <span>7-Day Trusted Browser Policy</span>
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                {trustedUntil && trustedUntil > Date.now() ? (
-                  <>
-                    Trusted until{' '}
-                    <strong className="text-cyan-500 dark:text-cyan-400 font-mono">
-                      {new Date(trustedUntil).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </strong>{' '}
-                    ({Math.max(1, Math.ceil((trustedUntil - Date.now()) / (24 * 60 * 60 * 1000)))} days left).
-                  </>
-                ) : (
-                  'No active 7-day browser trust token on this device.'
-                )}
+          <div className="space-y-3 divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                  Two-Factor Authentication (TOTP / Biometric)
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                  Enforces secondary verification when activating Admin Studio.
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                ENFORCED
               </span>
             </div>
 
-            {trustedUntil && trustedUntil > Date.now() && onRevokeTrustedBrowser && (
-              <button
-                type="button"
-                onClick={onRevokeTrustedBrowser}
-                className="px-3 py-1.5 rounded-lg border border-rose-300 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
-              >
-                Revoke Trusted Browser
-              </button>
-            )}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
+              <div>
+                <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <Laptop className="w-4 h-4 text-cyan-500" />
+                  <span>7-Day Trusted Browser Policy</span>
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                  {trustedUntil && trustedUntil > Date.now() ? (
+                    <>
+                      Trusted until{' '}
+                      <strong className="text-cyan-500 dark:text-cyan-400 font-mono">
+                        {new Date(trustedUntil).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </strong>{' '}
+                      ({Math.max(1, Math.ceil((trustedUntil - Date.now()) / (24 * 60 * 60 * 1000)))} days left).
+                    </>
+                  ) : (
+                    'No active 7-day browser trust token on this device.'
+                  )}
+                </span>
+              </div>
+
+              {trustedUntil && trustedUntil > Date.now() && onRevokeTrustedBrowser && (
+                <button
+                  type="button"
+                  onClick={onRevokeTrustedBrowser}
+                  className="px-3 py-1.5 rounded-lg border border-rose-300 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  Revoke Trusted Browser
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Product Feedback & Suggestions Card */}
+      {onOpenFeedbackSurvey && (
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div>
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <MessageSquarePlus className="w-4 h-4 theme-accent-text" />
+              <span>Product Feedback & Feature Suggestions</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Tell us what feels great or suggest features you want added to SupremeAI Studio.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenFeedbackSurvey}
+            className="px-4 py-2 rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-[var(--theme-accent)] text-slate-800 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            Share Feedback
+          </button>
+        </div>
+      )}
 
       {/* Account Session Sign Out Card */}
       <div className="p-5 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">

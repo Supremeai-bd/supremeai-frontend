@@ -20,7 +20,7 @@ interface AuthState {
 
   // Actions
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string, plan?: string) => Promise<boolean>;
+  signup: (name: string, email: string, password: string, plan?: string, isDeveloperEligible?: boolean) => Promise<boolean>;
   logout: () => void;
   verify2FA: (payload: {
     token?: string;
@@ -30,6 +30,7 @@ interface AuthState {
     userEmail: string;
   }) => Promise<boolean>;
   handleToggleRole: (forcedRole?: UserRole) => void;
+  setDeveloperEligibility: (eligible: boolean) => void;
   setIsTwoFactorModalOpen: (open: boolean) => void;
   setIsAdminAuthModalOpen: (open: boolean) => void;
   revokeTrustedBrowser: () => void;
@@ -52,6 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       avatar: 'Z',
       role: 'admin',
       isAdminEligible: true,
+      isDeveloperEligible: true,
       adminUserId: 'admin_root_001',
       plan: 'Enterprise',
       createdAt: '2026-01-15',
@@ -104,6 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           name: res.user.name,
           email: res.user.email,
           plan: res.user.plan,
+          developerMode: false,
         });
 
         toast.success(
@@ -118,10 +121,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
     },
 
-    signup: async (name: string, email: string, password: string, plan: string = 'Pro') => {
+    signup: async (
+      name: string,
+      email: string,
+      password: string,
+      plan: string = 'Pro',
+      isDeveloperEligible: boolean = false
+    ) => {
       set({ isLoading: true });
       try {
-        const res = await authService.signup(name, email, password, plan);
+        const res = await authService.signup(name, email, password, plan, isDeveloperEligible);
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(res.user));
         localStorage.setItem(ROLE_KEY, res.user.role);
 
@@ -137,6 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           name: res.user.name,
           email: res.user.email,
           plan: res.user.plan,
+          developerMode: false,
         });
 
         toast.success('Account Created', `Welcome to SupremeAI Studio, ${res.user.name}!`);
@@ -222,6 +232,26 @@ export const useAuthStore = create<AuthState>((set, get) => {
       toast.info('Workspace Switch', `Switched to ${nextRole === 'admin' ? 'Admin Studio' : 'User Mode'}`);
     },
 
+    setDeveloperEligibility: (eligible: boolean) => {
+      const { authUser } = get();
+      if (!authUser) return;
+      const updatedUser: AuthUser = {
+        ...authUser,
+        isDeveloperEligible: eligible,
+      };
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
+      set({ authUser: updatedUser });
+      if (!eligible) {
+        useCustomerStore.getState().updateSettings({ developerMode: false });
+      }
+      toast.info(
+        eligible ? 'Developer Switch Unlocked' : 'Developer Switch Hidden',
+        eligible
+          ? 'You can now switch between Standard and Developer Mode from the navigation bar or sidebar.'
+          : 'Your workspace is now set to clean Standard Mode.'
+      );
+    },
+
     setIsTwoFactorModalOpen: (open: boolean) => set({ isTwoFactorModalOpen: open }),
     setIsAdminAuthModalOpen: (open: boolean) => set({ isAdminAuthModalOpen: open }),
 
@@ -242,6 +272,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         avatar: customer.name.charAt(0).toUpperCase(),
         role: 'user',
         isAdminEligible: false,
+        isDeveloperEligible: Boolean(customer.isDeveloperEligible),
         plan: customer.tier,
         createdAt: customer.joinedDate,
       };
@@ -253,6 +284,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         plan: customer.tier,
         monthlyTokensUsed: customer.tokensUsed,
         monthlyTokensLimit: customer.tokenLimit,
+        developerMode: false,
       });
 
       set({

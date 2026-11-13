@@ -15,6 +15,7 @@ interface ChatThreadProps {
   onSendPrompt: (promptText: string) => void;
   error: string | null;
   userName?: string;
+  developerMode?: boolean;
 }
 
 export const ChatThread: React.FC<ChatThreadProps> = ({
@@ -26,6 +27,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   onSendPrompt,
   error,
   userName,
+  developerMode = false,
 }) => {
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -140,6 +142,8 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
             activeRole={activeRole}
             activeModel={activeModel}
             userName={userName}
+            developerMode={developerMode}
+            onSelectPrompt={onSendPrompt}
           />
         ) : (
           <div className="workspace-chat-container space-y-4">
@@ -150,6 +154,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
                 activeRole={activeRole}
                 activeModel={activeModel}
                 searchQuery={searchQuery}
+                developerMode={developerMode}
               />
             ))}
 
@@ -164,8 +169,8 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
                     <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                       {activeRole.name}
                     </span>
-                    <span className="text-[10px] font-mono text-cyan-500">
-                      Generating ({activeModel.id})...
+                    <span className={developerMode ? 'text-[10px] font-mono text-cyan-500' : 'text-[10px] text-cyan-600 dark:text-cyan-400 font-medium'}>
+                      {developerMode ? `Generating (${activeModel.id})...` : `${activeModel.name} · Generating...`}
                     </span>
                   </div>
                   <p className="text-xs leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap font-sans">

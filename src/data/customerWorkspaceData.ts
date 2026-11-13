@@ -207,6 +207,30 @@ export const MODEL_USAGE_BREAKDOWN = [
 
 export const INITIAL_PROMPT_TEMPLATES = [
   {
+    id: 'tmpl_gen_01',
+    title: 'Executive Summary & Key Action Items',
+    category: 'research',
+    description: 'Turn long meeting notes, reports, or articles into clear takeaways and next steps.',
+    template: 'Summarize the key points, decisions made, and clear next action items (with owners if mentioned) from the following notes:\n\n[PASTE NOTES OR DOCUMENT HERE]',
+    tags: ['summary', 'notes', 'productivity'],
+  },
+  {
+    id: 'tmpl_gen_02',
+    title: 'Clear & Professional Email Polish',
+    category: 'writing',
+    description: 'Refine rough drafts into polite, concise, and persuasive emails or announcements.',
+    template: 'Rewrite the following draft to be clear, warm, and concise for a professional audience. Keep the core message intact:\n\n[PASTE DRAFT HERE]',
+    tags: ['writing', 'email', 'clarity'],
+  },
+  {
+    id: 'tmpl_gen_03',
+    title: 'Structured Brainstorm & Pros/Cons Matrix',
+    category: 'general',
+    description: 'Explore options for a business decision with clear trade-offs and recommendations.',
+    template: 'Help me evaluate options for the following decision. Provide 3 practical approaches, their pros and cons, and a recommended next step:\n\n[DESCRIBE YOUR GOAL OR DECISION HERE]',
+    tags: ['brainstorm', 'planning', 'strategy'],
+  },
+  {
     id: 'tmpl_01',
     title: 'Strict Security Audit & OWASP Fuzz',
     category: 'security',

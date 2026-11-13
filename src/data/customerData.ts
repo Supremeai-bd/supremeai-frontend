@@ -15,6 +15,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: 'Just now',
     githubHandle: 'ziaulhaquezia01',
     region: 'Asia/Dhaka',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_002',
@@ -30,6 +31,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '12 mins ago',
     githubHandle: 'rahim-techscale',
     region: 'Asia/Singapore',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_003',
@@ -45,6 +47,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '45 mins ago',
     githubHandle: 'sjenkins-ai',
     region: 'US/East',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_004',
@@ -60,6 +63,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '2 hours ago',
     githubHandle: 'tanvir-ahmed',
     region: 'Asia/Dhaka',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_005',
@@ -75,6 +79,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '5 hours ago',
     githubHandle: 'elena-novasoft',
     region: 'Europe/Berlin',
+    isDeveloperEligible: false,
   },
   {
     id: 'cust_006',
@@ -90,6 +95,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '1 day ago',
     githubHandle: 'mbrody',
     region: 'US/West',
+    isDeveloperEligible: false,
   },
   {
     id: 'cust_007',
@@ -105,6 +111,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '3 hours ago',
     githubHandle: 'fatima-cloud',
     region: 'MiddleEast/Dubai',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_008',
@@ -120,6 +127,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '4 days ago',
     githubHandle: 'liam-celtic',
     region: 'Europe/Dublin',
+    isDeveloperEligible: false,
   },
   {
     id: 'cust_009',
@@ -135,6 +143,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: 'Yesterday',
     githubHandle: 'kavita-sundaram',
     region: 'Asia/Mumbai',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_010',
@@ -150,6 +159,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '7 days ago',
     githubHandle: 'zhaodavid',
     region: 'Asia/Tokyo',
+    isDeveloperEligible: false,
   },
   {
     id: 'cust_011',
@@ -165,6 +175,7 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '20 mins ago',
     githubHandle: 'alexei-hyperloop',
     region: 'Europe/London',
+    isDeveloperEligible: true,
   },
   {
     id: 'cust_012',
@@ -180,5 +191,6 @@ export const INITIAL_CUSTOMERS: CustomerRecord[] = [
     lastActive: '5 hours ago',
     githubHandle: 'shakib-vector',
     region: 'Asia/Dhaka',
+    isDeveloperEligible: false,
   },
 ];

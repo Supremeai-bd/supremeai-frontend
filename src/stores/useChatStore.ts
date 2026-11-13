@@ -31,7 +31,7 @@ interface ChatState {
   createNewSession: () => void;
   branchSession: (sourceSessionId?: string, upToMessageId?: string) => string;
   clearCurrentThread: () => void;
-  exportThread: (format: 'markdown' | 'json') => void;
+  exportThread: (format: 'markdown' | 'text' | 'json') => void;
 
   // Model & Role Actions
   selectModel: (model: ModelDetail) => void;
@@ -201,13 +201,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       toast.info('Thread Cleared', 'Messages removed from active conversation.');
     },
 
-    exportThread: (format: 'markdown' | 'json') => {
+    exportThread: (format: 'markdown' | 'text' | 'json') => {
       const { sessions, activeSessionId } = get();
       const current = sessions.find((s) => s.id === activeSessionId) || sessions[0];
       if (!current) return;
 
       let blob: Blob;
       let filename: string;
+      const safeTitle = current.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
       if (format === 'markdown') {
         let md = `# ${current.title}\n`;
@@ -219,11 +220,19 @@ export const useChatStore = create<ChatState>((set, get) => {
         });
 
         blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-        filename = `${current.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_export.md`;
+        filename = `${safeTitle}_export.md`;
+      } else if (format === 'text') {
+        let txt = `${current.title}\nExported: ${new Date().toLocaleString()}\n${'='.repeat(48)}\n\n`;
+        current.messages.forEach((msg) => {
+          const sender = msg.role === 'user' ? 'You' : msg.roleName || 'SupremeAI';
+          txt += `${sender}:\n${msg.content}\n\n${'-'.repeat(32)}\n\n`;
+        });
+        blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+        filename = `${safeTitle}_export.txt`;
       } else {
         const json = JSON.stringify(current, null, 2);
         blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-        filename = `${current.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_export.json`;
+        filename = `${safeTitle}_export.json`;
       }
 
       const url = URL.createObjectURL(blob);

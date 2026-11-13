@@ -32,6 +32,7 @@ interface UserPlanUsageViewProps {
   sessions: ChatSession[];
   darkMode?: boolean;
   onTopUpTokens: (addedTokens: number, costUsd: number) => void;
+  developerMode?: boolean;
 }
 
 interface DayActivity {
@@ -51,6 +52,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
   sessions,
   darkMode,
   onTopUpTokens,
+  developerMode = false,
 }) => {
   const [sectionTab, setSectionTab] = useState<'overview' | 'activity' | 'invoices'>('overview');
   const [metricView, setMetricView] = useState<'stacked' | 'total'>('stacked');
@@ -179,15 +181,15 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
           </div>
           <div className="pt-1 space-y-1 text-[11px] border-t border-slate-100 dark:border-slate-700">
             <div className="flex items-center justify-between text-blue-600 dark:text-blue-400">
-              <span>User Prompts:</span>
+              <span>{developerMode ? 'User Prompts:' : 'Your Prompts:'}</span>
               <span className="font-mono font-semibold tabular-nums">{data.userMessages}</span>
             </div>
             <div className="flex items-center justify-between text-purple-600 dark:text-purple-400">
-              <span>Gemini Responses:</span>
+              <span>{developerMode ? 'Gemini Responses:' : 'Assistant Replies:'}</span>
               <span className="font-mono font-semibold tabular-nums">{data.assistantMessages}</span>
             </div>
             <div className="flex items-center justify-between text-slate-500 pt-1 border-t border-slate-100 dark:border-slate-700">
-              <span>Tokens:</span>
+              <span>{developerMode ? 'Tokens:' : 'Credits used:'}</span>
               <span className="font-mono tabular-nums">~{(data.estimatedTokens / 1000).toFixed(1)}k</span>
             </div>
           </div>
@@ -203,10 +205,12 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Plan, Billing & Token Usage
+            {developerMode ? 'Plan, Billing & Token Usage' : 'Plan, Usage & Billing'}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Monitor monthly Gemini quota, 7-day chat telemetry, credit top-ups, and Stripe billing receipts.
+            {developerMode
+              ? 'Monitor monthly Gemini quota, 7-day chat telemetry, credit top-ups, and Stripe billing receipts.'
+              : 'Track your monthly allowance, 7-day activity, credit top-ups, and billing receipts.'}
           </p>
         </div>
 
@@ -278,11 +282,13 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
             <div className="p-6 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 md:col-span-2 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Monthly Token Consumption</h3>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {developerMode ? 'Monthly Token Consumption' : 'Monthly Credits'}
+                  </h3>
                   <p className="text-xs text-slate-400">Active billing cycle quota</p>
                 </div>
                 <span className="text-xs font-mono tabular-nums font-bold theme-accent-text">
-                  {currentTokensUsed.toLocaleString()} / {tokensLimit.toLocaleString()} tokens
+                  {currentTokensUsed.toLocaleString()} / {tokensLimit.toLocaleString()} {developerMode ? 'tokens' : 'credits'}
                 </span>
               </div>
 
@@ -297,13 +303,15 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
 
               <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
                 <span>{usagePercent}% utilized</span>
-                <span>{Math.max(0, tokensLimit - currentTokensUsed).toLocaleString()} tokens remaining</span>
+                <span>{Math.max(0, tokensLimit - currentTokensUsed).toLocaleString()} {developerMode ? 'tokens' : 'credits'} remaining</span>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-600 dark:text-slate-300 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-emerald-500" />
-                  Need extra token capacity for large reasoning runs?
+                  {developerMode
+                    ? 'Need extra token capacity for large reasoning runs?'
+                    : 'Need extra capacity for larger writing or research projects?'}
                 </span>
                 <button
                   type="button"
@@ -360,7 +368,9 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-semibold uppercase tracking-wider">Wallet Balance</span>
+                <span className="text-xs font-semibold uppercase tracking-wider">
+                  {developerMode ? 'Wallet Balance' : 'Account Credit'}
+                </span>
                 <Wallet className="w-4 h-4 text-emerald-500" />
               </div>
               <div className="mt-3">
@@ -375,7 +385,9 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
 
             <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-semibold uppercase tracking-wider">Model Spend</span>
+                <span className="text-xs font-semibold uppercase tracking-wider">
+                  {developerMode ? 'Model Spend' : 'Usage Cost'}
+                </span>
                 <TrendingUp className="w-4 h-4 text-blue-500" />
               </div>
               <div className="mt-3">
@@ -383,29 +395,35 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                   ${analytics ? analytics.totalSpent.toFixed(2) : '14.85'}
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                  Cache Saved: +${analytics ? analytics.totalSaved.toFixed(2) : '32.40'}
+                  {developerMode ? 'Cache Saved' : 'Smart Savings'}: +${analytics ? analytics.totalSaved.toFixed(2) : '32.40'}
                 </div>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-semibold uppercase tracking-wider">7-Day Ingestion</span>
+                <span className="text-xs font-semibold uppercase tracking-wider">
+                  {developerMode ? '7-Day Ingestion' : '7-Day Messages'}
+                </span>
                 <Sparkles className="w-4 h-4 text-purple-500" />
               </div>
               <div className="mt-3">
                 <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">
-                  {(totalTokens7Days / 1000).toFixed(1)}k
+                  {developerMode ? `${(totalTokens7Days / 1000).toFixed(1)}k` : totalMessages7Days}
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
-                  Peak: {peakDay?.dayName} ({(peakDay?.estimatedTokens / 1000).toFixed(1)}k)
+                  {developerMode
+                    ? `Peak: ${peakDay?.dayName} (${(peakDay?.estimatedTokens / 1000).toFixed(1)}k)`
+                    : `Peak: ${peakDay?.dayName} (${peakDay?.totalMessages} msgs)`}
                 </div>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-semibold uppercase tracking-wider">Daily Rate</span>
+                <span className="text-xs font-semibold uppercase tracking-wider">
+                  {developerMode ? 'Daily Rate' : 'Daily Average'}
+                </span>
                 <Activity className="w-4 h-4 text-cyan-500" />
               </div>
               <div className="mt-3">
@@ -413,7 +431,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                   {avgMessagesPerDay} <span className="text-xs font-normal text-slate-400 font-sans">msgs/day</span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1 font-mono tabular-nums">
-                  {totalMessages7Days} total turns
+                  {totalMessages7Days} {developerMode ? 'total turns' : 'total messages'}
                 </div>
               </div>
             </div>
@@ -427,7 +445,9 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                   Daily Message Activity (Last 7 Days)
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Interactive breakdown of user prompts and Gemini responses.
+                  {developerMode
+                    ? 'Interactive breakdown of user prompts and Gemini responses.'
+                    : 'Interactive breakdown of your prompts and assistant replies.'}
                 </p>
               </div>
               <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
@@ -438,7 +458,7 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                     metricView === 'stacked' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
                   }`}
                 >
-                  User vs AI
+                  {developerMode ? 'User vs AI' : 'You vs Assistant'}
                 </button>
                 <button
                   type="button"
@@ -461,8 +481,8 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
                   <Tooltip content={<CustomTooltip />} />
                   {metricView === 'stacked' ? (
                     <>
-                      <Bar dataKey="userMessages" name="User Prompts" stackId="a" fill="#3B82F6" maxBarSize={44} />
-                      <Bar dataKey="assistantMessages" name="Gemini Responses" stackId="a" fill="#8B5CF6" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                      <Bar dataKey="userMessages" name={developerMode ? 'User Prompts' : 'Your Prompts'} stackId="a" fill="#3B82F6" maxBarSize={44} />
+                      <Bar dataKey="assistantMessages" name={developerMode ? 'Gemini Responses' : 'Assistant Replies'} stackId="a" fill="#8B5CF6" radius={[6, 6, 0, 0]} maxBarSize={44} />
                     </>
                   ) : (
                     <Bar dataKey="totalMessages" name="Total Messages" fill="#3B82F6" radius={[6, 6, 0, 0]} maxBarSize={44} />
@@ -481,7 +501,9 @@ export const UserPlanUsageView: React.FC<UserPlanUsageViewProps> = ({
               <CreditCard className="w-4 h-4 text-slate-500" />
               <span>Invoice History & Receipts</span>
             </h3>
-            <span className="text-xs text-slate-400">Processed via Stripe</span>
+            <span className="text-xs text-slate-400">
+              {developerMode ? 'Processed via Stripe' : 'Billing receipts'}
+            </span>
           </div>
 
           <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 overflow-hidden">

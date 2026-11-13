@@ -49,6 +49,7 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
   const [newStatus, setNewStatus] = useState<'active' | 'past_due' | 'suspended'>('active');
   const [newGithub, setNewGithub] = useState('');
   const [newRegion, setNewRegion] = useState('Asia/Dhaka');
+  const [newDevEligible, setNewDevEligible] = useState(false);
 
   // Filter logic
   const filteredCustomers = customers.filter((cust) => {
@@ -97,11 +98,13 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
       connectedRepos: 0,
       githubHandle: newGithub.trim() || undefined,
       region: newRegion.trim() || 'Global',
+      isDeveloperEligible: newDevEligible,
     });
 
     setNewName('');
     setNewEmail('');
     setNewGithub('');
+    setNewDevEligible(false);
     setIsAddModalOpen(false);
   };
 
@@ -360,9 +363,16 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
 
                       {/* Plan Tier */}
                       <td className="p-3.5">
-                        <span className={getTierStyle(cust.tier)}>
-                          {cust.tier}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={getTierStyle(cust.tier)}>
+                            {cust.tier}
+                          </span>
+                          {cust.isDeveloperEligible && (
+                            <span className="text-[10px] font-mono text-cyan-600 dark:text-cyan-400">
+                              · Dev
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -562,6 +572,23 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
                 </div>
               </div>
 
+              <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <div>
+                  <span className="text-xs font-semibold text-slate-900 dark:text-white block">
+                    Developer Workspace Eligible
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                    Allows this customer to reveal the Standard / Developer switch.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={newDevEligible}
+                  onChange={(e) => setNewDevEligible(e.target.checked)}
+                  className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer shrink-0 ml-3"
+                />
+              </label>
+
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -651,6 +678,30 @@ export const AdminCustomersView: React.FC<AdminCustomersViewProps> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-semibold block">Developer Mode Switch Access</span>
+                  <span className="text-slate-400 text-[11px]">
+                    Show Standard ↔ Developer Mode toggle for this account
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !selectedCustomer.isDeveloperEligible;
+                    onUpdateCustomer(selectedCustomer.id, { isDeveloperEligible: next });
+                    setSelectedCustomer({ ...selectedCustomer, isDeveloperEligible: next });
+                  }}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors shrink-0 whitespace-nowrap ${
+                    selectedCustomer.isDeveloperEligible
+                      ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {selectedCustomer.isDeveloperEligible ? 'Eligible (On)' : 'Standard Only'}
+                </button>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">

@@ -18,6 +18,7 @@ interface UserTeamViewProps {
   onInviteMember: (member: Omit<TeamMember, 'id' | 'joinedDate' | 'avatar'>) => void;
   onUpdateRole: (id: string, newRole: TeamMember['role']) => void;
   onRemoveMember: (id: string) => void;
+  developerMode?: boolean;
 }
 
 export const UserTeamView: React.FC<UserTeamViewProps> = ({
@@ -25,11 +26,14 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
   onInviteMember,
   onUpdateRole,
   onRemoveMember,
+  developerMode = false,
 }) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState<TeamMember['role']>('Developer');
+  const [inviteRole, setInviteRole] = useState<TeamMember['role']>(
+    developerMode ? 'Developer' : 'Reviewer'
+  );
 
   const maxSeats = 10;
   const seatsUsed = members.length;
@@ -57,23 +61,23 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Team & Workspace Management
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-              Multi-Seat RBAC
-            </span>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {developerMode ? 'Team & Workspace Management' : 'Team & Collaboration'}
+          </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Invite engineering team members, assign fine-grained roles, and audit workspace security compliance.
+            {developerMode
+              ? 'Invite engineering team members, assign fine-grained RBAC roles, and audit workspace security compliance.'
+              : 'Invite team members and manage shared workspace access.'}
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setIsInviteModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer shrink-0"
+          onClick={() => {
+            setInviteRole(developerMode ? 'Developer' : 'Reviewer');
+            setIsInviteModalOpen(true);
+          }}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
         >
           <UserPlus className="w-4 h-4" />
           <span>Invite Member</span>
@@ -85,7 +89,7 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
         <div className="p-5 rounded-2xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-700 dark:text-slate-300">Workspace Seat Usage</span>
-            <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">
+            <span className="font-mono tabular-nums text-blue-600 dark:text-blue-400 font-bold">
               {seatsUsed} / {maxSeats} seats
             </span>
           </div>
@@ -95,7 +99,9 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
               style={{ width: `${seatPercentage}%` }}
             />
           </div>
-          <p className="text-[11px] text-slate-400">Developer Pro Plan includes 10 active seats.</p>
+          <p className="text-[11px] text-slate-400">
+            {developerMode ? 'Developer Pro Plan includes 10 active seats.' : 'Pro Plan includes 10 workspace seats.'}
+          </p>
         </div>
 
         <div className="p-5 rounded-2xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center gap-3">
@@ -103,9 +109,11 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">2FA Security Status</div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-              {members.filter((m) => m.twoFactorEnabled).length} of {members.length} Enforced
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              {developerMode ? '2FA Security Status' : 'Account Protection'}
+            </div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5 tabular-nums">
+              {members.filter((m) => m.twoFactorEnabled).length} of {members.length} Verified
             </div>
           </div>
         </div>
@@ -115,9 +123,11 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
             <Users className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">RBAC Roles Defined</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              {developerMode ? 'RBAC Roles Defined' : 'Active Roles'}
+            </div>
             <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-              4 Roles (Owner, Dev, Reviewer, Viewer)
+              {developerMode ? '4 Roles (Owner, Dev, Reviewer, Viewer)' : 'Owner, Editor, Reviewer, Viewer'}
             </div>
           </div>
         </div>
@@ -159,7 +169,7 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
                       className="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white disabled:opacity-60 cursor-pointer"
                     >
                       <option value="Owner">Owner</option>
-                      <option value="Developer">Developer</option>
+                      <option value="Developer">{developerMode ? 'Developer' : 'Editor'}</option>
                       <option value="Reviewer">Reviewer</option>
                       <option value="Viewer">Viewer</option>
                     </select>
@@ -264,9 +274,17 @@ export const UserTeamView: React.FC<UserTeamViewProps> = ({
                   onChange={(e) => setInviteRole(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 >
-                  <option value="Developer">Developer (Full chat, API keys, and repository sync)</option>
-                  <option value="Reviewer">Reviewer (View chats, approve PRs, no API key creation)</option>
-                  <option value="Viewer">Viewer (Read-only observation)</option>
+                  <option value="Developer">
+                    {developerMode
+                      ? 'Developer (Full chat, API keys, and repository sync)'
+                      : 'Editor (Full chat and shared workspace)'}
+                  </option>
+                  <option value="Reviewer">
+                    {developerMode
+                      ? 'Reviewer (View chats, approve PRs, no API key creation)'
+                      : 'Reviewer (View and comment on shared chats)'}
+                  </option>
+                  <option value="Viewer">Viewer (Read-only access)</option>
                 </select>
               </div>
 

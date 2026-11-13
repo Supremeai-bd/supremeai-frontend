@@ -94,9 +94,9 @@ export const WorkspaceDock: React.FC = () => {
       {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
 
       {/* Top Dock Navigation Bar */}
-      <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800/90 flex items-center justify-between gap-2 bg-slate-50/90 dark:bg-[#0b101b]">
+      <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800/90 flex items-center justify-between gap-2 bg-slate-50/90 dark:bg-[#0b101b] shrink-0 min-w-0">
         {/* Segmented Workspace Tabs */}
-        <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-200/70 dark:bg-slate-900 border border-slate-300/60 dark:border-slate-800">
+        <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-200/70 dark:bg-slate-900 border border-slate-300/60 dark:border-slate-800 overflow-x-auto min-w-0">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeDockTab === tab.id;
@@ -105,7 +105,7 @@ export const WorkspaceDock: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveDockTab(tab.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   active
                     ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-xs font-semibold'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -119,7 +119,7 @@ export const WorkspaceDock: React.FC = () => {
         </div>
 
         {/* Window Controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={() => setIsMaximized(!isMaximized)}
@@ -143,7 +143,7 @@ export const WorkspaceDock: React.FC = () => {
       </div>
 
       {/* Active Workspace Tab Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
         {activeDockTab === 'preview' && <WorkspacePreviewTab />}
         {activeDockTab === 'terminal' && <WorkspaceTerminalTab />}
         {activeDockTab === 'browser' && <WorkspaceBrowserTab />}

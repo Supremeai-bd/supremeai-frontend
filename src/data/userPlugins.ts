@@ -108,5 +108,7 @@ export const DEFAULT_USER_SETTINGS: UserAccountSettings = {
   layoutMode: 'sidebar-focus',
   contentLayout: 'fluid',
   developerMode: false,
+  enableKnowledgeGrounding: false,
+  showWorkspaceTips: true,
   customInstructions: '',
 };

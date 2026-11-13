@@ -58,6 +58,9 @@ interface SidebarProps {
   onToggleDarkMode?: () => void;
   layoutMode?: 'sidebar-focus' | 'classic';
   developerMode?: boolean;
+  isDeveloperEligible?: boolean;
+  enableKnowledgeGrounding?: boolean;
+  onToggleDeveloperMode?: () => void;
   tokensUsed?: number;
   tokensLimit?: number;
 }
@@ -84,6 +87,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSignOut,
   layoutMode = 'sidebar-focus',
   developerMode = false,
+  isDeveloperEligible = false,
+  enableKnowledgeGrounding = false,
+  onToggleDeveloperMode,
   tokensUsed = 0,
   tokensLimit = 1000000,
 }) => {
@@ -214,7 +220,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 h-full min-h-0 border-r border-slate-200/70 dark:border-slate-800/70 bg-white/72 dark:bg-[#111520]/80 backdrop-blur-2xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden">
+    <>
+      {/* Mobile/narrow-preview drawer backdrop */}
+      <div
+        onClick={onToggleOpen}
+        aria-hidden="true"
+        className="md:hidden fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-[1px]"
+      />
+      <aside className="fixed md:static inset-y-0 left-0 z-40 md:z-auto w-64 max-w-[82vw] h-full min-h-0 border-r border-slate-200/70 dark:border-slate-800/70 bg-white/95 md:bg-white/72 dark:bg-[#111520]/95 md:dark:bg-[#111520]/80 backdrop-blur-2xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden shadow-2xl md:shadow-none">
       {/* Top Studio Brand Header when Top Navbar is hidden (Sidebar Focus mode) */}
       {layoutMode === 'sidebar-focus' && (
         <div className="px-3.5 pt-3.5 pb-1 flex items-center justify-between gap-2">
@@ -587,27 +600,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Settings</span>
             </button>
 
+            {!developerMode && enableKnowledgeGrounding && (
+              <button
+                type="button"
+                onClick={() => onSelectTab('user-knowledge')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'user-knowledge'
+                    ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <BookOpen className="w-4 h-4 text-purple-500" />
+                  <span>Knowledge Base</span>
+                </div>
+                <span className="text-[10px] font-mono text-purple-500">RAG</span>
+              </button>
+            )}
+
             {developerMode && (
               <>
                 <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Developer Tools
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onSelectTab('user-knowledge')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                    activeTab === 'user-knowledge'
-                      ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <BookOpen className="w-4 h-4 text-purple-500" />
-                    <span>Knowledge & RAG</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-purple-500">RAG</span>
-                </button>
+                {enableKnowledgeGrounding && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectTab('user-knowledge')}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                      activeTab === 'user-knowledge'
+                        ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="w-4 h-4 text-purple-500" />
+                      <span>Knowledge & RAG</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-purple-500">RAG</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -732,6 +765,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
+        {/* Eligibility-Gated Quick Standard <-> Developer Switch (only shown to dev-eligible users) */}
+        {currentRole === 'user' && isDeveloperEligible && onToggleDeveloperMode && (
+          <div className="flex items-center p-0.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-[11px] font-medium">
+            <button
+              type="button"
+              onClick={() => {
+                if (developerMode) onToggleDeveloperMode();
+              }}
+              className={`flex-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                !developerMode
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Standard
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!developerMode) onToggleDeveloperMode();
+              }}
+              className={`flex-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                developerMode
+                  ? 'bg-cyan-600 text-white shadow-xs font-semibold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Developer
+            </button>
+          </div>
+        )}
+
         {/* Compact Theme & Live Screen Bar directly inside Sidebar */}
         <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60">
           <button
@@ -799,5 +864,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+    </>
   );
 };

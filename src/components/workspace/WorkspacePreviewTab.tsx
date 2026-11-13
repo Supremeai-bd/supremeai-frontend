@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Monitor, Tablet, Smartphone, RotateCw, Sun, Moon, Copy, Check, Maximize2 } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 
@@ -150,6 +150,23 @@ export const WorkspacePreviewTab: React.FC = () => {
   } = useWorkspaceStore();
 
   const [copied, setCopied] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () => {
+      setStageSize({ width: el.clientWidth, height: el.clientHeight });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const srcDoc = useMemo(
     () => buildSandboxSrcDoc(previewCode, previewLang, previewDarkMode),
@@ -172,15 +189,18 @@ export const WorkspacePreviewTab: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const frameWidthClass =
-    viewportDevice === 'mobile'
-      ? 'w-[375px]'
-      : viewportDevice === 'tablet'
-      ? 'w-[768px]'
-      : 'w-full';
+  const targetWidthPx =
+    viewportDevice === 'mobile' ? 375 : viewportDevice === 'tablet' ? 768 : 0;
+  const availableWidthPx = Math.max(200, stageSize.width - 24);
+  const availableHeightPx = Math.max(220, stageSize.height - 24);
+  const previewScale =
+    targetWidthPx > 0 && availableWidthPx < targetWidthPx
+      ? Math.max(0.32, availableWidthPx / targetWidthPx)
+      : 1;
+  const scaledPercent = Math.round(previewScale * 100);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
       {/* Preview Toolbar */}
       <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2 bg-slate-50/70 dark:bg-slate-900/50">
         {/* Device Viewport Selector */}
@@ -223,13 +243,18 @@ export const WorkspacePreviewTab: React.FC = () => {
           </button>
         </div>
 
-        {/* Source indicator */}
+        {/* Source & fit indicator */}
         <button
           type="button"
           onClick={() => setActiveDockTab('code')}
-          className="text-[11px] font-mono text-slate-500 dark:text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer truncate"
+          className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer truncate"
         >
-          Lang: <span className="text-cyan-500 font-semibold uppercase">{previewLang}</span> · Edit Code
+          <span className="text-cyan-500 font-semibold uppercase">{previewLang}</span>
+          {targetWidthPx > 0 && (
+            <span className="ml-1.5 text-slate-400">
+              · {targetWidthPx}px{previewScale < 1 ? ` (${scaledPercent}%)` : ''}
+            </span>
+          )}
         </button>
 
         {/* Actions */}
@@ -269,19 +294,47 @@ export const WorkspacePreviewTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Sandboxed Iframe Container */}
-      <div className="flex-1 overflow-auto bg-slate-200/60 dark:bg-[#05070c] flex justify-center p-2 sm:p-3">
-        <div
-          className={`${frameWidthClass} max-w-full h-full rounded-xl overflow-hidden border border-slate-300 dark:border-cyan-500/20 shadow-lg bg-white dark:bg-[#080b11] transition-all duration-200`}
-        >
-          <iframe
-            key={previewRefreshKey}
-            title="SupremeAI Live Preview Sandbox"
-            srcDoc={srcDoc}
-            sandbox="allow-scripts allow-forms allow-modals"
-            className="w-full h-full border-0"
-          />
-        </div>
+      {/* Sandboxed Iframe Container with Responsive Fit Scaling */}
+      <div
+        ref={stageRef}
+        className="flex-1 min-h-0 min-w-0 overflow-auto bg-slate-200/60 dark:bg-[#05070c] flex justify-center items-start p-2 sm:p-3"
+      >
+        {targetWidthPx > 0 ? (
+          <div
+            style={{
+              width: `${Math.round(targetWidthPx * previewScale)}px`,
+              height: `${availableHeightPx}px`,
+            }}
+            className="shrink-0 relative overflow-hidden rounded-xl border border-slate-300 dark:border-cyan-500/20 shadow-lg bg-white dark:bg-[#080b11]"
+          >
+            <div
+              style={{
+                width: `${targetWidthPx}px`,
+                height: `${Math.round(availableHeightPx / previewScale)}px`,
+                transform: `scale(${previewScale})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              <iframe
+                key={previewRefreshKey}
+                title="SupremeAI Live Preview Sandbox"
+                srcDoc={srcDoc}
+                sandbox="allow-scripts allow-forms allow-modals"
+                className="w-full h-full border-0"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="w-full h-full rounded-xl overflow-hidden border border-slate-300 dark:border-cyan-500/20 shadow-lg bg-white dark:bg-[#080b11]">
+            <iframe
+              key={previewRefreshKey}
+              title="SupremeAI Live Preview Sandbox"
+              srcDoc={srcDoc}
+              sandbox="allow-scripts allow-forms allow-modals"
+              className="w-full h-full border-0"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

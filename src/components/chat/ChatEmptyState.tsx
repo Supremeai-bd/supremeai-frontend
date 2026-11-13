@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { PenLine, Bug, FileText, Layers } from 'lucide-react';
+import { PenLine, Bug, FileText, Layers, Lightbulb, Compass } from 'lucide-react';
 import { RolePersona, ModelDetail } from '../../types';
 import { useThemeStore } from '../../stores/useThemeStore';
 
@@ -8,10 +8,11 @@ interface ChatEmptyStateProps {
   activeRole: RolePersona;
   activeModel: ModelDetail;
   userName?: string;
+  developerMode?: boolean;
   onSelectPrompt?: (prompt: string) => void;
 }
 
-const STARTER_PROMPTS = [
+const DEV_STARTER_PROMPTS = [
   {
     id: 'draft',
     title: 'Draft & Edit',
@@ -42,12 +43,45 @@ const STARTER_PROMPTS = [
   },
 ];
 
+const NON_DEV_STARTER_PROMPTS = [
+  {
+    id: 'draft-everyday',
+    title: 'Draft & Edit',
+    subtitle: 'Write clear emails, proposals, or articles',
+    prompt: 'Help me write a clear, friendly, and persuasive email update for my clients and team.',
+    icon: PenLine,
+  },
+  {
+    id: 'summarize-insights',
+    title: 'Summarize & Insights',
+    subtitle: 'Turn long notes or PDFs into key takeaways',
+    prompt: 'Summarize my meeting notes into clear key points, decisions made, and next action steps.',
+    icon: FileText,
+  },
+  {
+    id: 'brainstorm',
+    title: 'Brainstorm Ideas',
+    subtitle: 'Explore fresh angles, plans, or campaigns',
+    prompt: 'Help me brainstorm 5 practical campaign ideas and a simple 2-week launch plan for our product.',
+    icon: Lightbulb,
+  },
+  {
+    id: 'explain-simply',
+    title: 'Explain Simply',
+    subtitle: 'Break down complex topics into plain language',
+    prompt: 'Explain a complex topic step by step in simple everyday language with relatable examples.',
+    icon: Compass,
+  },
+];
+
 export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   activeRole,
   activeModel,
   userName = 'Ziaul',
+  developerMode = false,
   onSelectPrompt,
 }) => {
+  const starterPrompts = developerMode ? DEV_STARTER_PROMPTS : NON_DEV_STARTER_PROMPTS;
   const [isKeyPulse, setIsKeyPulse] = useState(false);
   const liveTheme = useThemeStore((s) => s.liveTheme);
   const isScenic = liveTheme !== 'cyber-studio';
@@ -152,7 +186,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
           transition={{ delay: 0.22, duration: 0.35 }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 w-full mt-6 text-left"
         >
-          {STARTER_PROMPTS.map((item) => {
+          {starterPrompts.map((item) => {
             const Icon = item.icon;
             return (
               <button

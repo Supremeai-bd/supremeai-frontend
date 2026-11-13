@@ -31,6 +31,8 @@ interface ChatInputProps {
   onToggleGrounding?: () => void;
   isDeepResearchActive?: boolean;
   onToggleDeepResearch?: () => void;
+  developerMode?: boolean;
+  enableKnowledgeGrounding?: boolean;
 }
 
 const TIER_RANK: Record<PlanTier, number> = {
@@ -50,6 +52,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onToggleGrounding,
   isDeepResearchActive = false,
   onToggleDeepResearch,
+  developerMode: developerModeProp,
+  enableKnowledgeGrounding = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -63,11 +67,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const config = usePlatformStore((s) => s.config);
   const currentRole = useAuthStore((s) => s.currentRole);
   const authUser = useAuthStore((s) => s.authUser);
-  const developerMode = useCustomerStore((s) => s.userSettings.developerMode);
+  const storeDeveloperMode = useCustomerStore((s) => s.userSettings.developerMode);
+  const developerMode =
+    developerModeProp !== undefined
+      ? developerModeProp
+      : Boolean(storeDeveloperMode && (authUser?.isDeveloperEligible || currentRole === 'admin'));
 
   const userTier: PlanTier = authUser?.plan || 'Pro';
   const isVisionEnabled = config.featureFlags.enable_multimodal_vision !== false;
   const isRagEnabled = config.featureFlags.enable_rag_grounding !== false;
+  const showRagControl = Boolean(enableKnowledgeGrounding && (isRagEnabled || currentRole === 'admin'));
 
   // Auto-resize textarea
   useEffect(() => {
@@ -248,7 +257,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       <span>Browse Prompt Recipes</span>
                     </button>
                   )}
-                  {onToggleGrounding && (isRagEnabled || currentRole === 'admin') && (
+                  {onToggleGrounding && showRagControl && (
                     <button
                       type="button"
                       onClick={() => {
@@ -307,8 +316,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           )}
 
-          {/* RAG Knowledge Grounding Toggle (respects feature flag & developer mode) */}
-          {onToggleGrounding && (isRagEnabled || currentRole === 'admin') && (developerMode || isGroundingActive || currentRole === 'admin') && (
+          {/* RAG Knowledge Grounding Toggle (controlled cleanly from Settings) */}
+          {onToggleGrounding && showRagControl && (
             <button
               type="button"
               onClick={onToggleGrounding}
@@ -405,13 +414,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                               {isBlocked && <Lock className="w-3 h-3 text-amber-500" />}
                               <span>{model.name}</span>
                             </span>
-                            <span className="text-[10px] font-mono text-slate-400">
-                              {isDisabledByAdmin
-                                ? 'Disabled'
-                                : isTierLocked
-                                ? `${policy.minTier}+`
-                                : model.latencyRating}
-                            </span>
+                            {(isDisabledByAdmin || isTierLocked || developerMode || currentRole === 'admin') && (
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {isDisabledByAdmin
+                                  ? 'Disabled'
+                                  : isTierLocked
+                                  ? `${policy.minTier}+`
+                                  : model.latencyRating}
+                              </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
                             {model.tagline}

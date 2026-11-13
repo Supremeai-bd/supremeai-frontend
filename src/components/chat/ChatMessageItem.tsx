@@ -9,6 +9,7 @@ interface ChatMessageItemProps {
   activeRole: RolePersona;
   activeModel: ModelDetail;
   searchQuery?: string;
+  developerMode?: boolean;
 }
 
 // Escape HTML utility
@@ -21,57 +22,67 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-// Markdown Processor configured for code blocks with copy buttons and responsive tables
-const markdownProcessor = new Marked({
-  gfm: true,
-  breaks: true,
-});
+function createMarkdownProcessor(showDockButtons: boolean) {
+  const processor = new Marked({
+    gfm: true,
+    breaks: true,
+  });
 
-markdownProcessor.use({
-  renderer: {
-    code({ text, lang }: { text: string; lang?: string }) {
-      const cleanLang = (lang || 'code').trim();
-      const escapedText = escapeHtml(text);
-      const encodedCode = encodeURIComponent(text);
+  processor.use({
+    renderer: {
+      code({ text, lang }: { text: string; lang?: string }) {
+        const cleanLang = (lang || 'code').trim();
+        const escapedText = escapeHtml(text);
+        const encodedCode = encodeURIComponent(text);
 
-      return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-md">
-        <div class="code-block-header flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-xs font-mono select-none">
-          <span class="flex items-center gap-1.5 font-medium text-slate-300">
-            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
-            <span class="uppercase tracking-wider text-[11px]">${cleanLang}</span>
-          </span>
-          <div class="flex items-center gap-1.5">
-            <button type="button" class="preview-code-btn flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
+        const dockActions = showDockButtons
+          ? `<button type="button" class="preview-code-btn flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
               <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
               <span>Preview</span>
             </button>
             <button type="button" class="edit-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
               <span>Dock</span>
-            </button>
-            <button type="button" class="copy-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-              <span>Copy</span>
-            </button>
+            </button>`
+          : '';
+
+        return `<div class="code-block-wrapper my-3 rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-md">
+          <div class="code-block-header flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-xs font-mono select-none">
+            <span class="flex items-center gap-1.5 font-medium text-slate-300">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+              <span class="uppercase tracking-wider text-[11px]">${cleanLang}</span>
+            </span>
+            <div class="flex items-center gap-1.5">
+              ${dockActions}
+              <button type="button" class="copy-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                <span>Copy</span>
+              </button>
+            </div>
           </div>
-        </div>
-        <pre class="p-3.5 overflow-x-auto text-xs leading-relaxed font-mono text-slate-100 bg-slate-950"><code class="language-${cleanLang}">${escapedText}</code></pre>
-      </div>`;
+          <pre class="p-3.5 overflow-x-auto text-xs leading-relaxed font-mono text-slate-100 bg-slate-950"><code class="language-${cleanLang}">${escapedText}</code></pre>
+        </div>`;
+      },
     },
-  },
-  hooks: {
-    postprocess(html: string) {
-      return html
-        .replace(/<table>/g, '<div class="markdown-table-wrapper"><table>')
-        .replace(/<\/table>/g, '</table></div>');
+    hooks: {
+      postprocess(html: string) {
+        return html
+          .replace(/<table>/g, '<div class="markdown-table-wrapper"><table>')
+          .replace(/<\/table>/g, '</table></div>');
+      },
     },
-  },
-});
+  });
+
+  return processor;
+}
+
+const devMarkdownProcessor = createMarkdownProcessor(true);
+const standardMarkdownProcessor = createMarkdownProcessor(false);
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   message,
   activeRole,
   activeModel,
-  searchQuery,
+  developerMode = false,
 }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
@@ -86,12 +97,13 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   const renderedContent = React.useMemo(() => {
     if (isUser) return message.content;
     try {
-      const parsed = markdownProcessor.parse(message.content);
+      const processor = developerMode ? devMarkdownProcessor : standardMarkdownProcessor;
+      const parsed = processor.parse(message.content);
       return typeof parsed === 'string' ? parsed : '';
     } catch {
       return message.content;
     }
-  }, [message.content, isUser]);
+  }, [message.content, isUser, developerMode]);
 
   return (
     <div
@@ -121,8 +133,8 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               {isUser ? 'You' : message.roleName || activeRole.name}
             </span>
             {!isUser && (
-              <span className="text-[10px] font-mono text-cyan-500">
-                {message.model || activeModel.id}
+              <span className={developerMode ? 'text-[10px] font-mono text-cyan-500' : 'text-[10px] text-cyan-600 dark:text-cyan-400 font-medium'}>
+                {developerMode ? message.model || activeModel.id : activeModel.name}
               </span>
             )}
             <span className="text-[10px] text-slate-400 font-mono">

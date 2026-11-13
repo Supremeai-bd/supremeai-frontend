@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   avatar?: string;
   isAdminEligible: boolean;
+  isDeveloperEligible?: boolean;
   adminUserId?: string;
   role: UserRole;
   plan: 'Free' | 'Pro' | 'Enterprise';
@@ -115,6 +116,8 @@ export interface UserAccountSettings {
   layoutMode?: 'sidebar-focus' | 'classic';
   contentLayout?: WorkspaceContentLayout;
   developerMode?: boolean;
+  enableKnowledgeGrounding?: boolean;
+  showWorkspaceTips?: boolean;
   customInstructions?: string;
 }
 
@@ -132,6 +135,7 @@ export interface CustomerRecord {
   lastActive: string;
   githubHandle?: string;
   region: string;
+  isDeveloperEligible?: boolean;
 }
 
 export interface McpServiceLog {
@@ -329,7 +333,7 @@ export interface ProviderKeyItem {
 export interface PromptTemplateItem {
   id: string;
   title: string;
-  category: 'code' | 'architecture' | 'security' | 'review' | 'general';
+  category: 'code' | 'architecture' | 'security' | 'review' | 'general' | 'writing' | 'research';
   description: string;
   template: string;
   tags: string[];

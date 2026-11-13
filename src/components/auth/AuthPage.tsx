@@ -5,6 +5,7 @@ import { LiveScreenBackdrop } from '../theme/LiveScreenBackdrop';
 import { ThemeControlPopover } from '../theme/ThemeControlPopover';
 import { usePlatformStore } from '../../stores/usePlatformStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useCustomerStore } from '../../stores/useCustomerStore';
 import { env } from '../../config/env';
 
 interface AuthPageProps {
@@ -36,7 +37,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
     setErrorMessage(null);
 
     const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
-    const payload = mode === 'login' ? { email, password } : { name, email, password, plan };
+    const payload =
+      mode === 'login'
+        ? { email, password }
+        : {
+            name,
+            email,
+            password,
+            plan,
+            isDeveloperEligible: false,
+            workspaceFocus: 'everyday',
+          };
 
     try {
       const res = await fetch(`${env.apiBaseUrl}${endpoint}`, {
@@ -58,6 +69,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
         const role = data.user.isAdminEligible && data.user.role === 'admin' ? 'admin' : 'user';
         localStorage.setItem('supremeai_studio_user_role', role);
         useAuthStore.setState({ authUser: data.user, currentRole: role });
+        useCustomerStore.getState().updateSettings({
+          name: data.user.name,
+          email: data.user.email,
+          plan: data.user.plan,
+          developerMode: false,
+        });
       }
 
       onLoginSuccess(data.user, data.token);
@@ -226,26 +243,31 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
             </div>
 
             {mode === 'signup' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Initial Plan Tier
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['Free', 'Pro', 'Enterprise'] as const).map((tier) => (
-                    <button
-                      key={tier}
-                      type="button"
-                      onClick={() => setPlan(tier)}
-                      className={`p-2 rounded-xl text-center border text-xs font-medium transition-all cursor-pointer ${
-                        plan === tier
-                          ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-500 dark:text-cyan-400'
-                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      {tier}
-                    </button>
-                  ))}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Initial Plan Tier
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Free', 'Pro', 'Enterprise'] as const).map((tier) => (
+                      <button
+                        key={tier}
+                        type="button"
+                        onClick={() => setPlan(tier)}
+                        className={`p-2 rounded-xl text-center border text-xs font-medium transition-all cursor-pointer ${
+                          plan === tier
+                            ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-500 dark:text-cyan-400'
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {tier}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Every account starts in clean Standard Mode — you can unlock Developer Tools anytime from Settings.
+                </p>
               </div>
             )}
 
@@ -309,9 +331,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
               >
                 <div className="truncate">
                   <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-400">
-                    Pro User (sarah.chen@fintech.io)
+                    Pro Developer (sarah.chen@fintech.io)
                   </div>
-                  <div className="text-[10px] text-slate-400">Pro Plan · Customer Workspace</div>
+                  <div className="text-[10px] text-slate-400">Pro Plan · Developer-Eligible Workspace</div>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">Select</span>
               </button>
@@ -323,9 +345,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
               >
                 <div className="truncate">
                   <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-purple-400">
-                    Free User (alex.j@partner.io)
+                    Everyday User (alex.j@partner.io)
                   </div>
-                  <div className="text-[10px] text-slate-400">Free Tier · Basic Models</div>
+                  <div className="text-[10px] text-slate-400">Free Tier · Non-Developer Standard Mode</div>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">Select</span>
               </button>

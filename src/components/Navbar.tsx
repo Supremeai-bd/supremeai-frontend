@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PanelLeft, PanelRight, ShieldCheck, LogOut, ChevronDown, Laptop } from 'lucide-react';
+import { PanelLeft, PanelRight, ShieldCheck, LogOut, ChevronDown, Laptop, Code2 } from 'lucide-react';
 import { ModelDetail, UserRole, AuthUser } from '../types';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
@@ -20,6 +20,9 @@ interface NavbarProps {
   authUser?: AuthUser | null;
   onSignOut?: () => void;
   trustedUntil?: number | null;
+  isDeveloperEligible?: boolean;
+  developerMode?: boolean;
+  onToggleDeveloperMode?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -34,10 +37,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   authUser,
   onSignOut,
   trustedUntil,
+  isDeveloperEligible = false,
+  developerMode: developerModeProp,
+  onToggleDeveloperMode,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
-  const developerMode = useCustomerStore((s) => s.userSettings.developerMode);
+  const storeDeveloperMode = useCustomerStore((s) => s.userSettings.developerMode);
+  const developerMode =
+    developerModeProp !== undefined
+      ? developerModeProp
+      : Boolean(storeDeveloperMode && (isDeveloperEligible || currentRole === 'admin'));
 
   return (
     <header className="h-14 border-b border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
@@ -240,8 +250,23 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
       </nav>
 
-      {/* Zone 3: Role Switcher + Model + Workspace Dock (if dev/admin) + Theme + Profile */}
+      {/* Zone 3: Mode/Role Switchers + Model + Workspace Dock (if dev/admin) + Theme + Profile */}
       <div className="flex items-center gap-2.5 shrink-0">
+        {currentRole === 'user' && isDeveloperEligible && onToggleDeveloperMode && (
+          <button
+            type="button"
+            onClick={onToggleDeveloperMode}
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              developerMode
+                ? 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100'
+                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-cyan-400 hover:text-cyan-600 dark:hover:text-cyan-400'
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span>{developerMode ? 'Developer Mode' : 'Switch to Developer'}</span>
+          </button>
+        )}
+
         {(currentRole === 'admin' || authUser?.isAdminEligible) && (
           <button
             type="button"
@@ -268,7 +293,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          <span className="font-mono text-[10px]">{activeModel.name.replace('Gemini ', '')}</span>
+          <span className={developerMode || currentRole === 'admin' ? 'font-mono text-[10px]' : 'text-[11px]'}>
+            {activeModel.name.replace('Gemini ', '')}
+          </span>
         </div>
 
         {(developerMode || currentRole === 'admin') && (
@@ -330,10 +357,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <div className="text-[11px] text-slate-400 font-mono truncate">
                     {authUser?.email || 'user@supremeai.bd'}
                   </div>
-                  <div className="flex items-center gap-2 mt-2 text-[11px] font-medium">
+                  <div className="flex items-center gap-2 mt-2 text-[11px] font-medium flex-wrap">
                     <span className="text-blue-600 dark:text-blue-400">
                       {authUser?.plan || 'Pro'} Plan
                     </span>
+                    {isDeveloperEligible && (
+                      <>
+                        <span className="text-slate-400">·</span>
+                        <span className="text-cyan-600 dark:text-cyan-400">
+                          {developerMode ? 'Developer Mode' : 'Standard Mode'}
+                        </span>
+                      </>
+                    )}
                     {authUser?.isAdminEligible && (
                       <>
                         <span className="text-slate-400">·</span>
@@ -361,8 +396,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
                   >
-                    Account & Security Settings
+                    Account & Preferences
                   </button>
+                  {currentRole === 'user' && isDeveloperEligible && onToggleDeveloperMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleDeveloperMode();
+                        setIsProfileOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Code2 className="w-3.5 h-3.5" />
+                      <span>{developerMode ? 'Switch to Standard Mode' : 'Switch to Developer Mode'}</span>
+                    </button>
+                  )}
                   {authUser?.isAdminEligible && currentRole === 'user' && (
                     <button
                       type="button"

@@ -31,6 +31,7 @@ export const authService = {
           email,
           role: isAdmin ? 'admin' : 'user',
           isAdminEligible: isAdmin,
+          isDeveloperEligible: isAdmin || email.toLowerCase().includes('sarah') || email.toLowerCase().includes('dev'),
           adminUserId: isAdmin ? 'admin_root_001' : undefined,
           plan: isAdmin ? 'Enterprise' : 'Pro',
           createdAt: '2026-01-15',
@@ -48,6 +49,7 @@ export const authService = {
       email: email,
       role: isAdmin ? 'admin' : 'user',
       isAdminEligible: isAdmin,
+      isDeveloperEligible: isAdmin,
       adminUserId: isAdmin ? data.user_id : undefined,
       plan: isAdmin ? 'Enterprise' : 'Pro',
       createdAt: new Date().toISOString().slice(0, 10),
@@ -64,7 +66,13 @@ export const authService = {
     };
   },
 
-  async signup(name: string, email: string, password: string, plan: string = 'Pro'): Promise<LoginResponse> {
+  async signup(
+    name: string,
+    email: string,
+    password: string,
+    plan: string = 'Pro',
+    isDeveloperEligible: boolean = false
+  ): Promise<LoginResponse> {
     if (env.isMockEnabled) {
       const isAdmin = email.toLowerCase().includes('admin') || email.toLowerCase().includes('njel');
       return {
@@ -75,6 +83,7 @@ export const authService = {
           email,
           role: isAdmin ? 'admin' : 'user',
           isAdminEligible: isAdmin,
+          isDeveloperEligible: isAdmin || isDeveloperEligible,
           adminUserId: isAdmin ? 'admin_root_001' : undefined,
           plan: plan as any,
           createdAt: new Date().toISOString().slice(0, 10),
@@ -83,7 +92,15 @@ export const authService = {
       };
     }
 
-    const data = await apiClient.post<any>('/api/v1/auth/register', { username: email, email, password, name });
+    const data = await apiClient.post<any>('/api/v1/auth/register', {
+      username: email,
+      email,
+      password,
+      name,
+      plan,
+      isDeveloperEligible,
+      workspaceFocus: isDeveloperEligible ? 'developer' : 'everyday',
+    });
     const token = data.access_token || data.token || '';
     const isAdmin = data.role === 'admin' || (data.user && data.user.role === 'admin');
     const user: AuthUser = data.user || {
@@ -92,6 +109,7 @@ export const authService = {
       email: email,
       role: isAdmin ? 'admin' : 'user',
       isAdminEligible: isAdmin,
+      isDeveloperEligible: isAdmin || isDeveloperEligible,
       adminUserId: isAdmin ? data.user_id : undefined,
       plan: (plan as any) || (isAdmin ? 'Enterprise' : 'Pro'),
       createdAt: new Date().toISOString().slice(0, 10),
@@ -119,6 +137,7 @@ export const authService = {
         email: data.email || '',
         role: isAdmin ? 'admin' : 'user',
         isAdminEligible: isAdmin,
+        isDeveloperEligible: isAdmin || Boolean(data.isDeveloperEligible),
         adminUserId: isAdmin ? data.user_id : undefined,
         plan: isAdmin ? 'Enterprise' : 'Pro',
         createdAt: new Date().toISOString().slice(0, 10),

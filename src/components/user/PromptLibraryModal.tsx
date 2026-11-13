@@ -7,12 +7,16 @@ interface PromptLibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTemplate: (templateText: string) => void;
+  developerMode?: boolean;
 }
+
+const NON_DEV_CATEGORIES = new Set<PromptTemplateItem['category']>(['writing', 'research', 'general']);
 
 export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
   isOpen,
   onClose,
   onSelectTemplate,
+  developerMode = false,
 }) => {
   const [templates, setTemplates] = useState<PromptTemplateItem[]>(() => {
     const saved = localStorage.getItem('supremeai_custom_prompts');
@@ -33,17 +37,27 @@ export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
 
   // New template form state
   const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState<PromptTemplateItem['category']>('code');
+  const [newCategory, setNewCategory] = useState<PromptTemplateItem['category']>(
+    developerMode ? 'code' : 'general'
+  );
   const [newDescription, setNewDescription] = useState('');
   const [newTemplate, setNewTemplate] = useState('');
   const [newTags, setNewTags] = useState('');
 
   if (!isOpen) return null;
 
-  const categories = ['all', 'security', 'code', 'architecture', 'review', 'general'];
+  const categories = developerMode
+    ? ['all', 'security', 'code', 'architecture', 'review', 'writing', 'research', 'general']
+    : ['all', 'writing', 'research', 'general'];
 
-  const filteredTemplates = templates.filter((t) => {
-    const matchesCategory = selectedCategory === 'all' || t.category === selectedCategory;
+  const activeCategory = categories.includes(selectedCategory) ? selectedCategory : 'all';
+
+  const visibleTemplates = developerMode
+    ? templates
+    : templates.filter((t) => NON_DEV_CATEGORIES.has(t.category));
+
+  const filteredTemplates = visibleTemplates.filter((t) => {
+    const matchesCategory = activeCategory === 'all' || t.category === activeCategory;
     const matchesSearch =
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -104,10 +118,14 @@ export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
               <h2 className="text-base font-semibold text-white tracking-tight flex items-center gap-2">
                 Prompt Templates & Recipes
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-mono">
-                  {templates.length} saved
+                  {visibleTemplates.length} saved
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">Reusable system instructions and structured workflow prompts</p>
+              <p className="text-xs text-slate-400">
+                {developerMode
+                  ? 'Reusable system instructions and structured workflow prompts'
+                  : 'Ready-to-use writing, research, and everyday productivity prompts'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -152,14 +170,20 @@ export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">Category</label>
                   <select
-                    value={newCategory}
+                    value={developerMode ? newCategory : (NON_DEV_CATEGORIES.has(newCategory) ? newCategory : 'general')}
                     onChange={(e) => setNewCategory(e.target.value as PromptTemplateItem['category'])}
                     className="w-full bg-[#0a0d14] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
                   >
-                    <option value="code">Code & Syntax</option>
-                    <option value="security">Security & Audit</option>
-                    <option value="architecture">Architecture</option>
-                    <option value="review">Code Review</option>
+                    {developerMode && (
+                      <>
+                        <option value="code">Code & Syntax</option>
+                        <option value="security">Security & Audit</option>
+                        <option value="architecture">Architecture</option>
+                        <option value="review">Code Review</option>
+                      </>
+                    )}
+                    <option value="writing">Writing & Comms</option>
+                    <option value="research">Research & Summaries</option>
                     <option value="general">General Custom</option>
                   </select>
                 </div>
@@ -234,7 +258,7 @@ export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors whitespace-nowrap ${
-                        selectedCategory === cat
+                        activeCategory === cat
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                           : 'bg-slate-800/60 text-slate-400 hover:text-white border border-transparent'
                       }`}
