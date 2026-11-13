@@ -1,4 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  loadVoicePreference,
+  saveVoicePreference,
+  VOICE_AVATAR_SYNC_EVENT,
+} from '../utils/hologramAvatar';
 
 export type LiveVoiceName = 'Zephyr' | 'Puck' | 'Kore' | 'Charon' | 'Fenrir';
 
@@ -101,8 +106,22 @@ export function useLiveVoiceSession({
 }: UseLiveVoiceSessionOptions = {}) {
   const [status, setStatus] = useState<LiveSessionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [voiceName, setVoiceName] = useState<LiveVoiceName>('Zephyr');
+  const [voiceName, setVoiceNameState] = useState<LiveVoiceName>(() => loadVoicePreference());
   const [isMuted, setIsMuted] = useState(false);
+
+  const setVoiceName = useCallback((next: LiveVoiceName) => {
+    setVoiceNameState(next);
+    saveVoicePreference(next);
+  }, []);
+
+  useEffect(() => {
+    const onSync = () => {
+      const saved = loadVoicePreference();
+      setVoiceNameState((prev) => (prev === saved ? prev : saved));
+    };
+    window.addEventListener(VOICE_AVATAR_SYNC_EVENT, onSync);
+    return () => window.removeEventListener(VOICE_AVATAR_SYNC_EVENT, onSync);
+  }, []);
   const [transcripts, setTranscripts] = useState<LiveTranscriptItem[]>([]);
   const [liveUserText, setLiveUserText] = useState('');
   const [liveModelText, setLiveModelText] = useState('');

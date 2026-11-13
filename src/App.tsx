@@ -31,7 +31,7 @@ import { ModelMatrix } from './components/ModelMatrix';
 import { RepoHub } from './components/RepoHub';
 import { UserProjectsView } from './components/user/UserProjectsView';
 import { UserPluginsView } from './components/user/UserPluginsView';
-import { UserSettingsView } from './components/user/UserSettingsView';
+import { UserSettingsView, SettingsSubTab } from './components/user/UserSettingsView';
 import { UserApiKeysView } from './components/user/UserApiKeysView';
 import { UserKnowledgeBaseView } from './components/user/UserKnowledgeBaseView';
 import { UserTeamView } from './components/user/UserTeamView';
@@ -247,6 +247,8 @@ export default function App() {
   );
   const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
   const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState<boolean>(false);
+  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general');
+  const [settingsSubTabKey, setSettingsSubTabKey] = useState<number>(0);
   const [isSurveyForceOpen, setIsSurveyForceOpen] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [dangerConfirm, setDangerConfirm] = useState<{
@@ -893,6 +895,11 @@ export default function App() {
                 }
                 roleName={activeRole.name}
                 onCommitTurn={appendVoiceTurn}
+                onOpenVoiceSettings={() => {
+                  setSettingsSubTab('voice-avatar');
+                  setSettingsSubTabKey((k) => k + 1);
+                  setActiveTab('user-settings');
+                }}
               />
 
               {(developerMode || currentRole === 'admin') && <WorkspaceDock />}
@@ -1057,6 +1064,12 @@ export default function App() {
               onSignOut={logout}
               onOpenFeedbackSurvey={() => setIsSurveyForceOpen(true)}
               onOpenKnowledgeBase={() => setActiveTab('user-knowledge')}
+              initialSubTab={settingsSubTab}
+              subTabRequestKey={settingsSubTabKey}
+              onOpenLiveVoice={() => {
+                setActiveTab('chat');
+                setIsLiveVoiceOpen(true);
+              }}
             />
           )}
 
