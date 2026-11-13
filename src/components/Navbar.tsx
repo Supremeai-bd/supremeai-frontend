@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Sun, Moon, PanelLeft, PanelRight, ExternalLink, ShieldCheck, User, LogOut, ChevronDown, Laptop, Sparkles } from 'lucide-react';
+import { PanelLeft, PanelRight, ShieldCheck, LogOut, ChevronDown, Laptop } from 'lucide-react';
 import { ModelDetail, UserRole, AuthUser } from '../types';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { ThemeControlPopover } from './theme/ThemeControlPopover';
 
 interface NavbarProps {
   activeTab: string;
@@ -39,7 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
   return (
-    <header className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
+    <header className="h-14 border-b border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
       {/* Zone 1: Sidebar Toggle + Brand Wordmark with Gemini Star */}
       <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
         <button
@@ -291,15 +292,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden sm:inline">Workspace</span>
         </button>
 
-        {/* Theme Toggle */}
-        <button
-          type="button"
-          onClick={onToggleDarkMode}
-          aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'}
-          className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-        >
-          {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
+        {/* Theme & Live Screen Popover */}
+        <ThemeControlPopover
+          compact
+          onOpenSettings={() => onSelectTab('user-settings')}
+        />
 
         {/* User Account & Sign Out Dropdown */}
         <div className="relative">

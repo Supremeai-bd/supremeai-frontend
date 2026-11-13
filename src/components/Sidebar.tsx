@@ -24,10 +24,11 @@ import {
   FileCheck2,
   LogOut,
   PanelLeft,
-  Sun,
-  Moon,
+  Palette,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole, AuthUser } from '../types';
+import { useThemeStore, LIVE_THEMES } from '../stores/useThemeStore';
+import { ThemeControlPopover } from './theme/ThemeControlPopover';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -83,6 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const liveTheme = useThemeStore((s) => s.liveTheme);
+  const activeThemeMeta = LIVE_THEMES.find((t) => t.id === liveTheme) || LIVE_THEMES[0];
 
   const filteredSessions = sessions.filter((s) =>
     s.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -105,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="w-64 h-full min-h-0 border-r border-slate-200/80 dark:border-slate-800/80 bg-slate-50/85 dark:bg-[#131314]/95 backdrop-blur-xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden">
+    <aside className="w-64 h-full min-h-0 border-r border-slate-200/70 dark:border-slate-800/70 bg-white/72 dark:bg-[#111520]/80 backdrop-blur-2xl flex flex-col shrink-0 transition-all text-slate-800 dark:text-slate-200 select-none overflow-hidden">
       {/* Top Studio Brand Header when Top Navbar is hidden (Sidebar Focus mode) */}
       {layoutMode === 'sidebar-focus' && (
         <div className="px-3.5 pt-3.5 pb-1 flex items-center justify-between gap-2">
@@ -642,8 +645,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* User Profile Footer with Quick Role Switcher (Admin-Only) and Sign Out */}
-      <div className="p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40">
+      {/* User Profile Footer with Full Theme Switcher, Role Switcher (Admin-Only) and Sign Out */}
+      <div className="p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 space-y-2">
+        {/* Compact Theme & Live Screen Bar directly inside Sidebar */}
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60">
+          <button
+            type="button"
+            onClick={() => onSelectTab('user-settings')}
+            className="flex items-center gap-1.5 min-w-0 text-[11px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+            title="Open Appearance Settings"
+          >
+            <Palette className="w-3.5 h-3.5 theme-accent-text shrink-0" />
+            <span className="truncate font-medium">{activeThemeMeta.name}</span>
+          </button>
+
+          <ThemeControlPopover
+            compact
+            align="left"
+            placement="top"
+            triggerLabel="Switch"
+            onOpenSettings={() => onSelectTab('user-settings')}
+          />
+        </div>
+
         <div className="flex items-center justify-between">
           <div
             onClick={() => onSelectTab('user-settings')}
@@ -653,28 +677,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {authUser?.avatar || authUser?.name?.charAt(0) || 'U'}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+              <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-[var(--theme-accent)] transition-colors">
                 {authUser?.name || 'User'}
               </div>
-              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium">
+              <div className="text-[10px] theme-accent-text font-medium">
                 {currentRole === 'admin' ? 'Admin' : (authUser?.plan || 'Pro')}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-0.5">
-            {onToggleDarkMode && (
-              <button
-                type="button"
-                onClick={onToggleDarkMode}
-                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                aria-label="Toggle color theme"
-                className="p-1.5 text-slate-400 hover:text-amber-500 dark:hover:text-cyan-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-              </button>
-            )}
-
             {/* Role switch button: ONLY shown if user is admin-eligible or already in admin mode */}
             {(currentRole === 'admin' || authUser?.isAdminEligible) && (
               <button

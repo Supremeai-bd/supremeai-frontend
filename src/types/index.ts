@@ -98,6 +98,8 @@ export interface PluginItem {
   author: string;
 }
 
+export type WorkspaceContentLayout = 'compact' | 'fluid' | 'maximized';
+
 export interface UserAccountSettings {
   name: string;
   email: string;
@@ -110,6 +112,7 @@ export interface UserAccountSettings {
   streamResponses: boolean;
   defaultModel: string;
   layoutMode?: 'sidebar-focus' | 'classic';
+  contentLayout?: WorkspaceContentLayout;
 }
 
 export interface CustomerRecord {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { RolePersona, ModelDetail } from '../../types';
+import { useThemeStore } from '../../stores/useThemeStore';
 
 interface ChatEmptyStateProps {
   activeRole: RolePersona;
@@ -14,6 +15,8 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   userName = 'Ziaul',
 }) => {
   const [isKeyPulse, setIsKeyPulse] = useState(false);
+  const liveTheme = useThemeStore((s) => s.liveTheme);
+  const isScenic = liveTheme !== 'cyber-studio';
 
   const firstName = userName.split(' ')[0].replace(/[^a-zA-Z0-9_-]/g, '') || 'there';
 
@@ -35,7 +38,11 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   }, []);
 
   return (
-    <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 py-6 select-none">
+    <div
+      className={`relative z-10 flex flex-col items-center justify-center text-center px-6 py-6 select-none ${
+        isScenic ? 'rounded-3xl' : ''
+      }`}
+    >
       {/* Core Gemini / SupremeAI Emblem */}
       <motion.div
         animate={{
@@ -46,7 +53,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
             ? { duration: 0.18 }
             : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
         }
-        className="mb-5 w-12 h-12 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-cyan-500/30 flex items-center justify-center shadow-[0_0_28px_rgba(0,240,255,0.2)]"
+        className="mb-5 w-12 h-12 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/60 dark:border-cyan-500/30 flex items-center justify-center shadow-[0_8px_28px_rgba(15,23,42,0.12)] dark:shadow-[0_0_28px_rgba(0,240,255,0.2)]"
       >
         <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
           <path
@@ -75,10 +82,12 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
-        className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-white"
+        className={`text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-white ${
+          isScenic ? 'drop-shadow-[0_1px_12px_rgba(255,255,255,0.65)] dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.65)]' : ''
+        }`}
       >
         Where should we start,{' '}
-        <span className="bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500 bg-clip-text text-transparent">
+        <span className="theme-accent-gradient-text">
           {firstName}?
         </span>
       </motion.h1>
@@ -88,13 +97,17 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.15, duration: 0.45 }}
-        className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-3 font-sans"
+        className={`flex items-center gap-2 text-xs mt-3 font-sans ${
+          isScenic
+            ? 'px-3.5 py-1 rounded-full bg-white/65 dark:bg-slate-900/60 backdrop-blur-md border border-white/50 dark:border-white/10 text-slate-700 dark:text-slate-200 shadow-xs'
+            : 'text-slate-500 dark:text-slate-400'
+        }`}
       >
         <span>{activeModel.name}</span>
         <span aria-hidden="true">·</span>
         <span>{activeRole.name}</span>
         <span aria-hidden="true">·</span>
-        <span className="text-cyan-600 dark:text-cyan-400 font-medium">SupremeAI Studio</span>
+        <span className="theme-accent-text font-medium">SupremeAI Studio</span>
       </motion.div>
     </div>
   );

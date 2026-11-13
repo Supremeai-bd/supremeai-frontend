@@ -35,7 +35,7 @@ export const UserApiKeysView: React.FC<UserApiKeysViewProps> = ({
   const activeWebhooksCount = webhooks.filter((w) => w.active).length;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-7xl mx-auto w-full">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 workspace-container">
       {/* View Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
