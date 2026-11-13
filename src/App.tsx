@@ -37,6 +37,8 @@ import { AdminFeatureFlagsView } from './components/admin/AdminFeatureFlagsView'
 import { AdminProviderKeysView } from './components/admin/AdminProviderKeysView';
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
 import { AdminTwoFactorModal } from './components/admin/AdminTwoFactorModal';
+import { HitlApprovalModal } from './components/admin/HitlApprovalModal';
+import { useHitlApproval } from './hooks/useHitlApproval';
 import { PromptLibraryModal } from './components/user/PromptLibraryModal';
 import { AuthPage } from './components/auth/AuthPage';
 import { UsageView } from './components/UsageView';
@@ -288,6 +290,15 @@ export default function App() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const { isDockOpen, toggleDock } = useWorkspaceStore();
   const layoutMode = userSettings.layoutMode || 'sidebar-focus';
+
+  // Human-in-the-Loop Safety Interception
+  const {
+    activeRequest: hitlActiveRequest,
+    isProcessing: isHitlProcessing,
+    approve: approveHitl,
+    reject: rejectHitl,
+    dismiss: dismissHitl,
+  } = useHitlApproval();
 
   // Theme state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -890,6 +901,20 @@ export default function App() {
             setActiveTab('chat');
           }}
           userEmail={authUser?.email || 'admin@supremeai.bd'}
+        />
+
+        {/* Human-in-the-Loop Interception Modal */}
+        <HitlApprovalModal
+          isOpen={Boolean(hitlActiveRequest)}
+          request={hitlActiveRequest}
+          onApprove={async (id) => {
+            await approveHitl(id);
+          }}
+          onReject={async (id, reason) => {
+            await rejectHitl(id, reason);
+          }}
+          onClose={dismissHitl}
+          isProcessing={isHitlProcessing}
         />
 
         <PromptLibraryModal
