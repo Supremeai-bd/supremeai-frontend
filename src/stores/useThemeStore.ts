@@ -61,6 +61,14 @@ export interface ThemeBackdropGridConfig {
   colorDark: string;
 }
 
+export interface ThemeBackdropAnimationConfig {
+  canvasSpeed: number;
+  gradientDurationSec: number;
+  gridDurationSec: number;
+  photoBreathScale: number;
+  photoDriftPx: number;
+}
+
 export interface ThemeBackdropConfig {
   aesthetic: string;
   baseGradient: {
@@ -81,8 +89,15 @@ export interface ThemeBackdropConfig {
     secondaryCount: number;
     glowIntensity: number;
   };
+  animationSpeed: ThemeBackdropAnimationConfig;
   gridOverlay?: ThemeBackdropGridConfig;
 }
+
+export const MOTION_SPEED_MULTIPLIER: Record<MotionSpeed, number> = {
+  calm: 0.55,
+  normal: 1.0,
+  dynamic: 1.65,
+};
 
 export interface ThemeSpecificOptions {
   // Alpine Dunes
@@ -756,6 +771,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       secondaryCount: 12,
       glowIntensity: 0.75,
     },
+    animationSpeed: {
+      canvasSpeed: 1.0,
+      gradientDurationSec: 18,
+      gridDurationSec: 8,
+      photoBreathScale: 1.07,
+      photoDriftPx: 18,
+    },
   },
   'misty-fjords': {
     aesthetic: 'nordic-slate-mist',
@@ -788,6 +810,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       count: 18,
       secondaryCount: 14,
       glowIntensity: 0.68,
+    },
+    animationSpeed: {
+      canvasSpeed: 1.05,
+      gradientDurationSec: 16,
+      gridDurationSec: 8,
+      photoBreathScale: 1.06,
+      photoDriftPx: 16,
     },
   },
   'emerald-highlands': {
@@ -822,6 +851,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       secondaryCount: 14,
       glowIntensity: 0.92,
     },
+    animationSpeed: {
+      canvasSpeed: 1.1,
+      gradientDurationSec: 15,
+      gridDurationSec: 8,
+      photoBreathScale: 1.07,
+      photoDriftPx: 18,
+    },
   },
   'amber-canyon': {
     aesthetic: 'warm-terracotta-sunbeam',
@@ -855,6 +891,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       secondaryCount: 10,
       glowIntensity: 0.85,
     },
+    animationSpeed: {
+      canvasSpeed: 1.05,
+      gradientDurationSec: 16,
+      gridDurationSec: 8,
+      photoBreathScale: 1.07,
+      photoDriftPx: 18,
+    },
   },
   'midnight-peaks': {
     aesthetic: 'nocturnal-starlit-indigo',
@@ -887,6 +930,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       count: 85,
       secondaryCount: 14,
       glowIntensity: 0.95,
+    },
+    animationSpeed: {
+      canvasSpeed: 1.15,
+      gradientDurationSec: 14,
+      gridDurationSec: 8,
+      photoBreathScale: 1.06,
+      photoDriftPx: 15,
     },
   },
   nebula: {
@@ -923,6 +973,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       secondaryCount: 3,
       glowIntensity: 1.0,
     },
+    animationSpeed: {
+      canvasSpeed: 1.2,
+      gradientDurationSec: 13,
+      gridDurationSec: 7,
+      photoBreathScale: 1.05,
+      photoDriftPx: 12,
+    },
   },
   cyberpunk: {
     aesthetic: 'neon-matrix-crt-grid',
@@ -957,6 +1014,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       count: 96,
       secondaryCount: 16,
       glowIntensity: 1.0,
+    },
+    animationSpeed: {
+      canvasSpeed: 1.25,
+      gradientDurationSec: 11,
+      gridDurationSec: 4.5,
+      photoBreathScale: 1.04,
+      photoDriftPx: 10,
     },
     gridOverlay: {
       enabled: true,
@@ -999,6 +1063,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       secondaryCount: 3,
       glowIntensity: 0.9,
     },
+    animationSpeed: {
+      canvasSpeed: 1.1,
+      gradientDurationSec: 14,
+      gridDurationSec: 8,
+      photoBreathScale: 1.05,
+      photoDriftPx: 12,
+    },
   },
   'oceanic-horizon': {
     aesthetic: 'pelagic-wave-caustics',
@@ -1031,6 +1102,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       count: 20,
       secondaryCount: 4,
       glowIntensity: 0.82,
+    },
+    animationSpeed: {
+      canvasSpeed: 1.15,
+      gradientDurationSec: 14,
+      gridDurationSec: 8,
+      photoBreathScale: 1.05,
+      photoDriftPx: 12,
     },
   },
   'solar-meadow': {
@@ -1065,6 +1143,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       secondaryCount: 7,
       glowIntensity: 0.86,
     },
+    animationSpeed: {
+      canvasSpeed: 1.05,
+      gradientDurationSec: 16,
+      gridDurationSec: 8,
+      photoBreathScale: 1.06,
+      photoDriftPx: 14,
+    },
   },
   'cyber-studio': {
     aesthetic: 'neural-architectural-grid',
@@ -1097,6 +1182,13 @@ export const THEME_BACKDROP_CONFIGS: Record<LiveThemeId, ThemeBackdropConfig> = 
       count: 46,
       secondaryCount: 5,
       glowIntensity: 0.88,
+    },
+    animationSpeed: {
+      canvasSpeed: 1.15,
+      gradientDurationSec: 14,
+      gridDurationSec: 5.5,
+      photoBreathScale: 1.04,
+      photoDriftPx: 10,
     },
     gridOverlay: {
       enabled: true,
@@ -1229,12 +1321,18 @@ export const getThemeSurfaces = (
   return def.surfaces[resolvedScheme];
 };
 
+export interface DomThemeMotionOptions {
+  motionSpeed?: MotionSpeed;
+  isAnimating?: boolean;
+}
+
 export const applyThemeToDom = (
   resolvedScheme: ResolvedColorScheme,
   themeMode: ThemeMode,
   liveTheme: LiveThemeId,
   animateTransition: boolean = false,
-  surfaceTone: SurfaceTone = 'adaptive'
+  surfaceTone: SurfaceTone = 'adaptive',
+  motionOptions: DomThemeMotionOptions = {}
 ) => {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
@@ -1253,10 +1351,19 @@ export const applyThemeToDom = (
     root.classList.remove('dark');
   }
 
+  const motionSpeed: MotionSpeed = motionOptions.motionSpeed || 'normal';
+  const isAnimating = motionOptions.isAnimating !== false;
+  const backdropConfig = getThemeBackdropConfig(liveTheme);
+  const speedRatio =
+    (MOTION_SPEED_MULTIPLIER[motionSpeed] || 1) * backdropConfig.animationSpeed.canvasSpeed;
+
   root.style.colorScheme = resolvedScheme;
   root.dataset.themeMode = themeMode;
   root.dataset.liveTheme = liveTheme;
   root.dataset.surfaceTone = surfaceTone;
+  root.dataset.aesthetic = backdropConfig.aesthetic;
+  root.dataset.motionSpeed = motionSpeed;
+  root.dataset.liveMotion = isAnimating ? 'live' : 'paused';
 
   const tokens = getThemeTokens(liveTheme, resolvedScheme);
   root.style.setProperty('--theme-accent', tokens.accent);
@@ -1275,6 +1382,23 @@ export const applyThemeToDom = (
   root.style.setProperty('--theme-surface-border', surfaces.surfaceBorder);
   root.style.setProperty('--theme-scrim-overlay', surfaces.scrimOverlay);
   root.style.setProperty('--theme-card-shadow', surfaces.cardShadow);
+
+  // Inject backdrop gradients & animation speeds directly onto :root
+  root.style.setProperty('--theme-backdrop-base', backdropConfig.baseGradient[resolvedScheme]);
+  root.style.setProperty(
+    '--theme-backdrop-radials',
+    backdropConfig.radialOverlays[resolvedScheme].join(', ') || 'none'
+  );
+  root.style.setProperty('--theme-backdrop-vignette', backdropConfig.vignette[resolvedScheme]);
+  root.style.setProperty('--theme-motion-speed', speedRatio.toFixed(3));
+  root.style.setProperty(
+    '--theme-gradient-duration',
+    `${(backdropConfig.animationSpeed.gradientDurationSec / speedRatio).toFixed(2)}s`
+  );
+  root.style.setProperty(
+    '--theme-grid-duration',
+    `${(backdropConfig.animationSpeed.gridDurationSec / speedRatio).toFixed(2)}s`
+  );
 };
 
 interface ThemeStoreState {
@@ -1307,6 +1431,7 @@ interface ThemeStoreState {
 
 const initialConfig = loadPersistedConfig();
 const initialOsDark = getInitialOsDark();
+const initialReducedMotion = getInitialReducedMotion();
 const initialResolved: ResolvedColorScheme =
   initialConfig.themeMode === 'system'
     ? initialOsDark
@@ -1319,7 +1444,13 @@ applyThemeToDom(
   initialConfig.themeMode,
   initialConfig.liveTheme,
   false,
-  initialConfig.surfaceTone
+  initialConfig.surfaceTone,
+  {
+    motionSpeed: initialConfig.motionSpeed,
+    isAnimating:
+      initialConfig.liveMotion &&
+      (!initialReducedMotion || initialConfig.overrideReducedMotion),
+  }
 );
 
 const persistFromState = (s: ThemeStoreState) => {
@@ -1335,6 +1466,12 @@ const persistFromState = (s: ThemeStoreState) => {
   });
 };
 
+const computeIsAnimating = (
+  liveMotion: boolean,
+  prefersReducedMotion: boolean,
+  overrideReducedMotion: boolean
+) => liveMotion && (!prefersReducedMotion || overrideReducedMotion);
+
 export const useThemeStore = create<ThemeStoreState>((set, get) => ({
   themeMode: initialConfig.themeMode,
   osPrefersDark: initialOsDark,
@@ -1346,7 +1483,7 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
   surfaceTone: initialConfig.surfaceTone,
   scrimIntensity: initialConfig.scrimIntensity,
   themeOptions: initialConfig.themeOptions,
-  prefersReducedMotion: getInitialReducedMotion(),
+  prefersReducedMotion: initialReducedMotion,
   lastSyncedAt: Date.now(),
   accentTokens: getThemeTokens(initialConfig.liveTheme, initialResolved),
 
@@ -1355,7 +1492,14 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
     const resolvedScheme: ResolvedColorScheme =
       themeMode === 'system' ? (state.osPrefersDark ? 'dark' : 'light') : themeMode;
 
-    applyThemeToDom(resolvedScheme, themeMode, state.liveTheme, true, state.surfaceTone);
+    applyThemeToDom(resolvedScheme, themeMode, state.liveTheme, true, state.surfaceTone, {
+      motionSpeed: state.motionSpeed,
+      isAnimating: computeIsAnimating(
+        state.liveMotion,
+        state.prefersReducedMotion,
+        state.overrideReducedMotion
+      ),
+    });
     const nextState = {
       ...state,
       themeMode,
@@ -1384,7 +1528,15 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
       state.themeMode,
       liveTheme,
       true,
-      state.surfaceTone
+      state.surfaceTone,
+      {
+        motionSpeed: state.motionSpeed,
+        isAnimating: computeIsAnimating(
+          state.liveMotion,
+          state.prefersReducedMotion,
+          state.overrideReducedMotion
+        ),
+      }
     );
     const nextState = {
       ...state,
@@ -1397,6 +1549,21 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
 
   setLiveMotion: (liveMotion) => {
     const state = get();
+    applyThemeToDom(
+      state.resolvedScheme,
+      state.themeMode,
+      state.liveTheme,
+      false,
+      state.surfaceTone,
+      {
+        motionSpeed: state.motionSpeed,
+        isAnimating: computeIsAnimating(
+          liveMotion,
+          state.prefersReducedMotion,
+          state.overrideReducedMotion
+        ),
+      }
+    );
     const nextState = { ...state, liveMotion };
     persistFromState(nextState);
     set({ liveMotion });
@@ -1404,6 +1571,21 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
 
   setOverrideReducedMotion: (overrideReducedMotion) => {
     const state = get();
+    applyThemeToDom(
+      state.resolvedScheme,
+      state.themeMode,
+      state.liveTheme,
+      false,
+      state.surfaceTone,
+      {
+        motionSpeed: state.motionSpeed,
+        isAnimating: computeIsAnimating(
+          state.liveMotion,
+          state.prefersReducedMotion,
+          overrideReducedMotion
+        ),
+      }
+    );
     const nextState = { ...state, overrideReducedMotion };
     persistFromState(nextState);
     set({ overrideReducedMotion });
@@ -1411,6 +1593,21 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
 
   setMotionSpeed: (motionSpeed) => {
     const state = get();
+    applyThemeToDom(
+      state.resolvedScheme,
+      state.themeMode,
+      state.liveTheme,
+      false,
+      state.surfaceTone,
+      {
+        motionSpeed,
+        isAnimating: computeIsAnimating(
+          state.liveMotion,
+          state.prefersReducedMotion,
+          state.overrideReducedMotion
+        ),
+      }
+    );
     const nextState = { ...state, motionSpeed };
     persistFromState(nextState);
     set({ motionSpeed });
@@ -1423,7 +1620,15 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
       state.themeMode,
       state.liveTheme,
       true,
-      surfaceTone
+      surfaceTone,
+      {
+        motionSpeed: state.motionSpeed,
+        isAnimating: computeIsAnimating(
+          state.liveMotion,
+          state.prefersReducedMotion,
+          state.overrideReducedMotion
+        ),
+      }
     );
     const nextState = { ...state, surfaceTone };
     persistFromState(nextState);
@@ -1455,7 +1660,15 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
       state.themeMode,
       state.liveTheme,
       animate,
-      state.surfaceTone
+      state.surfaceTone,
+      {
+        motionSpeed: state.motionSpeed,
+        isAnimating: computeIsAnimating(
+          state.liveMotion,
+          state.prefersReducedMotion,
+          state.overrideReducedMotion
+        ),
+      }
     );
     set({
       osPrefersDark,
@@ -1466,6 +1679,22 @@ export const useThemeStore = create<ThemeStoreState>((set, get) => ({
   },
 
   setPrefersReducedMotion: (prefersReducedMotion) => {
+    const state = get();
+    applyThemeToDom(
+      state.resolvedScheme,
+      state.themeMode,
+      state.liveTheme,
+      false,
+      state.surfaceTone,
+      {
+        motionSpeed: state.motionSpeed,
+        isAnimating: computeIsAnimating(
+          state.liveMotion,
+          prefersReducedMotion,
+          state.overrideReducedMotion
+        ),
+      }
+    );
     set({ prefersReducedMotion });
   },
 }));

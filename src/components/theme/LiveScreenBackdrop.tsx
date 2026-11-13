@@ -1,11 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import {
   useThemeStore,
   LIVE_THEMES,
   LiveThemeId,
-  MotionSpeed,
   ScrimIntensity,
+  MOTION_SPEED_MULTIPLIER,
   getThemeBackdropConfig,
 } from '../../stores/useThemeStore';
 
@@ -13,12 +12,6 @@ interface LiveScreenBackdropProps {
   isEmpty?: boolean;
   isChatView?: boolean;
 }
-
-const SPEED_MULTIPLIER: Record<MotionSpeed, number> = {
-  calm: 0.55,
-  normal: 1.0,
-  dynamic: 1.65,
-};
 
 const STAR_POSITIONS = [
   { top: '8%', left: '14%', size: 2, delay: 0 },
@@ -81,6 +74,8 @@ const MatrixRainCanvas: React.FC<{
   glowIntensity = 1,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -155,8 +150,8 @@ const MatrixRainCanvas: React.FC<{
     }
 
     let lastTime = 0;
-    const frameInterval = Math.max(18, Math.round(40 / speedMul));
     const step = (time: number) => {
+      const frameInterval = Math.max(16, Math.round(38 / Math.max(0.25, speedMulRef.current)));
       if (time - lastTime >= frameInterval) {
         lastTime = time;
         const width = window.innerWidth;
@@ -201,7 +196,7 @@ const MatrixRainCanvas: React.FC<{
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(rafId);
     };
-  }, [isDark, animate, speedMul, palette, density, particleCount, glowIntensity]);
+  }, [isDark, animate, palette, density, particleCount, glowIntensity]);
 
   return (
     <canvas
@@ -232,6 +227,8 @@ const NebulaCanvas: React.FC<{
   glowIntensity = 1,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -273,18 +270,18 @@ const NebulaCanvas: React.FC<{
     const clouds = baseClouds.slice(0, Math.max(1, Math.min(baseClouds.length, cloudCount)));
 
     let shooter = { active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0 };
-    let nextShooterAt = 2.0;
+    let nextShooterAt = 1.6;
 
-    const draw = (tSec: number, dt: number) => {
+    const draw = (simTime: number, scaledDt: number) => {
       ctx.clearRect(0, 0, W, H);
       const cx = W * 0.5;
       const cy = H * 0.46;
 
-      // Swirling translucent nebula clouds
+      // Swirling translucent nebula clouds scaled by theme + user speed
       for (let c = 0; c < clouds.length; c++) {
         const cl = clouds[c];
-        const px = W * cl.cx + Math.cos(tSec * cl.speed + c * 2) * (W * 0.08);
-        const py = H * cl.cy + Math.sin(tSec * (cl.speed * 1.3) + c) * (H * 0.07);
+        const px = W * cl.cx + Math.cos(simTime * cl.speed + c * 2) * (W * 0.09);
+        const py = H * cl.cy + Math.sin(simTime * (cl.speed * 1.3) + c) * (H * 0.08);
         const radius = Math.max(W, H) * cl.r;
         const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
         const alpha = (isDark ? 0.22 : 0.2) * glowIntensity;
@@ -301,11 +298,11 @@ const NebulaCanvas: React.FC<{
       for (const s of stars) {
         if (animate) {
           if (effect === 'warp-stars') {
-            s.z -= dt * 0.24 * speedMul;
+            s.z -= scaledDt * 0.24;
             if (s.z <= 0.04) s.z = 1.0;
           } else {
-            s.x += s.vx * dt * 0.18 * speedMul;
-            s.y += s.vy * dt * 0.18 * speedMul;
+            s.x += s.vx * scaledDt * 0.18;
+            s.y += s.vy * scaledDt * 0.18;
             if (s.x > 1.1) s.x = -1.1;
             if (s.x < -1.1) s.x = 1.1;
             if (s.y > 1.1) s.y = -1.1;
@@ -319,14 +316,14 @@ const NebulaCanvas: React.FC<{
         if (sx < -20 || sx > W + 20 || sy < -20 || sy > H + 20) continue;
 
         const depthAlpha = effect === 'warp-stars' ? Math.min(1, (1.05 - s.z) * 1.15) : 0.72;
-        const twinkle = 0.7 + 0.3 * Math.sin(tSec * 2.4 + s.x * 12);
+        const twinkle = 0.7 + 0.3 * Math.sin(simTime * 2.4 + s.x * 12);
         const alpha = depthAlpha * twinkle * (isDark ? 0.95 : 0.65);
         const r = s.size * (effect === 'warp-stars' ? Math.min(2.4, scale * 0.65) : 1);
 
         pts.push({ sx, sy, alpha, r, hue: isDark ? s.hue : '79, 70, 229' });
 
         if (effect === 'warp-stars' && animate) {
-          const prevScale = 1 / Math.min(1, s.z + 0.045 * speedMul);
+          const prevScale = 1 / Math.min(1, s.z + 0.045 * speedMulRef.current);
           const px = cx + s.x * (W * 0.45) * prevScale;
           const py = cy + s.y * (H * 0.45) * prevScale;
           ctx.strokeStyle = `rgba(${isDark ? s.hue : '99, 102, 241'}, ${(alpha * 0.55).toFixed(2)})`;
@@ -366,7 +363,7 @@ const NebulaCanvas: React.FC<{
 
       // Occasional cosmic shooting star
       if (animate) {
-        if (!shooter.active && tSec >= nextShooterAt) {
+        if (!shooter.active && simTime >= nextShooterAt) {
           shooter = {
             active: true,
             x: W * (0.2 + Math.random() * 0.6),
@@ -375,12 +372,12 @@ const NebulaCanvas: React.FC<{
             vy: 180 + Math.random() * 140,
             life: 0,
           };
-          nextShooterAt = tSec + 4 + Math.random() * 4;
+          nextShooterAt = simTime + 3.5 + Math.random() * 3.5;
         }
         if (shooter.active) {
-          shooter.x += shooter.vx * dt * speedMul;
-          shooter.y += shooter.vy * dt * speedMul;
-          shooter.life += dt;
+          shooter.x += shooter.vx * scaledDt;
+          shooter.y += shooter.vy * scaledDt;
+          shooter.life += scaledDt;
           const tailX = shooter.x - shooter.vx * 0.14;
           const tailY = shooter.y - shooter.vy * 0.14;
           const grad = ctx.createLinearGradient(tailX, tailY, shooter.x, shooter.y);
@@ -402,11 +399,13 @@ const NebulaCanvas: React.FC<{
 
     let rafId = 0;
     let prev = performance.now();
-    const start = prev;
+    let simTime = 0;
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - prev) / 1000);
       prev = now;
-      draw((now - start) / 1000, dt);
+      const scaledDt = dt * speedMulRef.current;
+      simTime += scaledDt;
+      draw(simTime, scaledDt);
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
@@ -414,7 +413,7 @@ const NebulaCanvas: React.FC<{
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(rafId);
     };
-  }, [isDark, animate, speedMul, effect, particleCount, cloudCount, glowIntensity]);
+  }, [isDark, animate, effect, particleCount, cloudCount, glowIntensity]);
 
   return (
     <canvas
@@ -451,6 +450,8 @@ const AuroraCurtainCanvas: React.FC<{
   glowIntensity = 0.9,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -481,9 +482,8 @@ const AuroraCurtainCanvas: React.FC<{
       phase: i * 0.7,
     }));
 
-    const draw = (tSec: number) => {
+    const draw = (t: number) => {
       ctx.clearRect(0, 0, W, H);
-      const t = tSec * speedMul;
 
       // Polar starfield (visible subtly in light mode too!)
       for (const s of stars) {
@@ -533,9 +533,13 @@ const AuroraCurtainCanvas: React.FC<{
     if (!animate) return () => window.removeEventListener('resize', resize);
 
     let rafId = 0;
-    const start = performance.now();
+    let prev = performance.now();
+    let simTime = 0;
     const tick = (now: number) => {
-      draw((now - start) / 1000);
+      const dt = Math.min(0.05, (now - prev) / 1000);
+      prev = now;
+      simTime += dt * speedMulRef.current;
+      draw(simTime);
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
@@ -543,7 +547,7 @@ const AuroraCurtainCanvas: React.FC<{
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(rafId);
     };
-  }, [isDark, animate, speedMul, palette, starCount, ribbonCount, glowIntensity]);
+  }, [isDark, animate, palette, starCount, ribbonCount, glowIntensity]);
 
   return (
     <canvas
@@ -565,6 +569,8 @@ const OceanWavesCanvas: React.FC<{
   glowIntensity?: number;
 }> = ({ isDark, animate, speedMul, energy, glintCount = 20, glowIntensity = 0.82 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -633,9 +639,8 @@ const OceanWavesCanvas: React.FC<{
       },
     ];
 
-    const draw = (tSec: number) => {
+    const draw = (t: number) => {
       ctx.clearRect(0, 0, W, H);
-      const t = tSec * speedMul;
 
       // Horizon glowing sun/moon column reflection
       const glowX = W * 0.5 + Math.sin(t * 0.3) * (W * 0.04);
@@ -706,9 +711,13 @@ const OceanWavesCanvas: React.FC<{
     if (!animate) return () => window.removeEventListener('resize', resize);
 
     let rafId = 0;
-    const start = performance.now();
+    let prev = performance.now();
+    let simTime = 0;
     const tick = (now: number) => {
-      draw((now - start) / 1000);
+      const dt = Math.min(0.05, (now - prev) / 1000);
+      prev = now;
+      simTime += dt * speedMulRef.current;
+      draw(simTime);
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
@@ -716,7 +725,7 @@ const OceanWavesCanvas: React.FC<{
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(rafId);
     };
-  }, [isDark, animate, speedMul, energy, glintCount, glowIntensity]);
+  }, [isDark, animate, energy, glintCount, glowIntensity]);
 
   return (
     <canvas
@@ -747,6 +756,8 @@ const GoldenDawnCanvas: React.FC<{
   glowIntensity = 0.86,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -773,14 +784,13 @@ const GoldenDawnCanvas: React.FC<{
       x: ((i * 89) % 1000) / 1000,
       y: ((i * 53) % 1000) / 1000,
       r: 1.4 + (i % 4) * 0.9,
-      speedY: 0.02 + (i % 5) * 0.008,
+      speedY: 0.025 + (i % 5) * 0.009,
       drift: 0.6 + (i % 3) * 0.4,
       phase: i * 0.9,
     }));
 
-    const draw = (tSec: number, dt: number) => {
+    const draw = (t: number, scaledDt: number) => {
       ctx.clearRect(0, 0, W, H);
-      const t = tSec * speedMul;
       const sunX = W * 0.56 + Math.sin(t * 0.25) * 18;
       const sunY = H * 0.34;
 
@@ -823,7 +833,7 @@ const GoldenDawnCanvas: React.FC<{
       // Rising warm pollen / light motes
       for (const m of motes) {
         if (animate) {
-          m.y -= m.speedY * dt * speedMul;
+          m.y -= m.speedY * scaledDt;
           if (m.y < -0.05) m.y = 1.05;
         }
         const mx = m.x * W + Math.sin(t * m.drift + m.phase) * 24;
@@ -843,11 +853,13 @@ const GoldenDawnCanvas: React.FC<{
 
     let rafId = 0;
     let prev = performance.now();
-    const start = prev;
+    let simTime = 0;
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - prev) / 1000);
       prev = now;
-      draw((now - start) / 1000, dt);
+      const scaledDt = dt * speedMulRef.current;
+      simTime += scaledDt;
+      draw(simTime, scaledDt);
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
@@ -855,7 +867,7 @@ const GoldenDawnCanvas: React.FC<{
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(rafId);
     };
-  }, [isDark, animate, speedMul, sunbeams, moteCount, rayCount, glowIntensity]);
+  }, [isDark, animate, sunbeams, moteCount, rayCount, glowIntensity]);
 
   return (
     <canvas
@@ -872,7 +884,7 @@ const NeuralMeshCanvas: React.FC<{
   isDark: boolean;
   animate: boolean;
   speedMul: number;
-  mouse: { nx: number; ny: number };
+  mouseRef: React.MutableRefObject<{ nx: number; ny: number }>;
   keyPulse: number;
   nodeCount?: number;
   glowIntensity?: number;
@@ -880,14 +892,14 @@ const NeuralMeshCanvas: React.FC<{
   isDark,
   animate,
   speedMul,
-  mouse,
+  mouseRef,
   keyPulse,
   nodeCount = 46,
   glowIntensity = 0.88,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const mouseRef = useRef(mouse);
-  mouseRef.current = mouse;
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
   const pulseRef = useRef(keyPulse);
   pulseRef.current = keyPulse;
 
@@ -915,23 +927,22 @@ const NeuralMeshCanvas: React.FC<{
     const nodes = Array.from({ length: Math.max(18, nodeCount) }, (_, i) => ({
       x: ((i * 79) % 1000) / 1000,
       y: ((i * 131) % 1000) / 1000,
-      vx: ((((i * 37) % 100) / 100) - 0.5) * 0.032,
-      vy: ((((i * 61) % 100) / 100) - 0.5) * 0.032,
+      vx: ((((i * 37) % 100) / 100) - 0.5) * 0.036,
+      vy: ((((i * 61) % 100) / 100) - 0.5) * 0.036,
       r: 2 + (i % 3) * 0.9,
       isViolet: i % 3 === 0,
     }));
 
-    const draw = (tSec: number, dt: number) => {
+    const draw = (t: number, scaledDt: number) => {
       ctx.clearRect(0, 0, W, H);
-      const t = tSec * speedMul;
       const mx = mouseRef.current.nx * W;
       const my = mouseRef.current.ny * H;
       const boost = pulseRef.current > 0 ? 1.45 : 1;
 
       if (animate) {
         for (const n of nodes) {
-          n.x += n.vx * dt * speedMul * boost;
-          n.y += n.vy * dt * speedMul * boost;
+          n.x += n.vx * scaledDt * boost;
+          n.y += n.vy * scaledDt * boost;
           if (n.x < 0.02 || n.x > 0.98) n.vx *= -1;
           if (n.y < 0.02 || n.y > 0.98) n.vy *= -1;
         }
@@ -1018,11 +1029,13 @@ const NeuralMeshCanvas: React.FC<{
 
     let rafId = 0;
     let prev = performance.now();
-    const start = prev;
+    let simTime = 0;
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - prev) / 1000);
       prev = now;
-      draw((now - start) / 1000, dt);
+      const scaledDt = dt * speedMulRef.current;
+      simTime += scaledDt;
+      draw(simTime, scaledDt);
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
@@ -1030,7 +1043,7 @@ const NeuralMeshCanvas: React.FC<{
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(rafId);
     };
-  }, [isDark, animate, speedMul, nodeCount, glowIntensity]);
+  }, [isDark, animate, mouseRef, nodeCount, glowIntensity]);
 
   return (
     <canvas
@@ -1069,6 +1082,8 @@ const PhotoAtmosphereCanvas: React.FC<{
   glowIntensity = 0.85,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1096,78 +1111,97 @@ const PhotoAtmosphereCanvas: React.FC<{
         ? Math.round(particleCount * 1.65)
         : themeId === 'emerald-highlands' && forestEffect === 'rain'
         ? Math.round(particleCount * 1.65)
-        : Math.max(12, particleCount);
+        : Math.max(16, particleCount);
 
     const particles = Array.from({ length: count }, (_, i) => ({
       x: ((i * 97) % 1000) / 1000,
       y: ((i * 59) % 1000) / 1000,
-      r: 1.2 + (i % 4) * 0.85,
-      speed: 0.08 + ((i * 17) % 10) * 0.025,
-      sway: 0.5 + (i % 5) * 0.35,
+      r: 1.4 + (i % 4) * 0.9,
+      speed: 0.1 + ((i * 17) % 10) * 0.028,
+      sway: 0.55 + (i % 5) * 0.35,
       phase: i * 0.83,
     }));
 
     let meteor = { active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0 };
-    let nextMeteor = 1.2;
+    let nextMeteor = 0.9;
 
-    const draw = (tSec: number, dt: number) => {
+    const draw = (t: number, scaledDt: number) => {
       ctx.clearRect(0, 0, W, H);
-      const t = tSec * speedMul;
 
       if (themeId === 'alpine-dunes' && snowIntensity !== 'off') {
-        const wind = snowIntensity === 'brisk' ? 0.16 : 0.06;
+        const wind = snowIntensity === 'brisk' ? 0.18 : 0.075;
         for (const p of particles) {
           if (animate) {
-            p.y += p.speed * dt * speedMul * (snowIntensity === 'brisk' ? 1.7 : 1.0);
-            p.x += wind * dt * speedMul;
+            p.y += p.speed * scaledDt * (snowIntensity === 'brisk' ? 1.7 : 1.05);
+            p.x += wind * scaledDt;
             if (p.y > 1.04) p.y = -0.04;
             if (p.x > 1.04) p.x = -0.04;
           }
-          const px = p.x * W + Math.sin(t * p.sway + p.phase) * 14;
+          const px = p.x * W + Math.sin(t * p.sway + p.phase) * 16;
           const py = p.y * H;
           ctx.fillStyle = isDark
-            ? 'rgba(224, 242, 254, 0.78)'
-            : 'rgba(255, 255, 255, 0.88)';
+            ? 'rgba(224, 242, 254, 0.84)'
+            : 'rgba(255, 255, 255, 0.92)';
           ctx.beginPath();
           ctx.arc(px, py, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (themeId === 'misty-fjords') {
+        // Drifting fjord sea-spray / luminous valley droplets above water & cliffs
+        for (const p of particles) {
+          if (animate) {
+            p.x += p.speed * 0.22 * scaledDt;
+            p.y += Math.sin(t * 0.6 + p.phase) * 0.014 * scaledDt;
+            if (p.x > 1.05) p.x = -0.05;
+          }
+          const px = p.x * W;
+          const py = (0.18 + p.y * 0.68) * H;
+          const pulse = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.9 + p.phase))) * glowIntensity;
+          ctx.fillStyle = isDark
+            ? `rgba(186, 230, 253, ${Math.min(0.8, pulse * 0.65).toFixed(2)})`
+            : `rgba(255, 255, 255, ${Math.min(0.9, pulse * 0.78).toFixed(2)})`;
+          ctx.beginPath();
+          ctx.arc(px, py, p.r * 1.15, 0, Math.PI * 2);
           ctx.fill();
         }
       } else if (themeId === 'emerald-highlands') {
         if (forestEffect === 'fireflies') {
           for (const p of particles) {
             if (animate) {
-              p.y -= p.speed * 0.25 * dt * speedMul;
-              p.x += Math.sin(t * 0.4 + p.phase) * 0.012 * dt * speedMul;
+              p.y -= p.speed * 0.34 * scaledDt;
+              p.x += Math.sin(t * 0.5 + p.phase) * 0.022 * scaledDt;
               if (p.y < -0.05) p.y = 1.05;
+              if (p.x > 1.05) p.x = -0.05;
+              if (p.x < -0.05) p.x = 1.05;
             }
-            const px = p.x * W + Math.cos(t * 0.8 + p.phase) * 20;
+            const px = p.x * W + Math.cos(t * 0.9 + p.phase) * 22;
             const py = p.y * H;
             const pulse =
-              (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * 2.3 + p.phase))) * glowIntensity;
-            const grad = ctx.createRadialGradient(px, py, 0, px, py, p.r * 5);
+              (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * 2.4 + p.phase))) * glowIntensity;
+            const grad = ctx.createRadialGradient(px, py, 0, px, py, p.r * 5.2);
             grad.addColorStop(
               0,
-              `rgba(167, 243, 208, ${Math.min(0.95, pulse * 0.9).toFixed(2)})`
+              `rgba(167, 243, 208, ${Math.min(0.95, pulse * 0.92).toFixed(2)})`
             );
             grad.addColorStop(
               0.4,
-              `rgba(52, 211, 153, ${Math.min(0.7, pulse * 0.45).toFixed(2)})`
+              `rgba(52, 211, 153, ${Math.min(0.75, pulse * 0.48).toFixed(2)})`
             );
             grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
             ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.arc(px, py, p.r * 5, 0, Math.PI * 2);
+            ctx.arc(px, py, p.r * 5.2, 0, Math.PI * 2);
             ctx.fill();
           }
         } else if (forestEffect === 'rain') {
           ctx.strokeStyle = isDark
-            ? 'rgba(167, 243, 208, 0.30)'
-            : 'rgba(240, 253, 244, 0.45)';
+            ? 'rgba(167, 243, 208, 0.34)'
+            : 'rgba(240, 253, 244, 0.48)';
           ctx.lineWidth = 1.1;
           for (const p of particles) {
             if (animate) {
-              p.y += p.speed * 5.2 * dt * speedMul;
-              p.x += 0.12 * dt * speedMul;
+              p.y += p.speed * 5.2 * scaledDt;
+              p.x += 0.12 * scaledDt;
               if (p.y > 1.05) p.y = -0.05;
               if (p.x > 1.05) p.x = -0.05;
             }
@@ -1182,9 +1216,9 @@ const PhotoAtmosphereCanvas: React.FC<{
       } else if (themeId === 'amber-canyon') {
         if (canyonEffect === 'sunbeams') {
           for (let i = 0; i < 4; i++) {
-            const x0 = W * (0.2 + i * 0.22) + Math.sin(t * 0.3 + i) * 30;
+            const x0 = W * (0.2 + i * 0.22) + Math.sin(t * 0.3 + i) * 32;
             const grad = ctx.createLinearGradient(x0, 0, x0 + W * 0.14, H);
-            const a = 0.08 + 0.05 * Math.sin(t * 0.8 + i);
+            const a = (0.09 + 0.05 * Math.sin(t * 0.8 + i)) * glowIntensity;
             grad.addColorStop(0, `rgba(253, 224, 71, ${a.toFixed(2)})`);
             grad.addColorStop(0.6, `rgba(251, 146, 60, ${(a * 0.45).toFixed(2)})`);
             grad.addColorStop(1, 'rgba(251, 146, 60, 0)');
@@ -1201,68 +1235,72 @@ const PhotoAtmosphereCanvas: React.FC<{
         if (canyonEffect === 'heat-dust' || canyonEffect === 'sunbeams') {
           for (const p of particles) {
             if (animate) {
-              p.x += p.speed * 0.35 * dt * speedMul;
-              p.y -= p.speed * 0.12 * dt * speedMul;
+              p.x += p.speed * 0.4 * scaledDt;
+              p.y -= p.speed * 0.15 * scaledDt;
               if (p.x > 1.05) p.x = -0.05;
               if (p.y < -0.05) p.y = 1.05;
             }
             const px = p.x * W;
-            const py = p.y * H + Math.sin(t * p.sway + p.phase) * 10;
-            const glow = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.6 + p.phase));
+            const py = p.y * H + Math.sin(t * p.sway + p.phase) * 12;
+            const glow = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.6 + p.phase))) * glowIntensity;
             ctx.fillStyle = isDark
-              ? `rgba(253, 186, 116, ${(glow * 0.55).toFixed(2)})`
-              : `rgba(255, 237, 213, ${(glow * 0.7).toFixed(2)})`;
+              ? `rgba(253, 186, 116, ${Math.min(0.85, glow * 0.6).toFixed(2)})`
+              : `rgba(255, 237, 213, ${Math.min(0.9, glow * 0.75).toFixed(2)})`;
             ctx.beginPath();
-            ctx.arc(px, py, p.r * 0.9, 0, Math.PI * 2);
+            ctx.arc(px, py, p.r, 0, Math.PI * 2);
             ctx.fill();
           }
         }
       } else if (themeId === 'midnight-peaks') {
-        // Twinkling upper-sky stars
+        // Slowly drifting + twinkling upper-sky stars
         for (const p of particles) {
           if (p.y > 0.62) continue;
-          const twinkle = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * 2.1 + p.phase));
-          const alpha = twinkle * (isDark ? 0.9 : 0.45);
+          if (animate) {
+            p.x += 0.008 * p.speed * scaledDt * 3;
+            if (p.x > 1.02) p.x = -0.02;
+          }
+          const twinkle = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * 2.3 + p.phase));
+          const alpha = twinkle * (isDark ? 0.92 : 0.48) * glowIntensity;
           ctx.fillStyle = isDark
-            ? `rgba(224, 231, 255, ${alpha.toFixed(2)})`
-            : `rgba(67, 56, 202, ${alpha.toFixed(2)})`;
+            ? `rgba(224, 231, 255, ${Math.min(0.98, alpha).toFixed(2)})`
+            : `rgba(67, 56, 202, ${Math.min(0.8, alpha).toFixed(2)})`;
           ctx.beginPath();
-          ctx.arc(p.x * W, p.y * H, p.r * 0.7, 0, Math.PI * 2);
+          ctx.arc(p.x * W, p.y * H, p.r * 0.75, 0, Math.PI * 2);
           ctx.fill();
         }
 
         if (midnightSky === 'polar-glow') {
-          const gx = W * 0.5 + Math.sin(t * 0.35) * (W * 0.12);
+          const gx = W * 0.5 + Math.sin(t * 0.38) * (W * 0.14);
           const gy = H * 0.22;
           const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, W * 0.45);
-          grad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.24)' : 'rgba(99, 102, 241, 0.14)');
-          grad.addColorStop(0.5, isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.08)');
+          grad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.26)' : 'rgba(99, 102, 241, 0.15)');
+          grad.addColorStop(0.5, isDark ? 'rgba(56, 189, 248, 0.14)' : 'rgba(56, 189, 248, 0.09)');
           grad.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = grad;
           ctx.fillRect(0, 0, W, H * 0.65);
         }
 
         if (animate && midnightSky === 'shooting-stars') {
-          if (!meteor.active && tSec >= nextMeteor) {
+          if (!meteor.active && t >= nextMeteor) {
             meteor = {
               active: true,
               x: W * (0.15 + Math.random() * 0.65),
               y: H * (0.06 + Math.random() * 0.2),
-              vx: (Math.random() > 0.4 ? 1 : -1) * (460 + Math.random() * 200),
-              vy: 160 + Math.random() * 140,
+              vx: (Math.random() > 0.4 ? 1 : -1) * (480 + Math.random() * 200),
+              vy: 170 + Math.random() * 140,
               life: 0,
             };
-            nextMeteor = tSec + 2.8 + Math.random() * 3.5;
+            nextMeteor = t + 2.2 + Math.random() * 2.8;
           }
           if (meteor.active) {
-            meteor.x += meteor.vx * dt * speedMul;
-            meteor.y += meteor.vy * dt * speedMul;
-            meteor.life += dt;
+            meteor.x += meteor.vx * scaledDt;
+            meteor.y += meteor.vy * scaledDt;
+            meteor.life += scaledDt;
             const tx = meteor.x - meteor.vx * 0.15;
             const ty = meteor.y - meteor.vy * 0.15;
             const grad = ctx.createLinearGradient(tx, ty, meteor.x, meteor.y);
             grad.addColorStop(0, 'rgba(255,255,255,0)');
-            grad.addColorStop(1, isDark ? 'rgba(199, 210, 254, 0.95)' : 'rgba(67, 56, 202, 0.75)');
+            grad.addColorStop(1, isDark ? 'rgba(199, 210, 254, 0.95)' : 'rgba(67, 56, 202, 0.78)');
             ctx.strokeStyle = grad;
             ctx.lineWidth = 2.2;
             ctx.beginPath();
@@ -1280,11 +1318,13 @@ const PhotoAtmosphereCanvas: React.FC<{
 
     let rafId = 0;
     let prev = performance.now();
-    const start = prev;
+    let simTime = 0;
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - prev) / 1000);
       prev = now;
-      draw((now - start) / 1000, dt);
+      const scaledDt = dt * speedMulRef.current;
+      simTime += scaledDt;
+      draw(simTime, scaledDt);
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
@@ -1296,7 +1336,6 @@ const PhotoAtmosphereCanvas: React.FC<{
     themeId,
     isDark,
     animate,
-    speedMul,
     snowIntensity,
     forestEffect,
     canyonEffect,
@@ -1324,6 +1363,8 @@ const FjordWaterRippleCanvas: React.FC<{
   intensity: 'calm' | 'lively' | 'off';
 }> = ({ photoSrc, isDark, animate, speedMul, intensity }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     if (intensity === 'off') return;
@@ -1353,9 +1394,8 @@ const FjordWaterRippleCanvas: React.FC<{
       thickness: 1.2 + (i % 3) * 0.7,
     }));
 
-    const renderFrame = (tSec: number) => {
+    const renderFrame = (t: number) => {
       if (!img.complete || img.naturalWidth === 0) return;
-      const t = tSec * speedMul;
 
       const vw = Math.max(window.innerWidth, 1);
       const vh = Math.max(window.innerHeight, 1);
@@ -1425,12 +1465,16 @@ const FjordWaterRippleCanvas: React.FC<{
     }
 
     let lastFrame = 0;
-    const start = performance.now();
+    let prev = performance.now();
+    let simTime = 0;
     const tick = (now: number) => {
       if (isCancelled) return;
+      const dt = Math.min(0.05, (now - prev) / 1000);
+      prev = now;
+      simTime += dt * speedMulRef.current;
       if (now - lastFrame >= 33) {
         lastFrame = now;
-        renderFrame((now - start) / 1000);
+        renderFrame(simTime);
       }
       rafId = window.requestAnimationFrame(tick);
     };
@@ -1441,7 +1485,7 @@ const FjordWaterRippleCanvas: React.FC<{
       img.removeEventListener('load', onLoad);
       window.cancelAnimationFrame(rafId);
     };
-  }, [photoSrc, isDark, animate, speedMul, intensity]);
+  }, [photoSrc, isDark, animate, intensity]);
 
   if (intensity === 'off') return null;
 
@@ -1532,6 +1576,8 @@ const AtmosphericMistCanvas: React.FC<{
 }> = ({ themeId, isDark, animate, speedMul, densityMul = 1, puffCount }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const preset = MIST_PRESETS[themeId];
+  const speedMulRef = useRef(speedMul);
+  speedMulRef.current = speedMul;
 
   useEffect(() => {
     if (!preset) return;
@@ -1564,9 +1610,8 @@ const AtmosphericMistCanvas: React.FC<{
       };
     });
 
-    const drawMist = (tSec: number) => {
+    const drawMist = (t: number) => {
       ctx.clearRect(0, 0, W, H);
-      const t = tSec * speedMul;
       const rgb = isDark ? preset.rgbDark : preset.rgbLight;
       const baseAlpha = (isDark ? preset.opacityDark : preset.opacityLight) * densityMul;
 
@@ -1600,18 +1645,22 @@ const AtmosphericMistCanvas: React.FC<{
 
     let rafId = 0;
     let lastFrame = 0;
-    const start = performance.now();
+    let prev = performance.now();
+    let simTime = 0;
     const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - prev) / 1000);
+      prev = now;
+      simTime += dt * speedMulRef.current;
       if (now - lastFrame >= 33) {
         lastFrame = now;
-        drawMist((now - start) / 1000);
+        drawMist(simTime);
       }
       rafId = window.requestAnimationFrame(tick);
     };
 
     rafId = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(rafId);
-  }, [preset, isDark, animate, speedMul, densityMul, puffCount]);
+  }, [preset, isDark, animate, densityMul, puffCount]);
 
   if (!preset) return null;
 
@@ -1643,16 +1692,19 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
   const themeOptions = useThemeStore((s) => s.themeOptions);
 
   const shouldAnimate = liveMotion && (!prefersReducedMotion || overrideReducedMotion);
-  const speedMul = SPEED_MULTIPLIER[motionSpeed] || 1;
   const isDark = resolvedScheme === 'dark';
-
-  const [mouse, setMouse] = useState({ nx: 0.5, ny: 0.5 });
-  const [keyPulse, setKeyPulse] = useState(0);
-  const [imgFailed, setImgFailed] = useState(false);
-
   const activeThemeDef = LIVE_THEMES.find((t) => t.id === liveTheme);
   const backdropConfig = getThemeBackdropConfig(liveTheme);
   const schemeKey = isDark ? 'dark' : 'light';
+  const speedMul =
+    (MOTION_SPEED_MULTIPLIER[motionSpeed] || 1) * backdropConfig.animationSpeed.canvasSpeed;
+
+  const backdropRootRef = useRef<HTMLDivElement | null>(null);
+  const mouseRef = useRef({ nx: 0.5, ny: 0.5 });
+  const wavePathRef = useRef<SVGPathElement | null>(null);
+  const [keyPulse, setKeyPulse] = useState(0);
+  const [imgFailed, setImgFailed] = useState(false);
+
   const rawNoiseId = useId();
   const noiseFilterId = `backdrop-noise-${rawNoiseId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const photoSrc = activeThemeDef?.previewImage;
@@ -1663,15 +1715,45 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
   }, [liveTheme]);
 
   useEffect(() => {
-    if (!shouldAnimate) return;
+    const rootEl = backdropRootRef.current;
+    if (!shouldAnimate) {
+      if (rootEl) {
+        rootEl.style.setProperty('--parallax-x', '0px');
+        rootEl.style.setProperty('--parallax-y', '0px');
+      }
+      return;
+    }
+
+    let rafPending = 0;
     const onMove = (e: MouseEvent) => {
-      setMouse({
-        nx: e.clientX / Math.max(window.innerWidth, 1),
-        ny: e.clientY / Math.max(window.innerHeight, 1),
-      });
+      const nx = e.clientX / Math.max(window.innerWidth, 1);
+      const ny = e.clientY / Math.max(window.innerHeight, 1);
+      mouseRef.current.nx = nx;
+      mouseRef.current.ny = ny;
+
+      if (!rafPending) {
+        rafPending = window.requestAnimationFrame(() => {
+          rafPending = 0;
+          const el = backdropRootRef.current;
+          if (el) {
+            const px = ((mouseRef.current.nx - 0.5) * -18).toFixed(2);
+            const py = ((mouseRef.current.ny - 0.5) * -12).toFixed(2);
+            el.style.setProperty('--parallax-x', `${px}px`);
+            el.style.setProperty('--parallax-y', `${py}px`);
+          }
+          if (wavePathRef.current) {
+            const qx = 300 + (mouseRef.current.nx - 0.5) * 40;
+            const qy = 160 - (24 + (mouseRef.current.ny - 0.5) * 36);
+            wavePathRef.current.setAttribute('d', `M 0 160 Q ${qx.toFixed(1)} ${qy.toFixed(1)}, 600 160 T 1200 160`);
+          }
+        });
+      }
     };
     window.addEventListener('mousemove', onMove, { passive: true });
-    return () => window.removeEventListener('mousemove', onMove);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      if (rafPending) window.cancelAnimationFrame(rafPending);
+    };
   }, [shouldAnimate]);
 
   useEffect(() => {
@@ -1680,8 +1762,19 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
     const onKey = (e: KeyboardEvent) => {
       if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') {
         setKeyPulse((p) => p + 1);
+        if (wavePathRef.current) {
+          const qx = 300 + (mouseRef.current.nx - 0.5) * 40;
+          wavePathRef.current.setAttribute('d', `M 0 160 Q ${qx.toFixed(1)} 108, 600 160 T 1200 160`);
+        }
         clearTimeout(timer);
-        timer = setTimeout(() => setKeyPulse(0), 320);
+        timer = setTimeout(() => {
+          setKeyPulse(0);
+          if (wavePathRef.current) {
+            const qx = 300 + (mouseRef.current.nx - 0.5) * 40;
+            const qy = 160 - (24 + (mouseRef.current.ny - 0.5) * 36);
+            wavePathRef.current.setAttribute('d', `M 0 160 Q ${qx.toFixed(1)} ${qy.toFixed(1)}, 600 160 T 1200 160`);
+          }
+        }, 280);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1690,9 +1783,6 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
       clearTimeout(timer);
     };
   }, [shouldAnimate, liveTheme]);
-
-  const px = shouldAnimate ? (mouse.nx - 0.5) * -18 : 0;
-  const py = shouldAnimate ? (mouse.ny - 0.5) * -12 : 0;
 
   const needsContentScrim = !isChatView || !isEmpty;
 
@@ -1721,8 +1811,18 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
 
   return (
     <div
+      ref={backdropRootRef}
       aria-hidden="true"
       data-aesthetic={backdropConfig.aesthetic}
+      data-live-theme={liveTheme}
+      data-motion-speed={motionSpeed}
+      data-live-motion={shouldAnimate ? 'live' : 'paused'}
+      style={{
+        background: `var(--theme-backdrop-base, ${backdropConfig.baseGradient[schemeKey]})`,
+        ['--photo-breath-scale' as string]: String(backdropConfig.animationSpeed.photoBreathScale),
+        ['--photo-drift-x' as string]: `${backdropConfig.animationSpeed.photoDriftPx}px`,
+        ['--photo-drift-y' as string]: `${Math.round(backdropConfig.animationSpeed.photoDriftPx * 0.72)}px`,
+      }}
       className="pointer-events-none select-none fixed inset-0 overflow-hidden z-0 transition-colors duration-700"
     >
       {/* 1. PHOTOGRAPHIC LIVE SCREENS */}
@@ -1730,50 +1830,35 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
         <div
           className="absolute inset-0 transition-colors duration-700"
           style={{
-            background: backdropConfig.baseGradient[schemeKey],
+            background: `var(--theme-backdrop-base, ${backdropConfig.baseGradient[schemeKey]})`,
           }}
         >
           {!imgFailed && (
-            <motion.div
-              key={liveTheme}
-              initial={{ opacity: 0.6 }}
-              animate={
-                shouldAnimate
-                  ? {
-                      opacity: 1,
-                      x: px,
-                      y: py,
-                      scale: [1.03, 1.06, 1.03],
-                    }
-                  : { opacity: 1, x: 0, y: 0, scale: 1.01 }
-              }
-              transition={
-                shouldAnimate
-                  ? {
-                      opacity: { duration: 0.5 },
-                      x: { type: 'spring', stiffness: 35, damping: 24 },
-                      y: { type: 'spring', stiffness: 35, damping: 24 },
-                      scale: {
-                        duration: Math.round(18 / speedMul),
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                      },
-                    }
-                  : { duration: 0.4 }
-              }
-              className="absolute inset-[-2%] will-change-transform"
+            <div
+              className="absolute inset-[-3%] will-change-transform transition-transform duration-300 ease-out"
+              style={{
+                transform: 'translate3d(var(--parallax-x, 0px), var(--parallax-y, 0px), 0)',
+              }}
             >
-              <img
-                src={photoSrc}
-                alt=""
-                referrerPolicy="no-referrer"
-                onError={() => setImgFailed(true)}
-                className="w-full h-full object-cover object-center transition-[filter] duration-700"
+              <div
+                key={liveTheme}
+                className={`w-full h-full ${shouldAnimate ? 'backdrop-photo-animated' : ''}`}
                 style={{
-                  filter: photoFilter,
+                  transform: shouldAnimate ? undefined : 'scale(1.02)',
                 }}
-              />
-            </motion.div>
+              >
+                <img
+                  src={photoSrc}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={() => setImgFailed(true)}
+                  className="w-full h-full object-cover object-center transition-[filter] duration-700"
+                  style={{
+                    filter: photoFilter,
+                  }}
+                />
+              </div>
+            </div>
           )}
 
           {/* Moonlit blue tint for Alpine Dunes moonlit mode */}
@@ -2034,7 +2119,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
               isDark={isDark}
               animate={shouldAnimate}
               speedMul={speedMul}
-              mouse={mouse}
+              mouseRef={mouseRef}
               keyPulse={keyPulse}
               nodeCount={backdropConfig.particleDensity.count}
               glowIntensity={backdropConfig.particleDensity.glowIntensity}
@@ -2055,22 +2140,13 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
                   <stop offset="100%" stopColor="rgba(139, 92, 246, 0)" />
                 </linearGradient>
               </defs>
-              <motion.path
+              <path
+                ref={wavePathRef}
                 d="M 0 160 Q 300 136, 600 160 T 1200 160"
-                initial={{ d: 'M 0 160 Q 300 136, 600 160 T 1200 160' }}
-                animate={
-                  shouldAnimate
-                    ? {
-                        d: `M 0 160 Q ${300 + (mouse.nx - 0.5) * 40} ${
-                          160 - (keyPulse > 0 ? 52 : 24 + (mouse.ny - 0.5) * 36)
-                        }, 600 160 T 1200 160`,
-                      }
-                    : { d: 'M 0 160 Q 300 136, 600 160 T 1200 160' }
-                }
-                transition={{ type: 'spring', stiffness: 90, damping: 18 }}
                 fill="none"
                 stroke="url(#studio-wave-cyan)"
                 strokeWidth={keyPulse > 0 ? 2.2 : 1.4}
+                className="transition-[stroke-width] duration-200"
               />
             </svg>
           )}
@@ -2098,12 +2174,14 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
         />
       )}
 
-      {/* Per-Theme Multi-Point Radial Aesthetic Overlays */}
+      {/* Per-Theme Multi-Point Radial Aesthetic Overlays (Animated at theme speed) */}
       {backdropConfig.radialOverlays[schemeKey].length > 0 && (
         <div
-          className="absolute inset-0 pointer-events-none transition-opacity duration-700"
+          className={`absolute inset-[-4%] pointer-events-none transition-opacity duration-700 ${
+            shouldAnimate ? 'backdrop-radials-animated' : ''
+          }`}
           style={{
-            backgroundImage: backdropConfig.radialOverlays[schemeKey].join(', '),
+            backgroundImage: `var(--theme-backdrop-radials, ${backdropConfig.radialOverlays[schemeKey].join(', ')})`,
           }}
         />
       )}
@@ -2135,7 +2213,7 @@ export const LiveScreenBackdrop: React.FC<LiveScreenBackdropProps> = ({
       <div
         className="absolute inset-0 pointer-events-none transition-opacity duration-700"
         style={{
-          background: backdropConfig.vignette[schemeKey],
+          background: `var(--theme-backdrop-vignette, ${backdropConfig.vignette[schemeKey]})`,
         }}
       />
 

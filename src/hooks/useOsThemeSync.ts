@@ -12,16 +12,25 @@ export function useOsThemeSync() {
   const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
   const liveTheme = useThemeStore((s) => s.liveTheme);
   const surfaceTone = useThemeStore((s) => s.surfaceTone);
+  const motionSpeed = useThemeStore((s) => s.motionSpeed);
+  const liveMotion = useThemeStore((s) => s.liveMotion);
+  const overrideReducedMotion = useThemeStore((s) => s.overrideReducedMotion);
+  const prefersReducedMotion = useThemeStore((s) => s.prefersReducedMotion);
   const setOsPrefersDark = useThemeStore((s) => s.setOsPrefersDark);
   const setPrefersReducedMotion = useThemeStore((s) => s.setPrefersReducedMotion);
 
   const themeModeRef = useRef(themeMode);
   themeModeRef.current = themeMode;
 
-  // Keep DOM classes & attributes synchronized
+  const isAnimating = liveMotion && (!prefersReducedMotion || overrideReducedMotion);
+
+  // Keep DOM classes, backdrop variables & animation speeds synchronized
   useEffect(() => {
-    applyThemeToDom(resolvedScheme, themeMode, liveTheme, false, surfaceTone);
-  }, [resolvedScheme, themeMode, liveTheme, surfaceTone]);
+    applyThemeToDom(resolvedScheme, themeMode, liveTheme, false, surfaceTone, {
+      motionSpeed,
+      isAnimating,
+    });
+  }, [resolvedScheme, themeMode, liveTheme, surfaceTone, motionSpeed, isAnimating]);
 
   // Watch OS color scheme & reduced-motion media queries in real time
   useEffect(() => {
