@@ -35,10 +35,10 @@ const getRuntimeMockOverride = (): boolean | null => {
 
 export const env: AppEnvConfig = {
   isMockEnabled: import.meta.env.PROD ? false : (getRuntimeMockOverride() ?? getEnvBool('VITE_USE_MOCK', false)),
-  apiBaseUrl: getEnvString('VITE_API_BASE_URL', ''),
-  supabaseUrl: getEnvString('VITE_SUPABASE_URL', ''),
-  gatewayUrl: getEnvString('VITE_GATEWAY_URL', '/v1'),
-  mcpTowerUrl: getEnvString('VITE_MCP_TOWER_URL', '/api/mcp-tower'),
+  apiBaseUrl: getEnvString('VITE_API_BASE_URL', import.meta.env.PROD ? 'https://supremeai-api-ulw0.onrender.com' : ''),
+  supabaseUrl: getEnvString('VITE_SUPABASE_URL', 'https://auth.supremeai.bd'),
+  gatewayUrl: getEnvString('VITE_GATEWAY_URL', import.meta.env.PROD ? 'https://supremeai-api-ulw0.onrender.com/v1' : '/v1'),
+  mcpTowerUrl: getEnvString('VITE_MCP_TOWER_URL', import.meta.env.PROD ? 'https://supremeai-mcp-tower.onrender.com/mcp' : '/api/mcp-tower'),
   version: 'v2.4.0-prod',
 };
 
