@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -691,11 +692,26 @@ async function startServer() {
   });
 
   // POST /api/admin/auth/verify - Validate Admin Key/Passcode
+  // AUDIT FIX (2026-11-13, CRITICAL): removed the hardcoded fallback passkey
+  // ('supremeai-admin-2026' committed to .env.example) and the universal
+  // 'admin' / 'supremeai' accept-any bypass. Auth now fails closed when
+  // ADMIN_PASSKEY is not configured in the environment.
   app.post('/api/admin/auth/verify', (req: Request, res: Response) => {
     const { passkey } = req.body || {};
-    const validPass = process.env.ADMIN_PASSKEY || 'supremeai-admin-2026';
+    const validPass = process.env.ADMIN_PASSKEY;
 
-    if (passkey === validPass || passkey === 'admin' || passkey === 'supremeai') {
+    if (!validPass) {
+      res.status(503).json({
+        success: false,
+        authenticated: false,
+        error: 'Admin access is not configured. Set ADMIN_PASSKEY in the environment.',
+      });
+      return;
+    }
+
+    const a = Buffer.from(String(passkey ?? ''));
+    const b = Buffer.from(validPass);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
       res.json({
         success: true,
         authenticated: true,
