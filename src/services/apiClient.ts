@@ -69,11 +69,22 @@ class ApiClient {
 
       const contentType = response.headers.get('content-type') || '';
       const isJson = contentType.includes('application/json');
-      const data = isJson ? await response.json() : await response.text();
+      let data: any = null;
+      if (isJson) {
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+      } else {
+        data = await response.text();
+      }
 
       if (!response.ok) {
         const errorMessage =
-          (isJson && data?.error) || (isJson && data?.message) || `HTTP Error ${response.status}: ${response.statusText}`;
+          (isJson && (data?.detail || data?.error || data?.message)) ||
+          (typeof data === 'string' && data.trim()) ||
+          `HTTP Error ${response.status}: ${response.statusText}`;
         throw new ApiError(errorMessage, response.status, data);
       }
 
