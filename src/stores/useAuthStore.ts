@@ -3,6 +3,7 @@ import { AuthUser, UserRole, CustomerRecord } from '../types';
 import { authService } from '../services/authService';
 import { env } from '../config/env';
 import { useCustomerStore } from './useCustomerStore';
+import { useChatStore } from './useChatStore';
 import { toast } from './useToastStore';
 
 const AUTH_USER_KEY = 'supremeai_auth_user';
@@ -103,6 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           const role: UserRole = user.isAdminEligible && user.role === 'admin' ? 'admin' : 'user';
           localStorage.setItem(ROLE_KEY, role);
           set({ authUser: user, currentRole: role, isLoading: false });
+          useChatStore.getState().syncRemoteSessions().catch(() => {});
         } else {
           // Expired or invalid credentials: clear the session fail-closed.
           localStorage.removeItem(AUTH_USER_KEY);
@@ -144,6 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           `Welcome back, ${res.user.name}!`,
           `Signed in as ${res.user.role === 'admin' ? 'Administrator' : 'User'}`
         );
+        useChatStore.getState().syncRemoteSessions().catch(() => {});
         return true;
       } catch (err: unknown) {
         set({ isLoading: false });

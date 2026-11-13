@@ -23,8 +23,9 @@ const getEnvString = (key: string, defaultValue: string): string => {
   return import.meta.env[key] || defaultValue;
 };
 
-// Check for runtime local override if developer switches mock mode in UI
+// Check for runtime local override if developer switches mock mode in UI (ONLY in dev mode!)
 const getRuntimeMockOverride = (): boolean | null => {
+  if (import.meta.env.PROD) return false;
   try {
     const saved = localStorage.getItem('supremeai_mock_override');
     if (saved !== null) return saved === 'true';
@@ -33,7 +34,7 @@ const getRuntimeMockOverride = (): boolean | null => {
 };
 
 export const env: AppEnvConfig = {
-  isMockEnabled: getRuntimeMockOverride() ?? getEnvBool('VITE_USE_MOCK', false),
+  isMockEnabled: import.meta.env.PROD ? false : (getRuntimeMockOverride() ?? getEnvBool('VITE_USE_MOCK', false)),
   apiBaseUrl: getEnvString('VITE_API_BASE_URL', 'https://supremeai-api-ulw0.onrender.com'),
   supabaseUrl: getEnvString('VITE_SUPABASE_URL', 'https://auth.supremeai.bd'),
   gatewayUrl: getEnvString('VITE_GATEWAY_URL', 'https://supremeai-api-ulw0.onrender.com/v1'),

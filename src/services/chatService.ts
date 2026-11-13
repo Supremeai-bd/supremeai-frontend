@@ -36,32 +36,60 @@ export const chatService = {
     } = options;
 
     try {
-      const response = await fetch(`${env.apiBaseUrl}/api/chat`, {
+      const token = localStorage.getItem('supremeai_access_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['X-SupremeAI-Key'] = token;
+      }
+
+      // Format messages including optional system instructions and grounding context
+      const formattedMessages: { role: string; content: string }[] = [];
+      if (systemInstruction?.trim()) {
+        formattedMessages.push({ role: 'system', content: systemInstruction.trim() });
+      }
+      if (groundingContext?.trim()) {
+        formattedMessages.push({
+          role: 'system',
+          content: `Grounding Knowledge Context:\n${groundingContext.trim()}`,
+        });
+      }
+      for (const m of messages) {
+        formattedMessages.push({
+          role: m.role,
+          content: m.content,
+        });
+      }
+
+      // Live backend route on deployed gateway: /api/v1/stream/chat
+      const response = await fetch(`${env.apiBaseUrl}/api/v1/stream/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         signal,
         body: JSON.stringify({
-          model,
-          systemInstruction,
-          groundingContext,
+          model: model || 'auto',
+          messages: formattedMessages,
+          stream: true,
           deepResearch,
           userContext,
-          messages: messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-            attachment: m.attachment,
-          })),
-          stream,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        const errorMsg =
+          errorData.detail ||
+          errorData.error ||
+          errorData.message ||
+          `Server error: ${response.status} ${response.statusText}`;
+        throw new Error(errorMsg);
       }
 
       if (!response.body) {
-        throw new Error('No readable response body received from Gemini inference proxy.');
+        throw new Error('No readable response body received from SupremeAI inference gateway.');
       }
 
       const reader = response.body.getReader();
@@ -80,17 +108,29 @@ export const chatService = {
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed.startsWith('data: ')) {
-            const dataStr = trimmed.slice(6);
+            const dataStr = trimmed.slice(6).trim();
             if (dataStr === '[DONE]') break;
             try {
               const parsed = JSON.parse(dataStr);
-              if (parsed.error) throw new Error(parsed.error);
-              if (parsed.text) {
-                accumulatedText += parsed.text;
-                onChunk(parsed.text);
+              if (parsed.error) {
+                const errDetail =
+                  typeof parsed.error === 'object'
+                    ? parsed.error.message || JSON.stringify(parsed.error)
+                    : String(parsed.error);
+                throw new Error(errDetail);
               }
-            } catch {
-              // Ignore non-json data frames
+              // Standard OpenAI/Gateway SSE delta chunk: parsed.choices[0].delta.content
+              // Fallback legacy proxy chunk: parsed.text
+              const chunk = parsed.choices?.[0]?.delta?.content ?? parsed.text ?? '';
+              if (chunk) {
+                accumulatedText += chunk;
+                onChunk(chunk);
+              }
+            } catch (jsonErr: any) {
+              if (jsonErr.message && !jsonErr.message.includes('JSON')) {
+                throw jsonErr;
+              }
+              // Non-json SSE data frame ignored safely
             }
           }
         }

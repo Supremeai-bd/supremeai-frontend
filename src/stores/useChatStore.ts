@@ -24,7 +24,7 @@ interface ChatState {
   isRoleModalOpen: boolean;
 
   // Session Management Actions
-  selectSession: (id: string) => void;
+  selectSession: (id: string) => Promise<void> | void;
   deleteSession: (id: string) => void;
   renameSession: (id: string, newTitle: string) => void;
   togglePinSession: (id: string) => void;
@@ -32,6 +32,7 @@ interface ChatState {
   branchSession: (sourceSessionId?: string, upToMessageId?: string) => string;
   clearCurrentThread: () => void;
   exportThread: (format: 'markdown' | 'text' | 'json') => void;
+  syncRemoteSessions: () => Promise<void>;
 
   // Model & Role Actions
   selectModel: (model: ModelDetail) => void;
@@ -83,13 +84,31 @@ export const useChatStore = create<ChatState>((set, get) => {
     isPromptModalOpen: false,
     isRoleModalOpen: false,
 
-    selectSession: (id: string) => {
+    selectSession: async (id: string) => {
       set({ activeSessionId: id, inferenceError: null });
+      const target = get().sessions.find((s) => s.id === id);
+      if (target && target.messages.length === 0) {
+        try {
+          const remoteMsgs = await conversationService.getMessages(id);
+          if (remoteMsgs.length > 0) {
+            const updated = get().sessions.map((s) =>
+              s.id === id ? { ...s, messages: remoteMsgs } : s
+            );
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            set({ sessions: updated });
+          }
+        } catch {
+          // Keep current local session state
+        }
+      }
     },
 
     deleteSession: (id: string) => {
       const { sessions, activeSessionId, activeModel, activeRole } = get();
       const filtered = sessions.filter((s) => s.id !== id);
+
+      // Asynchronously delete from remote server persistence
+      conversationService.deleteConversation(id).catch(() => {});
 
       if (filtered.length === 0) {
         const fallback: ChatSession = {
@@ -349,9 +368,14 @@ export const useChatStore = create<ChatState>((set, get) => {
             streamingContent: '',
           });
 
-          // Asynchronously sync exchange to remote Supabase persistence
-          conversationService.syncMessage(current.id, 'user', text).catch(() => {});
-          conversationService.syncMessage(current.id, 'assistant', assistantMsg.content).catch(() => {});
+          // Ensure remote conversation exists before syncing exchange
+          conversationService
+            .createConversation(current.title, current.id, activeModel.id)
+            .then(() => {
+              conversationService.syncMessage(current.id, 'user', text);
+              conversationService.syncMessage(current.id, 'assistant', assistantMsg.content);
+            })
+            .catch(() => {});
           return;
         } catch (err: unknown) {
           const errorMsg = err instanceof Error ? err.message : 'Deep research execution failed.';
@@ -418,9 +442,14 @@ export const useChatStore = create<ChatState>((set, get) => {
           });
           abortController = null;
 
-          // Asynchronously sync exchange to remote Supabase persistence
-          conversationService.syncMessage(current.id, 'user', text).catch(() => {});
-          conversationService.syncMessage(current.id, 'assistant', fullText).catch(() => {});
+          // Ensure remote conversation exists before syncing exchange
+          conversationService
+            .createConversation(current.title, current.id, activeModel.id)
+            .then(() => {
+              conversationService.syncMessage(current.id, 'user', text);
+              conversationService.syncMessage(current.id, 'assistant', fullText);
+            })
+            .catch(() => {});
         },
         onError: (err) => {
           set({
@@ -461,6 +490,35 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       set({ isStreaming: false, streamingContent: '' });
       toast.info('Generation Stopped', 'Model inference paused by user.');
+    },
+
+    syncRemoteSessions: async () => {
+      const token = localStorage.getItem('supremeai_access_token');
+      if (!token) return;
+      try {
+        const remoteList = await conversationService.listConversations();
+        if (remoteList && remoteList.length > 0) {
+          const localSessions = get().sessions;
+          const merged = [...localSessions];
+          for (const rem of remoteList) {
+            if (!merged.some((s) => s.id === rem.id)) {
+              merged.push({
+                id: rem.id,
+                title: rem.title || 'Conversation',
+                createdAt: new Date(rem.created_at).getTime(),
+                updatedAt: new Date(rem.updated_at).getTime(),
+                model: 'gemini-3.8-flash',
+                roleId: SYSTEM_ROLES[0].id,
+                messages: [],
+              });
+            }
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          set({ sessions: merged });
+        }
+      } catch (err) {
+        console.warn('[SyncRemoteSessions] Remote conversation load failed:', err);
+      }
     },
   };
 });
