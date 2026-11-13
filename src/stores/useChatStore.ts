@@ -5,6 +5,8 @@ import { GEMINI_MODELS } from '../data/models';
 import { chatService } from '../services/chatService';
 import { conversationService } from '../services/conversationService';
 import { researchService } from '../services/researchService';
+import { useAuthStore } from './useAuthStore';
+import { useCustomerStore } from './useCustomerStore';
 import { toast } from './useToastStore';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
@@ -25,6 +27,7 @@ interface ChatState {
   selectSession: (id: string) => void;
   deleteSession: (id: string) => void;
   renameSession: (id: string, newTitle: string) => void;
+  togglePinSession: (id: string) => void;
   createNewSession: () => void;
   branchSession: (sourceSessionId?: string, upToMessageId?: string) => string;
   clearCurrentThread: () => void;
@@ -114,6 +117,15 @@ export const useChatStore = create<ChatState>((set, get) => {
     renameSession: (id: string, newTitle: string) => {
       const { sessions } = get();
       const updated = sessions.map((s) => (s.id === id ? { ...s, title: newTitle } : s));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      set({ sessions: updated });
+    },
+
+    togglePinSession: (id: string) => {
+      const { sessions } = get();
+      const updated = sessions.map((s) =>
+        s.id === id ? { ...s, isPinned: !s.isPinned } : s
+      );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       set({ sessions: updated });
     },
@@ -347,12 +359,24 @@ export const useChatStore = create<ChatState>((set, get) => {
       const controller = new AbortController();
       abortController = controller;
 
+      const authState = useAuthStore.getState();
+      const customerSettings = useCustomerStore.getState().userSettings;
+      const effectiveSystemInstruction =
+        customInstruction.trim() ||
+        customerSettings.customInstructions?.trim() ||
+        activeRole.systemInstruction;
+
       await chatService.streamChat({
         model: activeModel.id,
         messages: updatedMessages,
-        systemInstruction: customInstruction || activeRole.systemInstruction,
+        systemInstruction: effectiveSystemInstruction,
         groundingContext,
         deepResearch,
+        userContext: {
+          email: authState.authUser?.email || customerSettings.email,
+          role: authState.currentRole,
+          tier: authState.authUser?.plan || customerSettings.plan,
+        },
         signal: controller.signal,
         onChunk: (chunk) => {
           set((state) => ({ streamingContent: state.streamingContent + chunk }));

@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
-import { Cpu, Zap, Activity, Check, ArrowRight, Gauge } from 'lucide-react';
+import { ArrowRight, Gauge, Lock } from 'lucide-react';
 import { GEMINI_MODELS } from '../data/models';
-import { ModelDetail } from '../types';
+import { ModelDetail, PlanTier } from '../types';
+import { usePlatformStore } from '../stores/usePlatformStore';
+import { useAuthStore } from '../stores/useAuthStore';
+import { env } from '../config/env';
 
 interface ModelMatrixProps {
   activeModel: ModelDetail;
   onSelectModel: (model: ModelDetail) => void;
   onNavigateToChat: () => void;
 }
+
+const TIER_RANK: Record<PlanTier, number> = {
+  Free: 0,
+  Pro: 1,
+  Enterprise: 2,
+};
 
 export const ModelMatrix: React.FC<ModelMatrixProps> = ({
   activeModel,
@@ -16,36 +25,38 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
 }) => {
   const [latencyResults, setLatencyResults] = useState<Record<string, { ms: number; status: 'ok' | 'error' }>>({});
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
+  const modelPolicies = usePlatformStore((s) => s.config.modelPolicies);
+  const currentRole = useAuthStore((s) => s.currentRole);
+  const authUser = useAuthStore((s) => s.authUser);
+  const userTier: PlanTier = authUser?.plan || 'Pro';
 
   const testModelLatency = async (modelId: string) => {
     setTestingModelId(modelId);
     const start = performance.now();
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`${env.apiBaseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: modelId,
           messages: [{ role: 'user', content: 'Ping. Answer with single word: OK' }],
           stream: false,
+          userContext: {
+            email: authUser?.email,
+            role: currentRole,
+            tier: userTier,
+          },
         }),
       });
 
       const end = performance.now();
       const duration = Math.round(end - start);
 
-      if (response.ok) {
-        setLatencyResults((prev) => ({
-          ...prev,
-          [modelId]: { ms: duration, status: 'ok' },
-        }));
-      } else {
-        setLatencyResults((prev) => ({
-          ...prev,
-          [modelId]: { ms: duration, status: 'error' },
-        }));
-      }
+      setLatencyResults((prev) => ({
+        ...prev,
+        [modelId]: { ms: duration, status: response.ok ? 'ok' : 'error' },
+      }));
     } catch {
       setLatencyResults((prev) => ({
         ...prev,
@@ -63,13 +74,12 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-8 max-w-6xl mx-auto space-y-8 text-slate-800 dark:text-slate-200">
-      {/* Editorial Header */}
       <div className="space-y-1.5 border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           Gemini Intelligence Matrix
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
-          Specification, reasoning capabilities, and throughput benchmarks across Gemini foundation models deployed in SupremeAI Studio.
+          Specification, governance status, reasoning capabilities, and throughput benchmarks across Gemini foundation models deployed in SupremeAI Studio.
         </p>
       </div>
 
@@ -79,6 +89,10 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
           const isActive = model.id === activeModel.id;
           const pingData = latencyResults[model.id];
           const isPinging = testingModelId === model.id;
+          const policy = modelPolicies[model.id] || { enabled: true, minTier: 'Free' };
+          const isBlocked =
+            currentRole !== 'admin' &&
+            (!policy.enabled || TIER_RANK[userTier] < TIER_RANK[policy.minTier]);
 
           return (
             <div
@@ -90,25 +104,33 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
               }`}
             >
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 gap-2">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {model.alias}
                   </span>
-                  {isActive && (
+                  {!policy.enabled ? (
+                    <span className="text-[10px] font-mono font-semibold text-rose-500">
+                      Disabled
+                    </span>
+                  ) : isActive ? (
                     <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                       Active
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {policy.minTier}+
                     </span>
                   )}
                 </div>
 
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {model.name}
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  {isBlocked && <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                  <span>{model.name}</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                   {model.tagline}
                 </p>
 
-                {/* Specs List with unboxed metadata */}
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Context Window</span>
@@ -123,9 +145,9 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Latency Rating</span>
-                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                      {model.latencyRating}
+                    <span className="text-slate-400">Min Plan Tier</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300">
+                      {policy.minTier}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -145,7 +167,6 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-2">
                 <button
                   type="button"
@@ -159,15 +180,26 @@ export const ModelMatrix: React.FC<ModelMatrixProps> = ({
 
                 <button
                   type="button"
+                  disabled={isBlocked}
                   onClick={() => handleApplyAndChat(model)}
-                  className={`w-full py-1.5 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                    isActive
-                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                      : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'
+                  className={`w-full py-1.5 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                    isBlocked
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                      : isActive
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 cursor-pointer'
+                      : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 cursor-pointer'
                   }`}
                 >
-                  <span>{isActive ? 'Chat with Model' : 'Select & Chat'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>
+                    {isBlocked
+                      ? !policy.enabled
+                        ? 'Disabled by Admin'
+                        : `Requires ${policy.minTier}`
+                      : isActive
+                      ? 'Chat with Model'
+                      : 'Select & Chat'}
+                  </span>
+                  {!isBlocked && <ArrowRight className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>

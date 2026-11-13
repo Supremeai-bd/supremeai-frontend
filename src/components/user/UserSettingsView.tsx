@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
 import {
   User,
-  Shield,
-  Zap,
-  Mail,
-  Bell,
-  Cpu,
-  Github,
   Check,
   Save,
   Gauge,
@@ -27,6 +21,8 @@ import {
   Columns3,
   Maximize2,
   Minimize2,
+  Terminal,
+  MessageSquareCode,
 } from 'lucide-react';
 import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
 import { GEMINI_MODELS } from '../../data/models';
@@ -36,6 +32,7 @@ import {
   ThemeMode,
   LiveThemeId,
 } from '../../stores/useThemeStore';
+import { useChatStore } from '../../stores/useChatStore';
 
 interface UserSettingsViewProps {
   settings: UserAccountSettings;
@@ -64,6 +61,8 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const [autoCodeReview, setAutoCodeReview] = useState(settings.autoCodeReview);
   const [streamResponses, setStreamResponses] = useState(settings.streamResponses);
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
+  const [developerMode, setDeveloperMode] = useState(Boolean(settings.developerMode));
+  const [customInstructions, setCustomInstructions] = useState(settings.customInstructions || '');
   const [layoutMode, setLayoutMode] = useState<'sidebar-focus' | 'classic'>(
     settings.layoutMode || 'sidebar-focus'
   );
@@ -71,6 +70,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     settings.contentLayout || 'fluid'
   );
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const setChatCustomInstruction = useChatStore((s) => s.setCustomInstruction);
+  const setIsRoleModalOpen = useChatStore((s) => s.setIsRoleModalOpen);
+  const activeRole = useChatStore((s) => s.activeRole);
 
   const themeMode = useThemeStore((s) => s.themeMode);
   const osPrefersDark = useThemeStore((s) => s.osPrefersDark);
@@ -93,15 +96,19 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       defaultModel,
       layoutMode,
       contentLayout,
+      developerMode,
+      customInstructions,
     });
+    setChatCustomInstruction(customInstructions);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   const usagePercent = Math.min(
     100,
-    Math.round((settings.monthlyTokensUsed / settings.monthlyTokensLimit) * 100)
+    Math.round((settings.monthlyTokensUsed / Math.max(1, settings.monthlyTokensLimit)) * 100)
   );
+  const userInitial = (settings.name || name || 'U').trim().charAt(0).toUpperCase() || 'U';
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-8 workspace-container space-y-8 text-slate-800 dark:text-slate-200">
@@ -111,7 +118,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           Account & Workspace Settings
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Manage your personal profile, role permissions, token usage quota, and developer preferences.
+          Manage your profile, AI persona instructions, workspace appearance, and optional developer tools.
         </p>
       </div>
 
@@ -119,21 +126,19 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       {(isAdminEligible || currentRole === 'admin') && (
         <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-slate-900 dark:to-slate-900/90 border border-blue-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                 Active Workspace
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
-                {currentRole === 'admin' ? 'Admin / Developer Studio' : 'Normal User Mode'}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                Admin Eligible
+              <span aria-hidden="true" className="text-slate-400">·</span>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {currentRole === 'admin' ? 'Admin Studio' : 'Customer Workspace'}
               </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300">
               {currentRole === 'admin'
-                ? 'You are in the Admin Studio with full access to Model Matrix, Swarm, and Ecosystem Repos.'
-                : 'You are in Normal User mode with streamlined chat, personal GitHub projects, and plugins.'}
+                ? 'You are in Admin Studio with central control over platform policies, models, customers, and telemetry.'
+                : 'You are in Customer mode with streamlined chat, billing, and personal workspace preferences.'}
             </p>
           </div>
 
@@ -159,13 +164,14 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
 
         <div className="flex items-center gap-4 pt-1">
           <div className="w-14 h-14 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-lg font-bold flex items-center justify-center shrink-0 shadow-xs">
-            Z
+            {userInitial}
           </div>
           <div>
             <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <span>{settings.name}</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                {settings.plan} Member
+              <span aria-hidden="true" className="text-slate-400">·</span>
+              <span className="text-xs font-medium theme-accent-text">
+                {settings.plan} Plan
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
@@ -187,7 +193,6 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </span>
         </div>
 
-        {/* Progress bar */}
         <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
           <div
             className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-500"
@@ -195,9 +200,9 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-slate-400">
-          <span>{usagePercent}% utilized for the current cycle</span>
-          <span>Resets on Dec 1, 2026</span>
+        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono tabular-nums">
+          <span>{usagePercent}% utilized</span>
+          <span>Resets monthly</span>
         </div>
       </div>
 
@@ -222,7 +227,6 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </div>
         </div>
 
-        {/* 3-Way Color Scheme Mode */}
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
             Color Scheme Synchronization
@@ -275,7 +279,6 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Live Screen Theme Cards */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
@@ -348,7 +351,6 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                         }}
                       />
                     )}
-                    {/* Mini floating glass prompt bar preview */}
                     <div className="absolute inset-x-4 top-5 h-3.5 rounded-full bg-white/80 dark:bg-slate-900/75 backdrop-blur-md border border-white/60 dark:border-white/10 shadow-xs" />
                     {isSelected && (
                       <span className="absolute top-2 right-2 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm">
@@ -371,14 +373,14 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Settings Form */}
+      {/* Preferences, Custom Instructions & Developer Mode Form */}
       <form
         onSubmit={handleSave}
         className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-5 shadow-xs"
       >
         <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-slate-500" />
-          <span>Preferences & Defaults</span>
+          <span>Preferences, AI Persona & Workspace Mode</span>
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -422,6 +424,39 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Custom Instructions & Persona Section (Moved out of crowded topbar) */}
+        <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/70 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <label className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <MessageSquareCode className="w-3.5 h-3.5 theme-accent-text" />
+                <span>Custom Instructions & AI Persona</span>
+              </label>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Active Persona: <span className="font-medium text-slate-700 dark:text-slate-200">{activeRole.name}</span>. Override or customize how Gemini responds across your chats.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsRoleModalOpen(true)}
+              className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] cursor-pointer shrink-0"
+            >
+              Switch Persona
+            </button>
+          </div>
+
+          <textarea
+            rows={3}
+            value={customInstructions}
+            onChange={(e) => {
+              setCustomInstructions(e.target.value);
+              setChatCustomInstruction(e.target.value);
+            }}
+            placeholder="Example: Always answer concisely with bullet points. Prefer TypeScript examples over JavaScript."
+            className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[var(--theme-accent)]"
+          />
         </div>
 
         {/* Workspace Content Width Layout Switcher (Compact / Fluid / Maximized) */}
@@ -539,8 +574,32 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Toggles */}
+        {/* Toggles including Developer Mode */}
         <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <label className="flex items-center justify-between cursor-pointer p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60">
+            <div className="flex items-start gap-2.5">
+              <Terminal className="w-4 h-4 theme-accent-text mt-0.5 shrink-0" />
+              <div>
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block">
+                  Developer Mode (Show Technical Tools)
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                  Reveal Knowledge & RAG, My Projects, API Keys & Hooks, Plugins, and the split Workspace Dock.
+                </span>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={developerMode}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setDeveloperMode(next);
+                onUpdateSettings({ developerMode: next });
+              }}
+              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0 ml-3"
+            />
+          </label>
+
           <label className="flex items-center justify-between cursor-pointer">
             <div>
               <span className="text-xs font-medium text-slate-900 dark:text-slate-100 block">
@@ -581,7 +640,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 Email Notifications & Digest
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                Receive weekly summary of connected project issues and AI suggestions.
+                Receive weekly summary of workspace activity and updates.
               </span>
             </div>
             <input
@@ -600,7 +659,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               Settings saved successfully!
             </span>
           ) : (
-            <span className="text-xs text-slate-400">All preferences stored locally.</span>
+            <span className="text-xs text-slate-400">Preferences saved locally and applied live.</span>
           )}
 
           <button
@@ -627,11 +686,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 Two-Factor Authentication (TOTP / Biometric)
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                Enforces secondary 6-digit TOTP token or hardware fingerprint touch when activating Admin Studio.
+                Enforces secondary verification when activating Admin Studio.
               </span>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              ACTIVE (ENFORCED)
+            <span className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+              ENFORCED
             </span>
           </div>
 
@@ -644,7 +703,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
                 {trustedUntil && trustedUntil > Date.now() ? (
                   <>
-                    This browser is currently trusted until{' '}
+                    Trusted until{' '}
                     <strong className="text-cyan-500 dark:text-cyan-400 font-mono">
                       {new Date(trustedUntil).toLocaleDateString('en-US', {
                         month: 'short',
@@ -652,10 +711,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                         year: 'numeric',
                       })}
                     </strong>{' '}
-                    ({Math.max(1, Math.ceil((trustedUntil - Date.now()) / (24 * 60 * 60 * 1000)))} days remaining).
+                    ({Math.max(1, Math.ceil((trustedUntil - Date.now()) / (24 * 60 * 60 * 1000)))} days left).
                   </>
                 ) : (
-                  'No active 7-day browser trust token on this device. 2FA will be prompted on next Admin switch.'
+                  'No active 7-day browser trust token on this device.'
                 )}
               </span>
             </div>
@@ -681,7 +740,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
             <span>Active Session Management</span>
           </h3>
           <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
-            Signing out will clear your session token and lock the workspace. You will need to log back in.
+            Signing out will clear your session token and lock the workspace.
           </p>
         </div>
 

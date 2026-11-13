@@ -2,14 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   PanelLeft,
   PanelRight,
-  BookOpen,
-  Sliders,
   Download,
   Trash2,
-  Database,
   Search,
   Share2,
   GitFork,
+  AlertTriangle,
+  X,
+  Lock,
+  UserCheck,
+  ShieldCheck,
+  Megaphone,
 } from 'lucide-react';
 import { ChatSearchBar } from './components/chat/ChatSearchBar';
 import { shareService } from './services/shareService';
@@ -28,7 +31,8 @@ import { UserSettingsView } from './components/user/UserSettingsView';
 import { UserApiKeysView } from './components/user/UserApiKeysView';
 import { UserKnowledgeBaseView } from './components/user/UserKnowledgeBaseView';
 import { UserTeamView } from './components/user/UserTeamView';
-import { UserBillingView } from './components/user/UserBillingView';
+import { UserPlanUsageView } from './components/user/UserPlanUsageView';
+import { AdminOverviewView } from './components/admin/AdminOverviewView';
 import { AdminCustomersView } from './components/admin/AdminCustomersView';
 import { AdminMcpTowerView } from './components/admin/AdminMcpTowerView';
 import { AdminAgentSwarmView } from './components/admin/AdminAgentSwarmView';
@@ -60,7 +64,7 @@ import { useAdminStore } from './stores/useAdminStore';
 import { useCustomerStore } from './stores/useCustomerStore';
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { useThemeStore } from './stores/useThemeStore';
-import { toast } from './stores/useToastStore';
+import { usePlatformStore } from './stores/usePlatformStore';
 import { useTabRouter } from './hooks/useTabRouter';
 import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { useOsThemeSync } from './hooks/useOsThemeSync';
@@ -68,16 +72,30 @@ import { LiveScreenBackdrop } from './components/theme/LiveScreenBackdrop';
 import { ThemeControlPopover } from './components/theme/ThemeControlPopover';
 import { UserProject, ChatAttachment } from './types';
 
+const ADMIN_ONLY_TABS = new Set([
+  'admin-overview',
+  'agent-swarm',
+  'task-queue',
+  'schema-parity',
+  'llm-gateway',
+  'feature-flags',
+  'provider-keys',
+  'security',
+  'system-audit',
+  'customers',
+  'models',
+  'roles',
+  'repos',
+]);
+
 export default function App() {
-  // Automated OS color-scheme & reduced-motion synchronization
   useOsThemeSync();
 
-  // Routing hook via Query Parameter (?tab=...) and Hash (#...)
   const { activeTab, setActiveTab } = useTabRouter('chat');
 
-  // Modular Stores
   const {
     authUser,
+    impersonatedCustomer,
     currentRole,
     trustedBrowserUntil,
     isTwoFactorModalOpen,
@@ -88,6 +106,7 @@ export default function App() {
     logout,
     revokeTrustedBrowser,
     impersonateCustomer,
+    exitImpersonation,
   } = useAuthStore();
 
   const {
@@ -104,12 +123,14 @@ export default function App() {
     selectSession,
     deleteSession,
     renameSession,
+    togglePinSession,
     createNewSession,
     branchSession,
     clearCurrentThread,
     exportThread,
     selectModel,
     selectRole,
+    setCustomInstruction,
     setIsPromptModalOpen,
     setIsRoleModalOpen,
     sendMessage,
@@ -128,6 +149,7 @@ export default function App() {
     auditRecords,
     customers,
     fetchMcpServices,
+    fetchAdminSync,
     rebootService,
     rebootAllServices,
     probeCluster,
@@ -176,18 +198,30 @@ export default function App() {
     recordTokenUsage,
   } = useCustomerStore();
 
-  // Navigation & Layout UI state
+  const {
+    config: platformConfig,
+    dismissedBannerMessage,
+    fetchConfig,
+    dismissBanner,
+  } = usePlatformStore();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [chatUtilityMode, setChatUtilityMode] = useState<'chat' | 'task'>('chat');
   const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [chatRoleFilter, setChatRoleFilter] = useState<'all' | 'user' | 'assistant'>('all');
+  const [dangerConfirm, setDangerConfirm] = useState<{
+    action: string;
+    title: string;
+    description: string;
+  } | null>(null);
+  const [isDangerRunning, setIsDangerRunning] = useState(false);
+
   const { isDockOpen, toggleDock } = useWorkspaceStore();
   const layoutMode = userSettings.layoutMode || 'sidebar-focus';
+  const developerMode = Boolean(userSettings.developerMode);
 
-  // Human-in-the-Loop Safety Interception
   const {
     activeRequest: hitlActiveRequest,
     isProcessing: isHitlProcessing,
@@ -196,13 +230,11 @@ export default function App() {
     dismiss: dismissHitl,
   } = useHitlApproval();
 
-  // Theme state via centralized useThemeStore + automated OS sync
   const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
   const cycleThemeMode = useThemeStore((s) => s.cycleThemeMode);
   const darkMode = resolvedScheme === 'dark';
   const toggleDarkMode = () => cycleThemeMode();
 
-  // Workspace Content Width Layout sync (compact / fluid / maximized)
   const contentLayout = userSettings.contentLayout || 'fluid';
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -210,18 +242,43 @@ export default function App() {
     }
   }, [contentLayout]);
 
-  // Initial fetch for MCP cluster telemetry
+  // Sync saved custom instructions into chat store on mount
   useEffect(() => {
-    fetchMcpServices();
-  }, [fetchMcpServices]);
+    if (userSettings.customInstructions && !customInstruction) {
+      setCustomInstruction(userSettings.customInstructions);
+    }
+  }, [userSettings.customInstructions, customInstruction, setCustomInstruction]);
 
-  // Live Server-Sent Events (SSE) telemetry pipeline for Admin Studio
+  // Fetch global platform governance config and MCP telemetry
+  useEffect(() => {
+    fetchConfig();
+    fetchMcpServices();
+  }, [fetchConfig, fetchMcpServices]);
+
+  // Sync central admin records whenever admin workspace is active
+  useEffect(() => {
+    if (currentRole === 'admin') {
+      fetchAdminSync();
+    }
+  }, [currentRole, fetchAdminSync]);
+
+  // Smooth tab routing when switching roles
+  const prevRoleRef = useRef(currentRole);
+  useEffect(() => {
+    if (prevRoleRef.current !== currentRole) {
+      if (currentRole === 'admin') {
+        setActiveTab('admin-overview');
+      } else if (ADMIN_ONLY_TABS.has(activeTab)) {
+        setActiveTab('chat');
+      }
+      prevRoleRef.current = currentRole;
+    }
+  }, [currentRole, activeTab, setActiveTab]);
+
   useMcpTelemetry(currentRole === 'admin');
 
-  // Active session lookup
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
-  // In-session search filtering
   const filteredChatMessages = React.useMemo(() => {
     const msgs = currentSession?.messages || [];
     if (!isChatSearchOpen) return msgs;
@@ -232,7 +289,6 @@ export default function App() {
     });
   }, [currentSession?.messages, isChatSearchOpen, chatRoleFilter, chatSearchQuery]);
 
-  // Auto-hide left sidebar whenever a user sends a message or streaming starts
   const prevSessionMsgRef = useRef<{ sessionId: string; count: number }>({
     sessionId: currentSession?.id || '',
     count: currentSession?.messages?.length || 0,
@@ -255,7 +311,6 @@ export default function App() {
     wasStreamingRef.current = isStreaming;
   }, [currentSession?.id, currentSession?.messages?.length, isStreaming]);
 
-  // Also collapse left sidebar when opening WorkspaceDock on medium/narrow viewports to prevent crowding
   const wasDockOpenRef = useRef<boolean>(isDockOpen);
   useEffect(() => {
     if (!wasDockOpenRef.current && isDockOpen && window.innerWidth < 1200) {
@@ -264,7 +319,6 @@ export default function App() {
     wasDockOpenRef.current = isDockOpen;
   }, [isDockOpen]);
 
-  // Project Quick Action Handlers
   const handleChatWithProject = (project: UserProject) => {
     createNewSession();
     setActiveTab('chat');
@@ -294,13 +348,27 @@ export default function App() {
     await sendMessage(text, attachment, knowledgeDocs, isDeepResearchActive);
   };
 
-  // If user is unauthenticated, show Authentication page
+  const handleExecuteDangerAction = async () => {
+    if (!dangerConfirm) return;
+    setIsDangerRunning(true);
+    try {
+      if (dangerConfirm.action === 'reboot-all') {
+        await rebootAllServices();
+      } else if (dangerConfirm.action === 'flush-dlq') {
+        retryAllDlq();
+      }
+      setDangerConfirm(null);
+    } finally {
+      setIsDangerRunning(false);
+    }
+  };
+
   if (!authUser) {
     return (
       <ErrorBoundary>
         <AuthPage
-          onLoginSuccess={() => {
-            setActiveTab('chat');
+          onLoginSuccess={(loggedInUser) => {
+            setActiveTab(loggedInUser.role === 'admin' ? 'admin-overview' : 'chat');
           }}
           darkMode={darkMode}
         />
@@ -312,6 +380,18 @@ export default function App() {
   const mcpAlertCount = getMcpAlertCount();
   const activePluginsCount = userPlugins.filter((p) => p.isEnabled).length;
   const isChatEmpty = (currentSession?.messages?.length || 0) === 0 && !isStreaming;
+  const showAnnouncement =
+    platformConfig.announcementBanner.active &&
+    platformConfig.announcementBanner.message.trim().length > 0 &&
+    dismissedBannerMessage !== platformConfig.announcementBanner.message;
+  const isMaintenanceBlocked = platformConfig.maintenanceMode && currentRole !== 'admin';
+
+  const bannerToneClasses =
+    platformConfig.announcementBanner.level === 'critical'
+      ? 'bg-rose-600 text-white border-rose-700'
+      : platformConfig.announcementBanner.level === 'warning'
+      ? 'bg-amber-500 text-slate-950 border-amber-600'
+      : 'bg-blue-600 text-white border-blue-700';
 
   return (
     <ErrorBoundary>
@@ -320,10 +400,50 @@ export default function App() {
           currentRole === 'admin' ? 'cyber-scanline' : ''
         }`}
       >
-        {/* Dynamic Live Screen Backdrop (automatically follows OS Light/Dark + selected scenic theme) */}
+        {/* Dynamic Live Screen Backdrop */}
         <LiveScreenBackdrop isEmpty={isChatEmpty} isChatView={activeTab === 'chat'} />
 
-        {/* Top Bar Navigation (Only shown in Classic Top Navigation layout mode) */}
+        {/* Admin Impersonation Bar */}
+        {impersonatedCustomer && (
+          <div className="relative z-30 px-4 py-1.5 bg-purple-600 text-white text-xs flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2 min-w-0 truncate">
+              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">
+                Viewing workspace as <strong>{impersonatedCustomer.name}</strong> ({impersonatedCustomer.tier} · {impersonatedCustomer.email})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                exitImpersonation();
+                setActiveTab('admin-overview');
+              }}
+              className="px-2.5 py-0.5 rounded-md bg-white/20 hover:bg-white/30 text-white font-semibold cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              Exit Impersonation
+            </button>
+          </div>
+        )}
+
+        {/* Global System Announcement Banner */}
+        {showAnnouncement && (
+          <div className={`relative z-30 px-4 py-1.5 text-xs border-b flex items-center justify-between gap-3 shrink-0 ${bannerToneClasses}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <Megaphone className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-medium truncate">{platformConfig.announcementBanner.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => dismissBanner(platformConfig.announcementBanner.message)}
+              aria-label="Dismiss announcement"
+              className="p-0.5 rounded hover:bg-black/15 cursor-pointer shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Top Bar Navigation (Classic layout mode) */}
         {layoutMode === 'classic' && (
           <div className="relative z-10">
             <Navbar
@@ -347,6 +467,51 @@ export default function App() {
 
         {/* Main Viewport Container */}
         <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative z-10">
+          {/* Maintenance Lock Overlay for non-admin workspaces */}
+          {isMaintenanceBlocked && (
+            <div className="absolute inset-0 z-40 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-6">
+              <div className="max-w-md w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 text-center space-y-4 shadow-2xl">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center mx-auto">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Scheduled Maintenance Active
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {platformConfig.maintenanceMessage}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  {(authUser.isAdminEligible || impersonatedCustomer) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (impersonatedCustomer) {
+                          exitImpersonation();
+                          setActiveTab('admin-overview');
+                        } else {
+                          handleToggleRole('admin');
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl theme-btn-primary text-xs font-semibold cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Return to Admin Console</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Studio Sidebar */}
           <Sidebar
             sessions={sessions}
@@ -354,6 +519,7 @@ export default function App() {
             onSelectSession={selectSession}
             onDeleteSession={deleteSession}
             onRenameSession={renameSession}
+            onTogglePinSession={togglePinSession}
             onNewSession={createNewSession}
             activeRole={activeRole}
             onOpenRoleModal={() => setIsRoleModalOpen(true)}
@@ -372,9 +538,12 @@ export default function App() {
             darkMode={darkMode}
             onToggleDarkMode={toggleDarkMode}
             layoutMode={layoutMode}
+            developerMode={developerMode}
+            tokensUsed={userSettings.monthlyTokensUsed}
+            tokensLimit={userSettings.monthlyTokensLimit}
           />
 
-          {/* Floating Sidebar Expand Button for Sidebar Focus Mode when Sidebar is collapsed */}
+          {/* Floating Sidebar Expand Button for Sidebar Focus Mode */}
           {layoutMode === 'sidebar-focus' && !sidebarOpen && (
             <button
               type="button"
@@ -387,78 +556,17 @@ export default function App() {
             </button>
           )}
 
-          {/* 1. Chat Workspace + Collapsible Resizable Right Split Dock (Preview / Terminal / Browser / Code) */}
+          {/* 1. Chat Workspace */}
           {activeTab === 'chat' && (
             <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative">
               <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative bg-transparent">
-
-                {/* Right-Aligned Workspace & Chat Utility Controls (Moved from bottom bar to right side) */}
+                {/* Streamlined Top-Right Chat Controls */}
                 <div
                   className={`relative z-20 px-3 sm:px-4 pt-3 flex items-center justify-end gap-1.5 flex-wrap pointer-events-none shrink-0 ${
                     layoutMode === 'sidebar-focus' && !sidebarOpen ? 'pl-14' : ''
                   }`}
                 >
                   <div className="pointer-events-auto flex items-center gap-1.5 flex-wrap justify-end">
-                    {/* Chat | Task mode selector */}
-                    <div className="flex items-center p-0.5 rounded-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-[11px] shadow-xs">
-                      <button
-                        type="button"
-                        onClick={() => setChatUtilityMode('chat')}
-                        className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                          chatUtilityMode === 'chat'
-                            ? 'bg-slate-900 dark:bg-slate-800 text-white shadow-xs'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        Chat
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChatUtilityMode('task')}
-                        className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                          chatUtilityMode === 'task'
-                            ? 'bg-slate-900 dark:bg-slate-800 text-white shadow-xs'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        Task
-                      </button>
-                    </div>
-
-                    {/* RAG Active indicator */}
-                    {knowledgeDocs.filter((d) => d.isGroundingActive).length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('user-knowledge')}
-                        title="Knowledge Base Grounding Active"
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 text-[11px] font-mono font-medium cursor-pointer hover:bg-cyan-500/20 transition-colors"
-                      >
-                        <Database className="w-3 h-3" />
-                        <span>RAG ({knowledgeDocs.filter((d) => d.isGroundingActive).length})</span>
-                      </button>
-                    )}
-
-                    {/* Recipes button */}
-                    <button
-                      type="button"
-                      onClick={() => setIsPromptModalOpen(true)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <BookOpen className="w-3 h-3 text-cyan-500" />
-                      <span className="hidden sm:inline">Recipes</span>
-                    </button>
-
-                    {/* Role selector */}
-                    <button
-                      type="button"
-                      onClick={() => setIsRoleModalOpen(true)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-xs"
-                    >
-                      <Sliders className="w-3 h-3" />
-                      <span className="hidden md:inline">{activeRole.name}</span>
-                    </button>
-
-                    {/* In-chat search toggle */}
                     <button
                       type="button"
                       onClick={() => setIsChatSearchOpen((prev) => !prev)}
@@ -473,10 +581,8 @@ export default function App() {
                       <span className="hidden md:inline">Search</span>
                     </button>
 
-                    {/* Export, Branch, Share & Clear when messages exist */}
                     {(currentSession?.messages?.length || 0) > 0 && (
                       <>
-                        {/* Branch conversation button */}
                         <button
                           type="button"
                           onClick={() => {
@@ -491,7 +597,6 @@ export default function App() {
                           <span className="hidden md:inline">Branch</span>
                         </button>
 
-                        {/* Share link button */}
                         <button
                           type="button"
                           onClick={async () => {
@@ -566,11 +671,9 @@ export default function App() {
                       </>
                     )}
 
-                    {/* Theme & Live Screen Switcher */}
                     <ThemeControlPopover onOpenSettings={() => setActiveTab('user-settings')} />
 
-                    {/* 1-click Right Workspace Dock Toggle in Sidebar Focus Mode */}
-                    {layoutMode === 'sidebar-focus' && (
+                    {layoutMode === 'sidebar-focus' && (developerMode || currentRole === 'admin') && (
                       <button
                         type="button"
                         onClick={toggleDock}
@@ -588,7 +691,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Inline In-Conversation Search Bar */}
                 {isChatSearchOpen && (
                   <ChatSearchBar
                     searchQuery={chatSearchQuery}
@@ -607,6 +709,7 @@ export default function App() {
                       activeRole={activeRole}
                       activeModel={activeModel}
                       userName={authUser?.name}
+                      onSelectPrompt={(prompt) => handleSendMessageWrapper(prompt)}
                     />
                     <div className="workspace-input-container mt-2">
                       <ChatInput
@@ -664,7 +767,7 @@ export default function App() {
                 )}
               </main>
 
-              <WorkspaceDock />
+              {(developerMode || currentRole === 'admin') && <WorkspaceDock />}
             </div>
           )}
 
@@ -709,11 +812,14 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'user-billing' && (
-            <UserBillingView
+          {(activeTab === 'user-billing' || (activeTab === 'usage' && currentRole !== 'admin')) && (
+            <UserPlanUsageView
+              planTier={authUser.plan || userSettings.plan}
               invoices={invoices}
               currentTokensUsed={userSettings.monthlyTokensUsed}
               tokensLimit={userSettings.monthlyTokensLimit}
+              sessions={sessions}
+              darkMode={darkMode}
               onTopUpTokens={topUpTokens}
             />
           )}
@@ -739,10 +845,25 @@ export default function App() {
             />
           )}
 
-          {/* 3. Usage Analytics (Recharts Telemetry) */}
-          {activeTab === 'usage' && <UsageView sessions={sessions} darkMode={darkMode} />}
+          {/* 3. Admin Usage Analytics */}
+          {activeTab === 'usage' && currentRole === 'admin' && (
+            <UsageView sessions={sessions} darkMode={darkMode} />
+          )}
 
-          {/* 4. Admin Studio Dashboard Views */}
+          {/* 4. Admin Studio Command Center & Operations */}
+          {activeTab === 'admin-overview' && (
+            <AdminOverviewView
+              customers={customers}
+              services={mcpServices}
+              workers={swarmWorkers}
+              jobs={queueJobs}
+              onNavigateTab={setActiveTab}
+              onOpenDangerConfirm={(action, title, description) =>
+                setDangerConfirm({ action, title, description })
+              }
+            />
+          )}
+
           {activeTab === 'agent-swarm' && (
             <AdminAgentSwarmView
               workers={swarmWorkers}
@@ -831,6 +952,49 @@ export default function App() {
           {activeTab === 'repos' && <RepoHub />}
         </div>
 
+        {/* Danger Zone Confirmation Modal */}
+        {dangerConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-rose-200 dark:border-rose-900/60 shadow-xl space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {dangerConfirm.title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDangerConfirm(null)}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                {dangerConfirm.description}
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setDangerConfirm(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDangerRunning}
+                  onClick={handleExecuteDangerAction}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isDangerRunning ? 'Executing...' : 'Confirm Action'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modals & Dialogs */}
         <RoleModal
           isOpen={isRoleModalOpen}
@@ -848,7 +1012,7 @@ export default function App() {
           onSuccess={() => {
             setIsAdminAuthModalOpen(false);
             handleToggleRole('admin');
-            setActiveTab('chat');
+            setActiveTab('admin-overview');
           }}
         />
 
@@ -863,12 +1027,11 @@ export default function App() {
             setIsTwoFactorModalOpen(false);
             useAuthStore.setState({ currentRole: 'admin' });
             localStorage.setItem('supremeai_studio_user_role', 'admin');
-            setActiveTab('chat');
+            setActiveTab('admin-overview');
           }}
           userEmail={authUser?.email || 'admin@supremeai.bd'}
         />
 
-        {/* Human-in-the-Loop Interception Modal */}
         <HitlApprovalModal
           isOpen={Boolean(hitlActiveRequest)}
           request={hitlActiveRequest}
@@ -888,7 +1051,6 @@ export default function App() {
           onSelectTemplate={(text) => handleSendMessageWrapper(text)}
         />
 
-        {/* Global Toast Notification System */}
         <ToastContainer />
       </div>
     </ErrorBoundary>

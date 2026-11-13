@@ -8,6 +8,11 @@ export interface ChatStreamOptions {
   groundingContext?: string;
   deepResearch?: boolean;
   stream?: boolean;
+  userContext?: {
+    email?: string;
+    role?: 'admin' | 'user';
+    tier?: 'Free' | 'Pro' | 'Enterprise';
+  };
   signal?: AbortSignal;
   onChunk: (text: string) => void;
   onDone: (fullText: string) => void;
@@ -23,6 +28,7 @@ export const chatService = {
       groundingContext,
       deepResearch = false,
       stream = true,
+      userContext,
       signal,
       onChunk,
       onDone,
@@ -39,6 +45,7 @@ export const chatService = {
           systemInstruction,
           groundingContext,
           deepResearch,
+          userContext,
           messages: messages.map((m) => ({
             role: m.role,
             content: m.content,

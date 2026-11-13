@@ -107,4 +107,6 @@ export const DEFAULT_USER_SETTINGS: UserAccountSettings = {
   defaultModel: 'gemini-3.8-flash',
   layoutMode: 'sidebar-focus',
   contentLayout: 'fluid',
+  developerMode: false,
+  customInstructions: '',
 };

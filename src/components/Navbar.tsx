@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PanelLeft, PanelRight, ShieldCheck, LogOut, ChevronDown, Laptop } from 'lucide-react';
 import { ModelDetail, UserRole, AuthUser } from '../types';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useCustomerStore } from '../stores/useCustomerStore';
 import { ThemeControlPopover } from './theme/ThemeControlPopover';
 
 interface NavbarProps {
@@ -24,9 +25,6 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onSelectTab,
-  onNewSession,
-  darkMode,
-  onToggleDarkMode,
   sidebarOpen,
   onToggleSidebar,
   activeModel,
@@ -39,6 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
+  const developerMode = useCustomerStore((s) => s.userSettings.developerMode);
+
   return (
     <header className="h-14 border-b border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between gap-6 shrink-0 transition-colors z-20">
       {/* Zone 1: Sidebar Toggle + Brand Wordmark with Gemini Star */}
@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <div
-          onClick={() => onSelectTab('chat')}
+          onClick={() => onSelectTab(currentRole === 'admin' ? 'admin-overview' : 'chat')}
           className="flex items-center gap-2 cursor-pointer group"
         >
           <div className="relative w-6 h-6 flex items-center justify-center">
@@ -88,10 +88,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Zone 2: Navigation Links depending on Current Role */}
-      <nav className="hidden md:flex items-center gap-4 text-xs font-medium text-slate-600 dark:text-slate-300">
+      {/* Zone 2: Navigation Links depending on Current Role & Developer Mode */}
+      <nav className="hidden md:flex items-center gap-3 text-xs font-medium text-slate-600 dark:text-slate-300">
         {currentRole === 'admin' ? (
           <>
+            <button
+              type="button"
+              onClick={() => onSelectTab('admin-overview')}
+              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                activeTab === 'admin-overview'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                  : 'hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Command Center
+            </button>
             <button
               type="button"
               onClick={() => onSelectTab('chat')}
@@ -105,14 +116,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('roles')}
+              onClick={() => onSelectTab('customers')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'roles'
+                activeTab === 'customers'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Customise Roles
+              Customers
             </button>
             <button
               type="button"
@@ -123,18 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Model Matrix
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectTab('customers')}
-              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'customers'
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
-                  : 'hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Customers
+              Models
             </button>
             <button
               type="button"
@@ -154,25 +154,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('usage')}
+              onClick={() => onSelectTab('feature-flags')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'usage'
+                activeTab === 'feature-flags'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Usage
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectTab('repos')}
-              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'repos'
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
-                  : 'hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Ecosystem Repos
+              Flags
             </button>
           </>
         ) : (
@@ -190,37 +179,52 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('user-projects')}
+              onClick={() => onSelectTab('user-billing')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'user-projects'
+                activeTab === 'user-billing' || activeTab === 'usage'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              My Projects
+              Plan & Usage
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('user-plugins')}
+              onClick={() => onSelectTab('user-team')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'user-plugins'
+                activeTab === 'user-team'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Plugins & Tools
+              Team
             </button>
-            <button
-              type="button"
-              onClick={() => onSelectTab('usage')}
-              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'usage'
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
-                  : 'hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Usage
-            </button>
+            {developerMode && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('user-projects')}
+                  className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                    activeTab === 'user-projects'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                      : 'hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Projects
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('user-plugins')}
+                  className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
+                    activeTab === 'user-plugins'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                      : 'hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Plugins
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => onSelectTab('user-settings')}
@@ -236,14 +240,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
       </nav>
 
-      {/* Zone 3: Role Switcher + Model + Theme + Profile / Sign Out */}
+      {/* Zone 3: Role Switcher + Model + Workspace Dock (if dev/admin) + Theme + Profile */}
       <div className="flex items-center gap-2.5 shrink-0">
-        {/* Role Switcher Pill: ONLY shown if Admin User ID is matched or already in admin mode */}
         {(currentRole === 'admin' || authUser?.isAdminEligible) && (
           <button
             type="button"
             onClick={onToggleRole}
-            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer ${
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               currentRole === 'admin'
                 ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
                 : 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100'
@@ -263,36 +266,35 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* Model Indicator */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
           <span className="font-mono text-[10px]">{activeModel.name.replace('Gemini ', '')}</span>
         </div>
 
-        {/* Split Workspace Dock Toggle (Preview / Terminal / Browser) */}
-        <button
-          type="button"
-          onClick={() => {
-            if (activeTab !== 'chat') {
-              onSelectTab('chat');
-              setDockOpen(true);
-            } else {
-              toggleDock();
-            }
-          }}
-          aria-label="Toggle Split Workspace Dock"
-          title="Toggle Split Workspace (Preview, Terminal, Browser)"
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-            isDockOpen && activeTab === 'chat'
-              ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400 shadow-xs'
-              : 'border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:border-cyan-500/40 hover:text-cyan-500'
-          }`}
-        >
-          <PanelRight className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Workspace</span>
-        </button>
+        {(developerMode || currentRole === 'admin') && (
+          <button
+            type="button"
+            onClick={() => {
+              if (activeTab !== 'chat') {
+                onSelectTab('chat');
+                setDockOpen(true);
+              } else {
+                toggleDock();
+              }
+            }}
+            aria-label="Toggle Split Workspace Dock"
+            title="Toggle Split Workspace (Preview, Terminal, Browser)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              isDockOpen && activeTab === 'chat'
+                ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400 shadow-xs'
+                : 'border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:border-cyan-500/40 hover:text-cyan-500'
+            }`}
+          >
+            <PanelRight className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Workspace</span>
+          </button>
+        )}
 
-        {/* Theme & Live Screen Popover */}
         <ThemeControlPopover
           compact
           onOpenSettings={() => onSelectTab('user-settings')}
@@ -306,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-1.5 p-1 pl-1.5 pr-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700 transition-colors cursor-pointer"
           >
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center text-[11px] font-bold">
-              {authUser?.avatar || authUser?.name?.charAt(0) || 'U'}
+              {authUser?.avatar || authUser?.name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <span className="hidden md:inline-block text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-[100px]">
               {authUser?.name?.split(' ')[0] || 'User'}
@@ -321,7 +323,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => setIsProfileOpen(false)}
               />
               <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-[#111622] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-40 p-3 space-y-2.5 animate-in fade-in text-xs">
-                {/* User info */}
                 <div className="pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
                   <div className="font-semibold text-slate-900 dark:text-white truncate">
                     {authUser?.name || 'SupremeAI User'}
@@ -329,19 +330,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <div className="text-[11px] text-slate-400 font-mono truncate">
                     {authUser?.email || 'user@supremeai.bd'}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mt-2 text-[11px] font-medium">
+                    <span className="text-blue-600 dark:text-blue-400">
                       {authUser?.plan || 'Pro'} Plan
                     </span>
                     {authUser?.isAdminEligible && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                        Admin Eligible
-                      </span>
+                      <>
+                        <span className="text-slate-400">·</span>
+                        <span className="font-mono text-purple-600 dark:text-purple-400">
+                          Admin Eligible
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* 7-day browser status */}
                 {trustedUntil && trustedUntil > Date.now() && (
                   <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-400 flex items-center gap-2">
                     <Laptop className="w-3.5 h-3.5 shrink-0" />
@@ -349,7 +352,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 )}
 
-                {/* Navigation items */}
                 <div className="space-y-1">
                   <button
                     type="button"
@@ -376,7 +378,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
 
-                {/* Sign Out Action */}
                 {onSignOut && (
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
                     <button

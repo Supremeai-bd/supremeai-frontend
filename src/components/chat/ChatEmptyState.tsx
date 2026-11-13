@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { PenLine, Bug, FileText, Layers } from 'lucide-react';
 import { RolePersona, ModelDetail } from '../../types';
 import { useThemeStore } from '../../stores/useThemeStore';
 
@@ -7,12 +8,45 @@ interface ChatEmptyStateProps {
   activeRole: RolePersona;
   activeModel: ModelDetail;
   userName?: string;
+  onSelectPrompt?: (prompt: string) => void;
 }
+
+const STARTER_PROMPTS = [
+  {
+    id: 'draft',
+    title: 'Draft & Edit',
+    subtitle: 'Write clear specs, emails, or release notes',
+    prompt: 'Help me draft a concise, structured technical product update for our engineering team and customers.',
+    icon: PenLine,
+  },
+  {
+    id: 'debug',
+    title: 'Debug Code',
+    subtitle: 'Find root causes and TypeScript fixes',
+    prompt: 'Analyze a tricky async race condition in React/TypeScript state management and show me a clean, leak-free fix.',
+    icon: Bug,
+  },
+  {
+    id: 'summarize',
+    title: 'Summarize Docs',
+    subtitle: 'Extract key decisions and action items',
+    prompt: 'Summarize complex technical architecture notes into executive bullet points, risks, and next action items.',
+    icon: FileText,
+  },
+  {
+    id: 'architect',
+    title: 'Architecture Plan',
+    subtitle: 'Design scalable APIs and data flows',
+    prompt: 'Design a resilient multi-tenant API architecture with rate limiting, caching, and zero-downtime deployment.',
+    icon: Layers,
+  },
+];
 
 export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   activeRole,
   activeModel,
   userName = 'Ziaul',
+  onSelectPrompt,
 }) => {
   const [isKeyPulse, setIsKeyPulse] = useState(false);
   const liveTheme = useThemeStore((s) => s.liveTheme);
@@ -39,7 +73,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
 
   return (
     <div
-      className={`relative z-10 flex flex-col items-center justify-center text-center px-6 py-6 select-none ${
+      className={`relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-4 select-none w-full max-w-3xl mx-auto ${
         isScenic ? 'rounded-3xl' : ''
       }`}
     >
@@ -53,7 +87,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
             ? { duration: 0.18 }
             : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
         }
-        className="mb-5 w-12 h-12 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/60 dark:border-cyan-500/30 flex items-center justify-center shadow-[0_8px_28px_rgba(15,23,42,0.12)] dark:shadow-[0_0_28px_rgba(0,240,255,0.2)]"
+        className="mb-4 w-12 h-12 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/60 dark:border-cyan-500/30 flex items-center justify-center shadow-[0_8px_28px_rgba(15,23,42,0.12)] dark:shadow-[0_0_28px_rgba(0,240,255,0.2)]"
       >
         <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
           <path
@@ -97,9 +131,9 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.15, duration: 0.45 }}
-        className={`flex items-center gap-2 text-xs mt-3 font-sans ${
+        className={`flex items-center gap-2 text-xs mt-2.5 font-sans ${
           isScenic
-            ? 'px-3.5 py-1 rounded-full bg-white/65 dark:bg-slate-900/60 backdrop-blur-md border border-white/50 dark:border-white/10 text-slate-700 dark:text-slate-200 shadow-xs'
+            ? 'px-3.5 py-1 rounded-xl bg-white/65 dark:bg-slate-900/60 backdrop-blur-md border border-white/50 dark:border-white/10 text-slate-700 dark:text-slate-200 shadow-xs'
             : 'text-slate-500 dark:text-slate-400'
         }`}
       >
@@ -109,6 +143,38 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         <span aria-hidden="true">·</span>
         <span className="theme-accent-text font-medium">SupremeAI Studio</span>
       </motion.div>
+
+      {/* 4 Clickable Starter Prompt Cards */}
+      {onSelectPrompt && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22, duration: 0.35 }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 w-full mt-6 text-left"
+        >
+          {STARTER_PROMPTS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onSelectPrompt(item.prompt)}
+                className="group p-3.5 rounded-xl bg-white/75 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:border-[var(--theme-accent)] transition-all cursor-pointer text-left flex flex-col justify-between gap-2 shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className="w-3.5 h-3.5 theme-accent-text shrink-0" />
+                  <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                    {item.title}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                  {item.subtitle}
+                </p>
+              </button>
+            );
+          })}
+        </motion.div>
+      )}
     </div>
   );
 };

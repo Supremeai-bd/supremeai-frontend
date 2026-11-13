@@ -50,8 +50,10 @@ interface AdminState {
   auditRecords: SystemAuditRecord[];
   customers: CustomerRecord[];
 
-  // MCP Operations
+  // MCP & Central Sync Operations
   fetchMcpServices: () => Promise<void>;
+  fetchAdminSync: () => Promise<void>;
+  fetchAuditRecords: () => Promise<void>;
   rebootService: (serviceId: string) => Promise<void>;
   rebootAllServices: () => Promise<void>;
   probeCluster: () => Promise<void>;
@@ -123,6 +125,40 @@ export const useAdminStore = create<AdminState>((set, get) => {
         }
       } catch (err) {
         console.warn('MCP tower fetch failed, using cached/mock telemetry:', err);
+      }
+    },
+
+    fetchAuditRecords: async () => {
+      try {
+        const records = await adminService.fetchAuditRecords();
+        if (records && records.length > 0) {
+          localStorage.setItem(AUDIT_KEY, JSON.stringify(records));
+          set({ auditRecords: records });
+        }
+      } catch {}
+    },
+
+    fetchAdminSync: async () => {
+      try {
+        const [customers, blockedIps, auditRecords] = await Promise.all([
+          adminService.fetchCustomers(),
+          adminService.fetchBlockedIps(),
+          adminService.fetchAuditRecords(),
+        ]);
+        if (customers && customers.length > 0) {
+          localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+          set({ customers });
+        }
+        if (blockedIps) {
+          localStorage.setItem(BLOCKED_IPS_KEY, JSON.stringify(blockedIps));
+          set({ blockedIps });
+        }
+        if (auditRecords && auditRecords.length > 0) {
+          localStorage.setItem(AUDIT_KEY, JSON.stringify(auditRecords));
+          set({ auditRecords });
+        }
+      } catch (err) {
+        console.warn('Admin central sync failed, keeping local cache:', err);
       }
     },
 
@@ -239,6 +275,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(QUEUE_KEY, JSON.stringify(updated));
         return { queueJobs: updated };
       });
+      adminService.flushDlq().then(() => get().fetchAuditRecords()).catch(() => {});
       toast.success('DLQ Reprocessed', 'All dead-letter jobs moved to active execution.');
     },
 
@@ -293,6 +330,14 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(BLOCKED_IPS_KEY, JSON.stringify(updated));
         return { blockedIps: updated };
       });
+      adminService
+        .blockIp(ip, reason)
+        .then((blockedIps) => {
+          localStorage.setItem(BLOCKED_IPS_KEY, JSON.stringify(blockedIps));
+          set({ blockedIps });
+          get().fetchAuditRecords();
+        })
+        .catch(() => {});
       toast.warning('IP Blocked', `${ip} has been added to Gateway WAF blacklist.`);
     },
 
@@ -302,6 +347,14 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(BLOCKED_IPS_KEY, JSON.stringify(updated));
         return { blockedIps: updated };
       });
+      adminService
+        .unblockIp(ip)
+        .then((blockedIps) => {
+          localStorage.setItem(BLOCKED_IPS_KEY, JSON.stringify(blockedIps));
+          set({ blockedIps });
+          get().fetchAuditRecords();
+        })
+        .catch(() => {});
       toast.info('IP Unblocked', `${ip} removed from WAF blacklist.`);
     },
 
@@ -317,6 +370,16 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(updated));
         return { customers: updated };
       });
+      adminService
+        .createCustomer(newCust)
+        .then((customers) => {
+          if (customers.length > 0) {
+            localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+            set({ customers });
+            get().fetchAuditRecords();
+          }
+        })
+        .catch(() => {});
       toast.success('Customer Created', `${customer.name} added to workspace.`);
     },
 
@@ -326,6 +389,16 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(updated));
         return { customers: updated };
       });
+      adminService
+        .updateCustomer(id, updates)
+        .then((customers) => {
+          if (customers.length > 0) {
+            localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+            set({ customers });
+            get().fetchAuditRecords();
+          }
+        })
+        .catch(() => {});
       toast.info('Customer Updated', 'Profile changes saved.');
     },
 
@@ -335,6 +408,14 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(updated));
         return { customers: updated };
       });
+      adminService
+        .deleteCustomer(id)
+        .then((customers) => {
+          localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+          set({ customers });
+          get().fetchAuditRecords();
+        })
+        .catch(() => {});
       toast.info('Customer Removed', 'Account purged from workspace.');
     },
   };

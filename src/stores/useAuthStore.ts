@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AuthUser, UserRole, CustomerRecord } from '../types';
 import { authService } from '../services/authService';
+import { useCustomerStore } from './useCustomerStore';
 import { toast } from './useToastStore';
 
 const AUTH_USER_KEY = 'supremeai_auth_user';
@@ -9,6 +10,8 @@ const TRUSTED_BROWSER_KEY = 'supremeai_trusted_browser_until';
 
 interface AuthState {
   authUser: AuthUser | null;
+  originalAdminUser: AuthUser | null;
+  impersonatedCustomer: CustomerRecord | null;
   currentRole: UserRole;
   trustedBrowserUntil: number | null;
   isTwoFactorModalOpen: boolean;
@@ -31,6 +34,7 @@ interface AuthState {
   setIsAdminAuthModalOpen: (open: boolean) => void;
   revokeTrustedBrowser: () => void;
   impersonateCustomer: (customer: CustomerRecord) => void;
+  exitImpersonation: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -72,6 +76,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
   return {
     authUser: getInitialUser(),
+    originalAdminUser: null,
+    impersonatedCustomer: null,
     currentRole: getInitialRole(),
     trustedBrowserUntil: getInitialTrustedUntil(),
     isTwoFactorModalOpen: false,
@@ -88,11 +94,22 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         set({
           authUser: res.user,
+          originalAdminUser: null,
+          impersonatedCustomer: null,
           currentRole: roleToSet,
           isLoading: false,
         });
 
-        toast.success(`Welcome back, ${res.user.name}!`, `Signed in as ${res.user.role === 'admin' ? 'Administrator' : 'User'}`);
+        useCustomerStore.getState().updateSettings({
+          name: res.user.name,
+          email: res.user.email,
+          plan: res.user.plan,
+        });
+
+        toast.success(
+          `Welcome back, ${res.user.name}!`,
+          `Signed in as ${res.user.role === 'admin' ? 'Administrator' : 'User'}`
+        );
         return true;
       } catch (err: unknown) {
         set({ isLoading: false });
@@ -110,8 +127,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         set({
           authUser: res.user,
+          originalAdminUser: null,
+          impersonatedCustomer: null,
           currentRole: res.user.role,
           isLoading: false,
+        });
+
+        useCustomerStore.getState().updateSettings({
+          name: res.user.name,
+          email: res.user.email,
+          plan: res.user.plan,
         });
 
         toast.success('Account Created', `Welcome to SupremeAI Studio, ${res.user.name}!`);
@@ -131,6 +156,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
       sessionStorage.removeItem('supremeai_admin_authed');
       set({
         authUser: null,
+        originalAdminUser: null,
+        impersonatedCustomer: null,
         currentRole: 'user',
         isTwoFactorModalOpen: false,
         isAdminAuthModalOpen: false,
@@ -167,17 +194,22 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     handleToggleRole: (forcedRole?: UserRole) => {
-      const { authUser, currentRole, trustedBrowserUntil } = get();
+      const { authUser, currentRole, trustedBrowserUntil, impersonatedCustomer } = get();
+      if (impersonatedCustomer && forcedRole === 'admin') {
+        get().exitImpersonation();
+        return;
+      }
       const nextRole = forcedRole || (currentRole === 'admin' ? 'user' : 'admin');
 
       if (nextRole === 'admin') {
-        // Identity check
         if (!authUser?.isAdminEligible) {
-          toast.warning('Access Restricted', 'Only verified Admin accounts matching admin_root_001 can switch to Admin Studio.');
+          toast.warning(
+            'Access Restricted',
+            'Only verified Admin accounts matching admin_root_001 can switch to Admin Studio.'
+          );
           return;
         }
 
-        // Check 7-day trusted browser
         const isBrowserTrusted = trustedBrowserUntil !== null && trustedBrowserUntil > Date.now();
         if (!isBrowserTrusted) {
           set({ isTwoFactorModalOpen: true });
@@ -200,9 +232,56 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     impersonateCustomer: (customer: CustomerRecord) => {
+      const { authUser, originalAdminUser } = get();
+      const adminSnapshot = originalAdminUser || authUser;
+
+      const impersonatedUser: AuthUser = {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        avatar: customer.name.charAt(0).toUpperCase(),
+        role: 'user',
+        isAdminEligible: false,
+        plan: customer.tier,
+        createdAt: customer.joinedDate,
+      };
+
       localStorage.setItem(ROLE_KEY, 'user');
-      set({ currentRole: 'user' });
-      toast.info('Customer Impersonation', `Switched to ${customer.name}'s workspace view.`);
+      useCustomerStore.getState().updateSettings({
+        name: customer.name,
+        email: customer.email,
+        plan: customer.tier,
+        monthlyTokensUsed: customer.tokensUsed,
+        monthlyTokensLimit: customer.tokenLimit,
+      });
+
+      set({
+        originalAdminUser: adminSnapshot,
+        impersonatedCustomer: customer,
+        authUser: impersonatedUser,
+        currentRole: 'user',
+      });
+      toast.info('Customer Impersonation Active', `Viewing workspace as ${customer.name} (${customer.tier}).`);
+    },
+
+    exitImpersonation: () => {
+      const { originalAdminUser } = get();
+      if (!originalAdminUser) return;
+
+      localStorage.setItem(ROLE_KEY, 'admin');
+      useCustomerStore.getState().updateSettings({
+        name: originalAdminUser.name,
+        email: originalAdminUser.email,
+        plan: originalAdminUser.plan,
+      });
+
+      set({
+        authUser: originalAdminUser,
+        originalAdminUser: null,
+        impersonatedCustomer: null,
+        currentRole: 'admin',
+      });
+      toast.success('Returned to Admin Studio', 'Exited customer impersonation session.');
     },
   };
 });

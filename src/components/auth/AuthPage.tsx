@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { AuthUser } from '../../types';
 import { LiveScreenBackdrop } from '../theme/LiveScreenBackdrop';
 import { ThemeControlPopover } from '../theme/ThemeControlPopover';
+import { usePlatformStore } from '../../stores/usePlatformStore';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { env } from '../../config/env';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser, token: string) => void;
   darkMode?: boolean;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = true }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('njelmedia@gmail.com');
   const [password, setPassword] = useState('admin123');
@@ -20,6 +23,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const config = usePlatformStore((s) => s.config);
+  const fetchConfig = usePlatformStore((s) => s.fetchConfig);
+
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -29,7 +39,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
     const payload = mode === 'login' ? { email, password } : { name, email, password, plan };
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(`${env.apiBaseUrl}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -40,6 +50,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
         throw new Error(data.error || 'Authentication failed. Please check your credentials.');
       }
 
+      if (data.token) {
+        localStorage.setItem('supremeai_access_token', data.token);
+      }
+      if (data.user) {
+        localStorage.setItem('supremeai_auth_user', JSON.stringify(data.user));
+        const role = data.user.isAdminEligible && data.user.role === 'admin' ? 'admin' : 'user';
+        localStorage.setItem('supremeai_studio_user_role', role);
+        useAuthStore.setState({ authUser: data.user, currentRole: role });
+      }
+
       onLoginSuccess(data.user, data.token);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
@@ -48,7 +68,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
     }
   };
 
-  // Demo account quick picker
   const pickDemoAccount = (demoEmail: string, demoPass: string, demoName: string) => {
     setMode('login');
     setEmail(demoEmail);
@@ -57,22 +76,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
     setErrorMessage(null);
   };
 
+  const signupPaused = mode === 'signup' && !config.allowNewSignups;
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors">
-      {/* Live Screen Backdrop with Automated OS Sync */}
       <LiveScreenBackdrop isEmpty isChatView />
 
-      {/* Top-right Theme & Live Screen Picker */}
       <div className="fixed top-4 right-4 z-30">
         <ThemeControlPopover />
       </div>
 
       <div className="w-full max-w-md relative z-10 space-y-6">
-        {/* Brand Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 text-xs font-semibold mb-1">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>SupremeAI Studio Next-Gen Architecture</span>
+            <span>SupremeAI Studio</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center justify-center gap-2">
@@ -94,14 +112,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
 
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             {mode === 'login'
-              ? 'Sign in to access your projects, agent swarm, and multi-turn Gemini reasoning models.'
-              : 'Create your developer account to begin crafting AI workflows and microservice telemetry.'}
+              ? 'Sign in to access your workspace, chats, and Gemini reasoning models.'
+              : 'Create your account to get started with SupremeAI Studio.'}
           </p>
         </div>
 
-        {/* Main Card */}
         <div className="rounded-3xl bg-white/85 dark:bg-[#111622]/85 backdrop-blur-2xl border border-white/60 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5">
-          {/* Segmented Mode Selector: Sign In / Create Account */}
+          {config.maintenanceMode && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-300 text-xs">
+              Scheduled maintenance is currently active. Only administrator accounts can access the workspace.
+            </div>
+          )}
+
           <div className="flex p-1 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs font-semibold">
             <button
               type="button"
@@ -133,6 +155,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
             </button>
           </div>
 
+          {signupPaused && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>New workspace signups are currently paused by the administrator.</span>
+            </div>
+          )}
+
           {errorMessage && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-xs animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -140,7 +169,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
@@ -183,11 +211,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                   Password
                 </label>
-                {mode === 'login' && (
-                  <span className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer">
-                    Forgot password?
-                  </span>
-                )}
               </div>
               <div className="relative">
                 <input
@@ -240,7 +263,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || signupPaused}
               className="w-full py-2.5 rounded-xl theme-btn-primary text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isLoading ? (
@@ -250,14 +273,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
                 </>
               ) : (
                 <>
-                  <span>{mode === 'login' ? 'Sign In to Studio' : 'Create Free Workspace'}</span>
+                  <span>{mode === 'login' ? 'Sign In to Studio' : 'Create Workspace'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Logins Section */}
+          {/* Quick Demo Logins */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
             <div className="flex items-center justify-between text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
               <span>Quick Test Accounts</span>
@@ -265,76 +288,51 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
             </div>
 
             <div className="space-y-1.5">
-              {/* Admin Demo */}
               <button
                 type="button"
                 onClick={() => pickDemoAccount('njelmedia@gmail.com', 'admin123', 'Ziaul Haq (Admin)')}
                 className="w-full flex items-center justify-between p-2 rounded-xl bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/20 text-left transition-colors cursor-pointer group"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-500 flex items-center justify-center font-bold text-[10px]">
-                    👑
+                <div className="truncate">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-cyan-400">
+                    Super Admin (njelmedia@gmail.com)
                   </div>
-                  <div className="truncate">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-cyan-400">
-                      Super Admin (njelmedia@gmail.com)
-                    </div>
-                    <div className="text-[10px] text-slate-400">Matched Admin ID: admin_root_001 • Has Admin Switch</div>
-                  </div>
+                  <div className="text-[10px] text-slate-400">Full Central Control & Admin Studio</div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-mono">
-                  Select
-                </span>
+                <span className="text-[10px] font-mono text-cyan-400">Select</span>
               </button>
 
-              {/* Standard Pro User Demo */}
               <button
                 type="button"
                 onClick={() => pickDemoAccount('sarah.chen@fintech.io', 'password123', 'Sarah Chen')}
                 className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-left transition-colors cursor-pointer group"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-[10px]">
-                    💻
+                <div className="truncate">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-400">
+                    Pro User (sarah.chen@fintech.io)
                   </div>
-                  <div className="truncate">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-400">
-                      Developer (sarah.chen@fintech.io)
-                    </div>
-                    <div className="text-[10px] text-slate-400">Standard User • Admin Switch Hidden</div>
-                  </div>
+                  <div className="text-[10px] text-slate-400">Pro Plan · Customer Workspace</div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-400 font-mono">
-                  Select
-                </span>
+                <span className="text-[10px] font-mono text-slate-400">Select</span>
               </button>
 
-              {/* Free Viewer Demo */}
               <button
                 type="button"
                 onClick={() => pickDemoAccount('alex.j@partner.io', 'password123', 'Alex Johnson')}
                 className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-left transition-colors cursor-pointer group"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-500 flex items-center justify-center font-bold text-[10px]">
-                    👥
+                <div className="truncate">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-purple-400">
+                    Free User (alex.j@partner.io)
                   </div>
-                  <div className="truncate">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-purple-400">
-                      Viewer (alex.j@partner.io)
-                    </div>
-                    <div className="text-[10px] text-slate-400">Free Tier User • Admin Switch Hidden</div>
-                  </div>
+                  <div className="text-[10px] text-slate-400">Free Tier · Basic Models</div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-400 font-mono">
-                  Select
-                </span>
+                <span className="text-[10px] font-mono text-slate-400">Select</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Security badge footer */}
         <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
           <span>SupremeAI Zero-Trust Vault • TOTP & WebAuthn Biometric 2FA Enabled</span>

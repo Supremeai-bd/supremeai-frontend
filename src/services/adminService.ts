@@ -1,10 +1,43 @@
 import { apiClient } from './apiClient';
-import { McpTowerService } from '../types';
+import {
+  McpTowerService,
+  PlatformConfig,
+  ModelPolicy,
+  CustomerRecord,
+  SystemAuditRecord,
+  BlockedIpRecord,
+  ProviderKeyItem,
+} from '../types';
 import { INITIAL_MCP_SERVICES, INITIAL_ADMIN_METRICS } from '../data/mcpTowerData';
 import { INITIAL_FEATURE_FLAGS } from '../data/adminExpansionData';
 import { env } from '../config/env';
 
 export const adminService = {
+  async fetchPlatformConfig(): Promise<PlatformConfig> {
+    return apiClient.get<PlatformConfig>('/api/platform/config');
+  },
+
+  async updatePlatformConfig(
+    updates: Partial<Omit<PlatformConfig, 'featureFlags' | 'modelPolicies'>> & { actor?: string }
+  ): Promise<PlatformConfig> {
+    const res = await apiClient.post<{ success: boolean; config: PlatformConfig }>(
+      '/api/admin/config',
+      updates
+    );
+    return res.config;
+  },
+
+  async updateModelPolicy(
+    modelId: string,
+    policy: Partial<ModelPolicy>
+  ): Promise<Record<string, ModelPolicy>> {
+    const res = await apiClient.post<{ success: boolean; modelPolicies: Record<string, ModelPolicy> }>(
+      '/api/admin/models/policy',
+      { modelId, ...policy }
+    );
+    return res.modelPolicies;
+  },
+
   async fetchOverview() {
     if (env.isMockEnabled) {
       return {
@@ -110,5 +143,81 @@ export const adminService = {
       [key]: enabled,
     });
     return data.flags;
+  },
+
+  async fetchCustomers(): Promise<CustomerRecord[]> {
+    const res = await apiClient.get<{ customers: CustomerRecord[] }>('/api/admin/customers');
+    return res.customers || [];
+  },
+
+  async createCustomer(
+    customer: Omit<CustomerRecord, 'id' | 'joinedDate' | 'lastActive'>
+  ): Promise<CustomerRecord[]> {
+    const res = await apiClient.post<{ customers: CustomerRecord[] }>('/api/admin/customers', customer);
+    return res.customers || [];
+  },
+
+  async updateCustomer(id: string, updates: Partial<CustomerRecord>): Promise<CustomerRecord[]> {
+    const res = await apiClient.request<{ customers: CustomerRecord[] }>(`/api/admin/customers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    return res.customers || [];
+  },
+
+  async deleteCustomer(id: string): Promise<CustomerRecord[]> {
+    const res = await apiClient.delete<{ customers: CustomerRecord[] }>(`/api/admin/customers/${id}`);
+    return res.customers || [];
+  },
+
+  async fetchBlockedIps(): Promise<BlockedIpRecord[]> {
+    const res = await apiClient.get<{ blockedIps: BlockedIpRecord[] }>('/api/admin/security');
+    return res.blockedIps || [];
+  },
+
+  async blockIp(ip: string, reason: string): Promise<BlockedIpRecord[]> {
+    const res = await apiClient.post<{ blockedIps: BlockedIpRecord[] }>('/api/admin/security/block-ip', {
+      ip,
+      reason,
+    });
+    return res.blockedIps || [];
+  },
+
+  async unblockIp(ip: string): Promise<BlockedIpRecord[]> {
+    const res = await apiClient.delete<{ blockedIps: BlockedIpRecord[] }>(
+      `/api/admin/security/block-ip/${encodeURIComponent(ip)}`
+    );
+    return res.blockedIps || [];
+  },
+
+  async fetchAuditRecords(): Promise<SystemAuditRecord[]> {
+    const res = await apiClient.get<{ auditRecords: SystemAuditRecord[] }>('/api/admin/audit');
+    return res.auditRecords || [];
+  },
+
+  async flushDlq(): Promise<void> {
+    await apiClient.post('/api/admin/queue/flush-dlq');
+  },
+
+  async fetchProviders(): Promise<ProviderKeyItem[]> {
+    const res = await apiClient.get<{ providers: ProviderKeyItem[] }>('/api/admin/providers');
+    return res.providers || [];
+  },
+
+  async probeProvider(
+    providerId: string
+  ): Promise<{ success: boolean; message: string; providers: ProviderKeyItem[] }> {
+    return apiClient.post('/api/admin/providers/probe', { providerId });
+  },
+
+  async updateProviderPriority(
+    providerId: string,
+    direction: 'up' | 'down'
+  ): Promise<ProviderKeyItem[]> {
+    const res = await apiClient.post<{ providers: ProviderKeyItem[] }>('/api/admin/providers/priority', {
+      providerId,
+      direction,
+    });
+    return res.providers || [];
   },
 };

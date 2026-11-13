@@ -48,6 +48,7 @@ export interface ChatSession {
   messages: ChatMessage[];
   projectId?: string;
   parentSessionId?: string;
+  isPinned?: boolean;
 }
 
 export interface RolePersona {
@@ -113,6 +114,8 @@ export interface UserAccountSettings {
   defaultModel: string;
   layoutMode?: 'sidebar-focus' | 'classic';
   contentLayout?: WorkspaceContentLayout;
+  developerMode?: boolean;
+  customInstructions?: string;
 }
 
 export interface CustomerRecord {
@@ -343,6 +346,31 @@ export interface WebhookDeliveryLog {
   success: boolean;
 }
 
+export type PlanTier = 'Free' | 'Pro' | 'Enterprise';
 
+export interface AnnouncementBanner {
+  active: boolean;
+  message: string;
+  level: 'info' | 'warning' | 'critical';
+}
 
+export interface ModelPolicy {
+  enabled: boolean;
+  minTier: PlanTier;
+}
 
+export interface PlatformConfig {
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  announcementBanner: AnnouncementBanner;
+  allowNewSignups: boolean;
+  defaultModelId: string;
+  featureFlags: Record<string, boolean>;
+  modelPolicies: Record<string, ModelPolicy>;
+}
+
+export interface BlockedIpRecord {
+  ip: string;
+  reason: string;
+  date: string;
+}
