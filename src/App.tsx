@@ -47,6 +47,10 @@ import { PromptLibraryModal } from './components/user/PromptLibraryModal';
 import { AuthPage } from './components/auth/AuthPage';
 import { UsageView } from './components/UsageView';
 import { ToastContainer } from './components/common/ToastContainer';
+// AUDIT FIX (2026-11-13, N3): `toast` was used at App.tsx share-link button
+// but never imported — tsc --noEmit failed with 2x TS2304. The convenience
+// helper is exported by the toast store.
+import { toast } from './stores/useToastStore';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { WorkspaceDock } from './components/workspace/WorkspaceDock';
 
