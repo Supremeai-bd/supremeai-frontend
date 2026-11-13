@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { ChatSearchBar } from './components/chat/ChatSearchBar';
 import { shareService } from './services/shareService';
-import { motion } from 'motion/react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ChatThread } from './components/ChatThread';
@@ -56,135 +55,19 @@ import { useChatStore } from './stores/useChatStore';
 import { useAdminStore } from './stores/useAdminStore';
 import { useCustomerStore } from './stores/useCustomerStore';
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
+import { useThemeStore } from './stores/useThemeStore';
+import { toast } from './stores/useToastStore';
 import { useTabRouter } from './hooks/useTabRouter';
 import { useMcpTelemetry } from './hooks/useMcpTelemetry';
+import { useOsThemeSync } from './hooks/useOsThemeSync';
+import { LiveScreenBackdrop } from './components/theme/LiveScreenBackdrop';
+import { ThemeControlPopover } from './components/theme/ThemeControlPopover';
 import { UserProject, ChatAttachment } from './types';
 
-const THEME_KEY = 'supremeai_studio_theme';
-
-export const ReactAmbientAura: React.FC<{ isEmpty?: boolean }> = ({ isEmpty = true }) => {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0, nx: 0.5, ny: 0.5 });
-  const [keyPulse, setKeyPulse] = useState(0);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const nx = e.clientX / Math.max(window.innerWidth, 1);
-      const ny = e.clientY / Math.max(window.innerHeight, 1);
-      setMousePos({
-        x: (nx - 0.5) * 44,
-        y: (ny - 0.5) * 44,
-        nx,
-        ny,
-      });
-    };
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') {
-        setKeyPulse((prev) => prev + 1);
-        clearTimeout(timeout);
-        timeout = setTimeout(() => setKeyPulse(0), 340);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      clearTimeout(timeout);
-    };
-  }, []);
-
-  const isTyping = keyPulse > 0;
-  const waveAmplitude = isTyping ? 24 : 12 + (mousePos.ny - 0.5) * 18;
-  const waveShift = (mousePos.nx - 0.5) * 40;
-
-  return (
-    <div
-      aria-hidden="true"
-      className={`pointer-events-none select-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-500 ${
-        isEmpty ? 'opacity-100' : 'opacity-30'
-      }`}
-    >
-      {/* Interactive Mouse & Keystroke Glowing Neural Orb */}
-      <motion.div
-        animate={{
-          x: mousePos.x * 1.1,
-          y: mousePos.y * 1.1,
-          scale: isTyping ? 1.18 : [1, 1.07, 1],
-          opacity: isTyping ? 0.65 : [0.35, 0.5, 0.35],
-        }}
-        transition={{
-          x: { type: 'spring', stiffness: 55, damping: 20 },
-          y: { type: 'spring', stiffness: 55, damping: 20 },
-          scale: isTyping
-            ? { duration: 0.22 }
-            : { duration: 7, repeat: Infinity, ease: 'easeInOut' },
-          opacity: isTyping
-            ? { duration: 0.22 }
-            : { duration: 7, repeat: Infinity, ease: 'easeInOut' },
-        }}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[26rem] h-[26rem] rounded-full bg-gradient-to-tr from-cyan-400/25 via-blue-500/20 to-violet-500/25 blur-3xl"
-      />
-
-      {/* Secondary Counter-Orbital Glow */}
-      <motion.div
-        animate={{
-          x: -mousePos.x * 0.7,
-          y: -mousePos.y * 0.7,
-          scale: isTyping ? 1.12 : 1,
-        }}
-        transition={{ type: 'spring', stiffness: 45, damping: 22 }}
-        className="absolute top-[42%] left-[52%] -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-gradient-to-br from-violet-500/15 via-cyan-400/15 to-emerald-400/10 blur-2xl"
-      />
-
-      {/* Interactive SVG Neural Wave */}
-      <svg
-        viewBox="0 0 1200 320"
-        preserveAspectRatio="none"
-        className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-72 opacity-55 dark:opacity-65"
-      >
-        <defs>
-          <linearGradient id="neural-wave-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(6, 182, 212, 0)" />
-            <stop offset="30%" stopColor="rgba(6, 182, 212, 0.45)" />
-            <stop offset="70%" stopColor="rgba(139, 92, 246, 0.45)" />
-            <stop offset="100%" stopColor="rgba(139, 92, 246, 0)" />
-          </linearGradient>
-          <linearGradient id="neural-wave-blue" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(59, 130, 246, 0)" />
-            <stop offset="50%" stopColor="rgba(59, 130, 246, 0.35)" />
-            <stop offset="100%" stopColor="rgba(6, 182, 212, 0)" />
-          </linearGradient>
-        </defs>
-
-        <motion.path
-          animate={{
-            d: `M 0 160 Q ${300 + waveShift} ${160 - waveAmplitude * 2.2}, 600 160 T 1200 160`,
-            strokeWidth: isTyping ? 2.2 : 1.4,
-          }}
-          transition={{ type: 'spring', stiffness: 90, damping: 18 }}
-          fill="none"
-          stroke="url(#neural-wave-cyan)"
-        />
-
-        <motion.path
-          animate={{
-            d: `M 0 170 Q ${320 - waveShift} ${170 + waveAmplitude * 1.9}, 600 165 T 1200 155`,
-            strokeWidth: isTyping ? 1.8 : 1.1,
-          }}
-          transition={{ type: 'spring', stiffness: 70, damping: 20 }}
-          fill="none"
-          stroke="url(#neural-wave-blue)"
-        />
-      </svg>
-    </div>
-  );
-};
-
 export default function App() {
+  // Automated OS color-scheme & reduced-motion synchronization
+  useOsThemeSync();
+
   // Routing hook via Query Parameter (?tab=...) and Hash (#...)
   const { activeTab, setActiveTab } = useTabRouter('chat');
 
@@ -309,24 +192,19 @@ export default function App() {
     dismiss: dismissHitl,
   } = useHitlApproval();
 
-  // Theme state
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved !== null) return saved === 'dark';
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+  // Theme state via centralized useThemeStore + automated OS sync
+  const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
+  const cycleThemeMode = useThemeStore((s) => s.cycleThemeMode);
+  const darkMode = resolvedScheme === 'dark';
+  const toggleDarkMode = () => cycleThemeMode();
 
+  // Workspace Content Width Layout sync (compact / fluid / maximized)
+  const contentLayout = userSettings.contentLayout || 'fluid';
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem(THEME_KEY, 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem(THEME_KEY, 'light');
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.workspaceLayout = contentLayout;
     }
-  }, [darkMode]);
-
-  const toggleDarkMode = () => setDarkMode(!darkMode);
+  }, [contentLayout]);
 
   // Initial fetch for MCP cluster telemetry
   useEffect(() => {
@@ -434,16 +312,12 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div
-        className={`flex flex-col h-full w-full bg-[#f8fafc] dark:bg-[#080b11] text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden transition-colors relative ${
+        className={`theme-crossfade flex flex-col h-full w-full text-slate-900 dark:text-slate-100 font-sans antialiased overflow-hidden relative ${
           currentRole === 'admin' ? 'cyber-scanline' : ''
         }`}
       >
-        {/* Cyber-Ground Perspective Digital Neon Grid */}
-        <div className="absolute inset-0 cyber-ground-grid pointer-events-none z-0" />
-
-        {/* Ambient Neon Plasma Aurora Glow Blobs */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-cyan-500/15 dark:bg-cyan-500/10 blur-3xl pointer-events-none z-0 cyber-aurora-cyan" />
-        <div className="absolute -bottom-32 -right-32 w-[32rem] h-[32rem] rounded-full bg-purple-500/15 dark:bg-violet-600/10 blur-3xl pointer-events-none z-0 cyber-aurora-violet" />
+        {/* Dynamic Live Screen Backdrop (automatically follows OS Light/Dark + selected scenic theme) */}
+        <LiveScreenBackdrop isEmpty={isChatEmpty} isChatView={activeTab === 'chat'} />
 
         {/* Top Bar Navigation (Only shown in Classic Top Navigation layout mode) */}
         {layoutMode === 'classic' && (
@@ -512,9 +386,7 @@ export default function App() {
           {/* 1. Chat Workspace + Collapsible Resizable Right Split Dock (Preview / Terminal / Browser / Code) */}
           {activeTab === 'chat' && (
             <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative">
-              <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(219,234,254,0.45),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(30,58,138,0.2),rgba(19,19,20,0))]">
-                {/* Interactive React Ambient Aura in empty chat area */}
-                <ReactAmbientAura isEmpty={isChatEmpty} />
+              <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative bg-transparent">
 
                 {/* Right-Aligned Workspace & Chat Utility Controls (Moved from bottom bar to right side) */}
                 <div
@@ -690,6 +562,9 @@ export default function App() {
                       </>
                     )}
 
+                    {/* Theme & Live Screen Switcher */}
+                    <ThemeControlPopover onOpenSettings={() => setActiveTab('user-settings')} />
+
                     {/* 1-click Right Workspace Dock Toggle in Sidebar Focus Mode */}
                     {layoutMode === 'sidebar-focus' && (
                       <button
@@ -698,7 +573,7 @@ export default function App() {
                         aria-label={isDockOpen ? 'Close workspace dock' : 'Open workspace dock'}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium backdrop-blur-md border transition-all cursor-pointer shadow-xs ${
                           isDockOpen
-                            ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-300'
+                            ? 'theme-accent-active'
                             : 'bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
@@ -729,7 +604,7 @@ export default function App() {
                       activeModel={activeModel}
                       userName={authUser?.name}
                     />
-                    <div className="w-full max-w-4xl mt-2">
+                    <div className="workspace-input-container mt-2">
                       <ChatInput
                         onSendMessage={handleSendMessageWrapper}
                         onStopStreaming={stopStreaming}

@@ -72,7 +72,7 @@ export const UserProjectsView: React.FC<UserProjectsViewProps> = ({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-8 max-w-5xl mx-auto space-y-6 text-slate-800 dark:text-slate-200">
+    <div className="flex-1 overflow-y-auto px-6 py-8 workspace-container space-y-6 text-slate-800 dark:text-slate-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
         <div>

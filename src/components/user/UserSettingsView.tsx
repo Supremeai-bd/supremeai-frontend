@@ -18,9 +18,24 @@ import {
   ShieldAlert,
   PanelLeft,
   LayoutGrid,
+  Sun,
+  Moon,
+  Monitor,
+  Palette,
+  Play,
+  Pause,
+  Columns3,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
-import { UserAccountSettings, UserRole } from '../../types';
+import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
 import { GEMINI_MODELS } from '../../data/models';
+import {
+  useThemeStore,
+  LIVE_THEMES,
+  ThemeMode,
+  LiveThemeId,
+} from '../../stores/useThemeStore';
 
 interface UserSettingsViewProps {
   settings: UserAccountSettings;
@@ -52,7 +67,20 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const [layoutMode, setLayoutMode] = useState<'sidebar-focus' | 'classic'>(
     settings.layoutMode || 'sidebar-focus'
   );
+  const [contentLayout, setContentLayout] = useState<WorkspaceContentLayout>(
+    settings.contentLayout || 'fluid'
+  );
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const themeMode = useThemeStore((s) => s.themeMode);
+  const osPrefersDark = useThemeStore((s) => s.osPrefersDark);
+  const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
+  const liveTheme = useThemeStore((s) => s.liveTheme);
+  const liveMotion = useThemeStore((s) => s.liveMotion);
+  const prefersReducedMotion = useThemeStore((s) => s.prefersReducedMotion);
+  const setThemeMode = useThemeStore((s) => s.setThemeMode);
+  const setLiveTheme = useThemeStore((s) => s.setLiveTheme);
+  const setLiveMotion = useThemeStore((s) => s.setLiveMotion);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +92,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       streamResponses,
       defaultModel,
       layoutMode,
+      contentLayout,
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
@@ -75,7 +104,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-8 max-w-4xl mx-auto space-y-8 text-slate-800 dark:text-slate-200">
+    <div className="flex-1 overflow-y-auto px-6 py-8 workspace-container space-y-8 text-slate-800 dark:text-slate-200">
       {/* Header */}
       <div className="border-b border-slate-200/80 dark:border-slate-800 pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -172,6 +201,176 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
         </div>
       </div>
 
+      {/* Appearance, Automated OS Sync & Live Screen Themes */}
+      <div className="p-5 rounded-2xl bg-white/90 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 space-y-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Palette className="w-4 h-4 theme-accent-text" />
+              <span>Appearance, OS Sync & Live Screens</span>
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Automatically watch your OS color scheme or choose a fixed mode and ambient live screen.
+            </p>
+          </div>
+
+          <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
+            OS Preference: <span className="font-semibold text-slate-800 dark:text-slate-200">{osPrefersDark ? 'Dark' : 'Light'}</span>
+            {themeMode === 'system' && (
+              <span className="theme-accent-text"> · Syncing live</span>
+            )}
+          </div>
+        </div>
+
+        {/* 3-Way Color Scheme Mode */}
+        <div>
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Color Scheme Synchronization
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {(
+              [
+                {
+                  id: 'system' as ThemeMode,
+                  title: 'Auto (OS Sync)',
+                  desc: `Matches system setting (currently ${osPrefersDark ? 'Dark' : 'Light'})`,
+                  icon: <Monitor className="w-4 h-4" />,
+                },
+                {
+                  id: 'light' as ThemeMode,
+                  title: 'Light',
+                  desc: 'Always use bright daylight surfaces',
+                  icon: <Sun className="w-4 h-4" />,
+                },
+                {
+                  id: 'dark' as ThemeMode,
+                  title: 'Dark',
+                  desc: 'Always use deep low-glare surfaces',
+                  icon: <Moon className="w-4 h-4" />,
+                },
+              ]
+            ).map((modeOpt) => {
+              const active = themeMode === modeOpt.id;
+              return (
+                <button
+                  key={modeOpt.id}
+                  type="button"
+                  onClick={() => setThemeMode(modeOpt.id)}
+                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    active
+                      ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <div className={`mt-0.5 shrink-0 ${active ? 'theme-accent-text' : 'text-slate-400'}`}>
+                    {modeOpt.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold">{modeOpt.title}</div>
+                    <div className="text-[11px] opacity-80 mt-0.5">{modeOpt.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Live Screen Theme Cards */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Live Screen Backdrop
+            </label>
+            <button
+              type="button"
+              onClick={() => setLiveMotion(!liveMotion)}
+              disabled={prefersReducedMotion}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50 ${
+                liveMotion && !prefersReducedMotion
+                  ? 'theme-accent-active'
+                  : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              {liveMotion && !prefersReducedMotion ? (
+                <>
+                  <Pause className="w-3 h-3" />
+                  <span>Live Motion On</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  <span>{prefersReducedMotion ? 'OS Reduced Motion' : 'Static Screen'}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {LIVE_THEMES.map((theme) => {
+              const isSelected = liveTheme === theme.id;
+              const previewBg =
+                resolvedScheme === 'dark'
+                  ? theme.darkPreviewGradient
+                  : theme.lightPreviewGradient;
+
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => setLiveTheme(theme.id as LiveThemeId)}
+                  className={`group rounded-xl border overflow-hidden text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'theme-accent-active ring-2 ring-[var(--theme-accent-ring)]'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50/70 dark:bg-slate-800/50'
+                  }`}
+                >
+                  <div
+                    className="h-24 w-full relative overflow-hidden"
+                    style={{ background: previewBg }}
+                  >
+                    {theme.previewImage && (
+                      <img
+                        src={theme.previewImage}
+                        alt={theme.name}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        style={{
+                          filter: theme.isNocturnalPhoto
+                            ? resolvedScheme === 'dark'
+                              ? 'brightness(0.86) contrast(1.06)'
+                              : 'brightness(1.22) contrast(0.94) saturate(0.88)'
+                            : resolvedScheme === 'dark'
+                            ? 'brightness(0.45) contrast(1.15) saturate(0.8)'
+                            : 'none',
+                        }}
+                      />
+                    )}
+                    {/* Mini floating glass prompt bar preview */}
+                    <div className="absolute inset-x-4 top-5 h-3.5 rounded-full bg-white/80 dark:bg-slate-900/75 backdrop-blur-md border border-white/60 dark:border-white/10 shadow-xs" />
+                    {isSelected && (
+                      <span className="absolute top-2 right-2 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm">
+                        <Check className="w-3 h-3" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-2.5">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white">
+                      {theme.name}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                      {theme.subtitle}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Settings Form */}
       <form
         onSubmit={handleSave}
@@ -225,7 +424,72 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
           </select>
         </div>
 
-        {/* Workspace Layout Mode Segmented Selector */}
+        {/* Workspace Content Width Layout Switcher (Compact / Fluid / Maximized) */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Workspace Layout
+            </label>
+            <span className="text-[11px] font-mono text-slate-400">
+              {contentLayout === 'compact'
+                ? '800px focused column'
+                : contentLayout === 'fluid'
+                ? '1088px balanced width'
+                : '100% full-bleed canvas'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {(
+              [
+                {
+                  id: 'compact' as WorkspaceContentLayout,
+                  title: 'Compact',
+                  desc: 'Narrow reading column for distraction-free focus (~800px).',
+                  icon: <Minimize2 className="w-4 h-4" />,
+                },
+                {
+                  id: 'fluid' as WorkspaceContentLayout,
+                  title: 'Fluid',
+                  desc: 'Balanced adaptive container across chats and views (~1088px).',
+                  icon: <Columns3 className="w-4 h-4" />,
+                },
+                {
+                  id: 'maximized' as WorkspaceContentLayout,
+                  title: 'Maximized',
+                  desc: 'Edge-to-edge full workspace width for wide monitors (100%).',
+                  icon: <Maximize2 className="w-4 h-4" />,
+                },
+              ]
+            ).map((opt) => {
+              const active = contentLayout === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setContentLayout(opt.id);
+                    onUpdateSettings({ contentLayout: opt.id });
+                  }}
+                  className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    active
+                      ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <div className={`mt-0.5 shrink-0 ${active ? 'theme-accent-text' : 'text-slate-400'}`}>
+                    {opt.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold">{opt.title}</div>
+                    <div className="text-[11px] opacity-80 mt-0.5">{opt.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Workspace Navigation Layout Mode Segmented Selector */}
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
             Workspace Navigation Layout
@@ -239,11 +503,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               }}
               className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                 layoutMode === 'sidebar-focus'
-                  ? 'border-cyan-500/60 bg-cyan-500/10 text-slate-900 dark:text-white shadow-xs'
+                  ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
                   : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
-              <PanelLeft className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'sidebar-focus' ? 'text-cyan-500' : 'text-slate-400'}`} />
+              <PanelLeft className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'sidebar-focus' ? 'theme-accent-text' : 'text-slate-400'}`} />
               <div>
                 <div className="text-xs font-semibold">Sidebar Focus (Gemini)</div>
                 <div className="text-[11px] opacity-80 mt-0.5">
@@ -260,11 +524,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               }}
               className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                 layoutMode === 'classic'
-                  ? 'border-cyan-500/60 bg-cyan-500/10 text-slate-900 dark:text-white shadow-xs'
+                  ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
                   : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
-              <LayoutGrid className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'classic' ? 'text-cyan-500' : 'text-slate-400'}`} />
+              <LayoutGrid className={`w-4 h-4 mt-0.5 shrink-0 ${layoutMode === 'classic' ? 'theme-accent-text' : 'text-slate-400'}`} />
               <div>
                 <div className="text-xs font-semibold">Top Navigation (Classic)</div>
                 <div className="text-[11px] opacity-80 mt-0.5">
@@ -341,7 +605,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
 
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-medium hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full theme-btn-primary text-xs font-medium cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
             <span>Save Preferences</span>

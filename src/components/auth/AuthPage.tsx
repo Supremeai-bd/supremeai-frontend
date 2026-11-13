@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, CheckCircle2, AlertCircle, KeyRound, Laptop } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { AuthUser } from '../../types';
+import { LiveScreenBackdrop } from '../theme/LiveScreenBackdrop';
+import { ThemeControlPopover } from '../theme/ThemeControlPopover';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser, token: string) => void;
@@ -56,9 +58,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-slate-50 dark:bg-[#0a0d14] text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[360px] bg-gradient-to-tr from-cyan-500/10 via-blue-500/10 to-purple-500/10 blur-[100px] pointer-events-none rounded-full" />
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors">
+      {/* Live Screen Backdrop with Automated OS Sync */}
+      <LiveScreenBackdrop isEmpty isChatView />
+
+      {/* Top-right Theme & Live Screen Picker */}
+      <div className="fixed top-4 right-4 z-30">
+        <ThemeControlPopover />
+      </div>
 
       <div className="w-full max-w-md relative z-10 space-y-6">
         {/* Brand Header */}
@@ -93,7 +100,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
         </div>
 
         {/* Main Card */}
-        <div className="rounded-3xl bg-white dark:bg-[#111622] border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5">
+        <div className="rounded-3xl bg-white/85 dark:bg-[#111622]/85 backdrop-blur-2xl border border-white/60 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5">
           {/* Segmented Mode Selector: Sign In / Create Account */}
           <div className="flex p-1 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs font-semibold">
             <button
@@ -234,7 +241,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, darkMode = t
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 rounded-xl theme-btn-primary text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isLoading ? (
                 <>

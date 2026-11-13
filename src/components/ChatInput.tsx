@@ -148,7 +148,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="w-full px-4 py-3 bg-transparent transition-colors">
-      <div className="max-w-3xl mx-auto space-y-2.5">
+      <div className="workspace-input-container space-y-2.5">
         {/* Hidden File Input */}
         <input
           ref={fileInputRef}
@@ -187,7 +187,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         {/* Gemini-style Floating Input Capsule */}
-        <div className="relative rounded-3xl bg-slate-100/90 dark:bg-[#1e1f20] border border-slate-200/90 dark:border-slate-800 shadow-md focus-within:shadow-lg focus-within:border-slate-400 dark:focus-within:border-slate-600 transition-all p-2.5 flex items-center gap-2">
+        <div className="relative rounded-full sm:rounded-3xl bg-white/85 dark:bg-[#171b26]/82 backdrop-blur-2xl border border-white/75 dark:border-slate-700/75 shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.45)] theme-capsule-focus transition-all p-2.5 flex items-center gap-2">
           {/* Plus (+) Button for Connectors, Skills, and File Uploads */}
           <div className="relative">
             <button
@@ -277,7 +277,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               title={isGroundingActive ? "Knowledge Base Grounding Active (Click to disable)" : "Enable Knowledge Base Grounding (RAG)"}
               className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                 isGroundingActive
-                  ? "bg-cyan-500/20 text-cyan-500 border border-cyan-500/40 shadow-xs"
+                  ? "theme-accent-active border shadow-xs"
                   : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60"
               }`}
             >
@@ -396,7 +396,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onClick={() => handleSubmit()}
                 disabled={!inputText.trim() && !attachment}
                 aria-label="Send prompt"
-                className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                className="w-8 h-8 rounded-full theme-btn-primary disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
               </button>

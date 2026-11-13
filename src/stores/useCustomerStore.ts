@@ -312,6 +312,9 @@ export const useCustomerStore = create<CustomerState>((set) => {
       set((state) => {
         const updated = { ...state.userSettings, ...newSettings };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+        if (typeof document !== 'undefined' && updated.contentLayout) {
+          document.documentElement.dataset.workspaceLayout = updated.contentLayout;
+        }
         return { userSettings: updated };
       });
       toast.info('Settings Saved', 'Account preferences updated.');

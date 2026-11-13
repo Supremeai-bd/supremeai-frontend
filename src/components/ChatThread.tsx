@@ -142,7 +142,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
             userName={userName}
           />
         ) : (
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="workspace-chat-container space-y-4">
             {filteredMessages.map((msg) => (
               <ChatMessageItem
                 key={msg.id}

@@ -7,6 +7,26 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+:root {
+  --theme-accent: #0284c7;
+  --theme-accent-hover: #0369a1;
+  --theme-accent-soft: rgba(2, 132, 199, 0.12);
+  --theme-accent-ring: rgba(2, 132, 199, 0.36);
+  --theme-accent-contrast: #ffffff;
+  --theme-accent-gradient: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+  --theme-accent-secondary: #2563eb;
+}
+
+.dark {
+  --theme-accent: #38bdf8;
+  --theme-accent-hover: #0ea5e9;
+  --theme-accent-soft: rgba(56, 189, 248, 0.16);
+  --theme-accent-ring: rgba(56, 189, 248, 0.42);
+  --theme-accent-contrast: #062033;
+  --theme-accent-gradient: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  --theme-accent-secondary: #818cf8;
+}
+
 html,
 body,
 #root {
@@ -20,6 +40,184 @@ body,
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  transition:
+    background-color 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Smooth cross-fade across primary workspace surfaces when theme or OS preference shifts */
+main,
+header,
+aside,
+.theme-crossfade {
+  transition:
+    background-color 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow, opacity !important;
+  transition-duration: 440ms !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  main,
+  header,
+  aside,
+  .theme-crossfade,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dynamic Theme-Tinted Interactive Surfaces */
+.theme-btn-primary {
+  background: var(--theme-accent-gradient);
+  color: var(--theme-accent-contrast);
+  box-shadow: 0 8px 22px -6px var(--theme-accent-ring);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.theme-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 26px -5px var(--theme-accent-ring);
+}
+
+.theme-btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.theme-accent-active {
+  background-color: var(--theme-accent-soft);
+  border-color: var(--theme-accent-ring);
+  color: var(--theme-accent);
+}
+
+.theme-accent-text {
+  color: var(--theme-accent);
+}
+
+.theme-accent-gradient-text {
+  background-image: var(--theme-accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.theme-capsule-focus:focus-within {
+  border-color: var(--theme-accent-ring);
+  box-shadow:
+    0 16px 48px rgba(15, 23, 42, 0.14),
+    0 0 0 3px var(--theme-accent-soft);
+}
+
+/* Nebula Cosmic Theme CSS Variable Aesthetic */
+[data-live-theme='nebula'] {
+  --cosmic-nebula-glow: rgba(124, 58, 237, 0.24);
+  --cosmic-indigo-border: rgba(99, 102, 241, 0.32);
+}
+
+.dark[data-live-theme='nebula'] {
+  --cosmic-nebula-glow: rgba(168, 85, 247, 0.32);
+  --cosmic-indigo-border: rgba(167, 139, 250, 0.36);
+}
+
+[data-live-theme='nebula'] .theme-capsule-focus:focus-within {
+  border-color: var(--cosmic-indigo-border);
+  box-shadow:
+    0 18px 50px rgba(30, 27, 75, 0.26),
+    0 0 0 3px var(--cosmic-nebula-glow);
+}
+
+[data-live-theme='nebula'] .cyber-hud-glass {
+  border-color: var(--cosmic-indigo-border);
+  box-shadow: 0 8px 30px -4px var(--cosmic-nebula-glow);
+}
+
+/* Cyberpunk High-Contrast Neon Green & Magenta Theme CSS Variables */
+[data-live-theme='cyberpunk'] {
+  --cyberpunk-neon-green: #047857;
+  --cyberpunk-neon-magenta: #c026d3;
+  --cyberpunk-glow: rgba(192, 38, 211, 0.24);
+}
+
+.dark[data-live-theme='cyberpunk'] {
+  --cyberpunk-neon-green: #22ff88;
+  --cyberpunk-neon-magenta: #ff2ad4;
+  --cyberpunk-glow: rgba(255, 42, 212, 0.28);
+}
+
+[data-live-theme='cyberpunk'] .theme-capsule-focus:focus-within {
+  border-color: var(--cyberpunk-neon-magenta);
+  box-shadow:
+    0 0 24px -4px var(--cyberpunk-glow),
+    0 0 0 2px var(--theme-accent-soft);
+}
+
+[data-live-theme='cyberpunk'] .cyber-hud-glass {
+  border-color: rgba(34, 255, 136, 0.34);
+  box-shadow:
+    0 0 22px -6px rgba(34, 255, 136, 0.22),
+    0 4px 20px -2px var(--cyberpunk-glow);
+}
+
+[data-live-theme='cyberpunk'] .cyber-cursor {
+  background-color: var(--cyberpunk-neon-green);
+  box-shadow: 0 0 8px var(--cyberpunk-neon-magenta);
+}
+
+/* Workspace Layout Container Width Variables (Compact / Fluid / Maximized) */
+:root,
+[data-workspace-layout='fluid'] {
+  --workspace-container-max: 68rem;
+  --workspace-chat-max: 58rem;
+  --workspace-input-max: 48rem;
+}
+
+[data-workspace-layout='compact'] {
+  --workspace-container-max: 50rem;
+  --workspace-chat-max: 44rem;
+  --workspace-input-max: 40rem;
+}
+
+[data-workspace-layout='maximized'] {
+  --workspace-container-max: 100%;
+  --workspace-chat-max: 100%;
+  --workspace-input-max: min(100%, 76rem);
+}
+
+.workspace-container,
+.workspace-chat-container,
+.workspace-input-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  transition: max-width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workspace-container {
+  max-width: var(--workspace-container-max);
+}
+
+.workspace-chat-container {
+  max-width: var(--workspace-chat-max);
+}
+
+.workspace-input-container {
+  max-width: var(--workspace-input-max);
 }
 
 /* Custom Markdown Rendering Styles for ChatThread */
