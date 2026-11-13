@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Eye, Terminal, Globe, Code2, X, GripVertical, Maximize2, Minimize2 } from 'lucide-react';
+import { Eye, Terminal, Globe, Code2, GitGraph, X, GripVertical, Maximize2, Minimize2 } from 'lucide-react';
 import { useWorkspaceStore, WorkspaceTab } from '../../stores/useWorkspaceStore';
 import { WorkspacePreviewTab } from './WorkspacePreviewTab';
 import { WorkspaceTerminalTab } from './WorkspaceTerminalTab';
 import { WorkspaceBrowserTab } from './WorkspaceBrowserTab';
 import { WorkspaceCodeTab } from './WorkspaceCodeTab';
+import { WorkspaceGraphTab } from './WorkspaceGraphTab';
 
 export const WorkspaceDock: React.FC = () => {
   const {
@@ -54,6 +55,7 @@ export const WorkspaceDock: React.FC = () => {
     { id: 'terminal', label: 'Terminal', icon: Terminal },
     { id: 'browser', label: 'Browser', icon: Globe },
     { id: 'code', label: 'Code', icon: Code2 },
+    { id: 'graph', label: 'Graph', icon: GitGraph },
   ];
 
   return (
@@ -146,6 +148,7 @@ export const WorkspaceDock: React.FC = () => {
         {activeDockTab === 'terminal' && <WorkspaceTerminalTab />}
         {activeDockTab === 'browser' && <WorkspaceBrowserTab />}
         {activeDockTab === 'code' && <WorkspaceCodeTab />}
+        {activeDockTab === 'graph' && <WorkspaceGraphTab />}
       </div>
     </aside>
   );

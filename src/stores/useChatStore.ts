@@ -4,6 +4,7 @@ import { SYSTEM_ROLES } from '../data/roles';
 import { GEMINI_MODELS } from '../data/models';
 import { chatService } from '../services/chatService';
 import { conversationService } from '../services/conversationService';
+import { researchService } from '../services/researchService';
 import { toast } from './useToastStore';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
@@ -295,6 +296,53 @@ export const useChatStore = create<ChatState>((set, get) => {
               .map((d) => `[GROUNDING DOCUMENT: "${d.title}" (Type: ${d.type})]\n${d.contentPreview}`)
               .join('\n\n')
           : undefined;
+
+      if (deepResearch) {
+        set({ streamingContent: 'Initializing Deep Research pipeline...\nSynthesizing multi-source empirical intelligence...\n' });
+        try {
+          const res = await researchService.execute(text);
+          const assistantMsg: ChatMessage = {
+            id: `msg_${Date.now()}`,
+            role: 'assistant',
+            content: `### 🔬 Deep Research Analysis: ${res.report.title}\n\n${res.report.summary}`,
+            timestamp: Date.now(),
+            model: activeModel.id,
+            roleName: 'Deep Researcher',
+            researchReport: res.report,
+          };
+
+          const finalSessions = get().sessions.map((s) =>
+            s.id === current.id
+              ? {
+                  ...s,
+                  messages: [...s.messages, assistantMsg],
+                  updatedAt: Date.now(),
+                }
+              : s
+          );
+
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(finalSessions));
+          set({
+            sessions: finalSessions,
+            isStreaming: false,
+            streamingContent: '',
+          });
+
+          // Asynchronously sync exchange to remote Supabase persistence
+          conversationService.syncMessage(current.id, 'user', text).catch(() => {});
+          conversationService.syncMessage(current.id, 'assistant', assistantMsg.content).catch(() => {});
+          return;
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : 'Deep research execution failed.';
+          set({
+            isStreaming: false,
+            streamingContent: '',
+            inferenceError: errorMsg,
+          });
+          toast.error('Deep Research Error', errorMsg);
+          return;
+        }
+      }
 
       const controller = new AbortController();
       abortController = controller;

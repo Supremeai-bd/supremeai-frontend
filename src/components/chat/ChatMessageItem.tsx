@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Copy, Check, Paperclip, Sparkles, User } from 'lucide-react';
 import { Marked } from 'marked';
 import { ChatMessage, RolePersona, ModelDetail } from '../../types';
+import { ResearchReportViewer } from './ResearchReportViewer';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -169,10 +170,15 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             {message.content}
           </p>
         ) : (
-          <div
-            className="markdown-body text-xs leading-relaxed text-slate-800 dark:text-slate-200 font-sans"
-            dangerouslySetInnerHTML={{ __html: renderedContent }}
-          />
+          <>
+            {message.researchReport && (
+              <ResearchReportViewer report={message.researchReport} />
+            )}
+            <div
+              className="markdown-body text-xs leading-relaxed text-slate-800 dark:text-slate-200 font-sans"
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
+            />
+          </>
         )}
       </div>
     </div>

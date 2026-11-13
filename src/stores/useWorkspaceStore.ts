@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { toast } from './useToastStore';
 
-export type WorkspaceTab = 'preview' | 'terminal' | 'browser' | 'code';
+export type WorkspaceTab = 'preview' | 'terminal' | 'browser' | 'code' | 'graph';
 export type ViewportDevice = 'desktop' | 'tablet' | 'mobile';
 
 export interface TerminalLine {

@@ -34,6 +34,7 @@ export interface ChatMessage {
   model?: string;
   roleName?: string;
   attachment?: ChatAttachment;
+  researchReport?: any;
 }
 
 export interface ChatSession {

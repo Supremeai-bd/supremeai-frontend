@@ -38,3 +38,4 @@ export const shareService = {
     return apiClient.get(`/api/share/${encodeURIComponent(shareId)}`, { skipAuth: true });
   },
 };
+
