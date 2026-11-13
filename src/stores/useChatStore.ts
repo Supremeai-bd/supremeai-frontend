@@ -519,7 +519,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           role: 'assistant',
           content: cleanAssistant,
           timestamp: now + 1,
-          model: 'supreme-voice',
+          model: 'gemini-3.8-live',
           roleName: voiceName ? `${activeRole.name} (${voiceName} Voice)` : 'SupremeAI Live',
         });
       }

@@ -29,7 +29,7 @@ interface LiveVoiceModalProps {
 
 const STATUS_COPY: Record<LiveSessionStatus, { label: string; dotClass: string }> = {
   idle: { label: 'Ready to connect', dotClass: 'bg-slate-400' },
-  connecting: { label: 'Connecting to SupremeAI Live Voice...', dotClass: 'bg-amber-400 animate-pulse' },
+  connecting: { label: 'Connecting to gemini-3.8-live...', dotClass: 'bg-amber-400 animate-pulse' },
   listening: { label: 'Listening — speak naturally', dotClass: 'bg-emerald-500 animate-pulse' },
   speaking: { label: 'SupremeAI Live speaking...', dotClass: 'bg-cyan-400 animate-ping' },
   muted: { label: 'Microphone muted', dotClass: 'bg-rose-500' },
@@ -260,7 +260,7 @@ export const LiveVoiceModal: React.FC<LiveVoiceModalProps> = ({
                   Voice Conversation
                 </h2>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  supreme-voice
+                  gemini-3.8-live
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">

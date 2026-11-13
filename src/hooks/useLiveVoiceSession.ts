@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { env } from '../config/env';
 
 export type LiveVoiceName = 'Zephyr' | 'Puck' | 'Kore' | 'Charon' | 'Fenrir';
 
@@ -346,14 +345,8 @@ export function useLiveVoiceSession({
 
         streamRef.current = stream;
 
-        let wsUrl: string;
-        if (env.apiBaseUrl && env.apiBaseUrl.startsWith('http')) {
-          const baseWs = env.apiBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
-          wsUrl = `${baseWs}/api/live`;
-        } else {
-          const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          wsUrl = `${wsProtocol}//${window.location.host}/api/live`;
-        }
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/api/live`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
