@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { KnowledgeDoc } from '../../types';
 import { FileProcessingPreviewModal } from './knowledge/FileProcessingPreviewModal';
+import { knowledgeService } from '../../services/knowledgeService';
 
 interface UserKnowledgeBaseViewProps {
   documents: KnowledgeDoc[];
@@ -73,13 +74,35 @@ export const UserKnowledgeBaseView: React.FC<UserKnowledgeBaseViewProps> = ({
       contentPreview: newContent.trim().substring(0, 300),
     });
 
+    // Seed into backend RAG index asynchronously
+    knowledgeService.seedDocument({
+      title: newTitle.trim(),
+      content: newContent.trim(),
+      category: newType,
+    }).catch(() => {});
+
     setIsUploadModalOpen(false);
     setNewTitle('');
     setNewContent('');
   };
 
-  const handleRunSemanticSearch = () => {
+  const handleRunSemanticSearch = async () => {
     if (!testQuery.trim()) return;
+
+    try {
+      const backendResults = await knowledgeService.search(testQuery, 3);
+      if (backendResults && backendResults.length > 0) {
+        setSimulatedMatches(
+          backendResults.map((r) => ({
+            docTitle: r.title,
+            chunk: r.content,
+            score: r.score ?? 0.88,
+          }))
+        );
+        return;
+      }
+    } catch {}
+
     const q = testQuery.toLowerCase();
     const matches = documents
       .filter((d) => d.isGroundingActive)
