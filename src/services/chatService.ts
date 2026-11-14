@@ -77,13 +77,14 @@ export const chatService = {
             return 'supremeai-web';
           case 'supremeai-api':
             return 'supremeai-api';
-          case 'supreme-reason':
-            return 'gemini-2.5-pro';
           case 'supreme-spark':
-            return 'gemini-2.5-flash';
+            return 'supreme-spark';
+          case 'supreme-reason':
+            return 'supreme-reason';
           case 'supreme-deep':
-            return 'gemini-2.5-pro';
+            return 'supreme-deep';
           case 'supreme-core':
+            return 'supreme-core';
           default:
             return 'auto';
         }
