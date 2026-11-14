@@ -1426,6 +1426,197 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Swarm & Queue Management Endpoints
+  let devSwarmWorkers = [
+    {
+      id: 'worker-solver-01',
+      name: 'Autonomous Solver Agent',
+      type: 'solver',
+      status: 'active',
+      currentTask: 'Resolving Issue #42: Backpressure handling in WebSocket stream broker',
+      currentIssueOrPr: 'Supremeai-bd/supremeai #42',
+      processedCount: 184,
+      successRate: 97.8,
+      cpuPercent: 18.4,
+      memoryMb: 412,
+      uptime: '14h 22m',
+      logs: [
+        'Identified unbounded buffer allocation in event emitter.',
+        'Generated patch applying bounded circular ring-buffer.',
+        'Unit test suite verified: 34 tests passing with 0 regressions.',
+      ],
+    },
+    {
+      id: 'worker-verifier-02',
+      name: 'AST Code Verifier & Validator',
+      type: 'verifier',
+      status: 'active',
+      currentTask: 'Running TypeScript AST graph verification on PR #94',
+      currentIssueOrPr: 'Supremeai-bd/supremeai-studio #94',
+      processedCount: 312,
+      successRate: 99.4,
+      cpuPercent: 9.2,
+      memoryMb: 280,
+      uptime: '28h 10m',
+      logs: [
+        'AST tree generated for 84 source modules.',
+        'Checked symbol cross-references: 0 circular dependencies.',
+        'Strict null check verification PASSED.',
+      ],
+    },
+    {
+      id: 'worker-scout-03',
+      name: 'Ecosystem Scout & Dependency Tracker',
+      type: 'ecosystem-scout',
+      status: 'idle',
+      currentTask: 'Awaiting scheduled 15-minute package index crawl',
+      currentIssueOrPr: 'Continuous background crawler',
+      processedCount: 94,
+      successRate: 100.0,
+      cpuPercent: 1.1,
+      memoryMb: 145,
+      uptime: '42h 50m',
+      logs: [
+        'Checked @google/genai SDK v3.2.0 compatibility.',
+        'Found 0 upstream security advisories in current node_modules lockfile.',
+      ],
+    },
+    {
+      id: 'worker-security-04',
+      name: 'Adversarial Prompt & Rules Breaker',
+      type: 'rules-breaker',
+      status: 'active',
+      currentTask: 'Fuzzing prompt boundaries with 500 adversarial jailbreak vectors',
+      currentIssueOrPr: 'Adversarial Test Suite #19',
+      processedCount: 780,
+      successRate: 99.8,
+      cpuPercent: 24.6,
+      memoryMb: 520,
+      uptime: '19h 45m',
+      logs: [
+        'Injected recursive delimiter extraction payload: Blocked by boundary shield.',
+        'Tested system instruction override vector: Sanitized by LLM gateway filter.',
+      ],
+    },
+  ];
+
+  let devQueueJobs = [
+    {
+      id: 'job_q_101',
+      queueName: 'ai-reasoning',
+      taskType: 'multi_turn_stream_inference',
+      payloadSummary: 'Prompt inference on supreme-core for customer ziaul@supremeai.bd',
+      status: 'active',
+      attempts: 1,
+      maxAttempts: 3,
+      latencyMs: 38,
+      createdAt: 'Just now',
+    },
+    {
+      id: 'job_q_102',
+      queueName: 'github-sync',
+      taskType: 'repo_ast_index',
+      payloadSummary: 'AST re-index for Supremeai-bd/supremeai-studio on commit d4e28f',
+      status: 'active',
+      attempts: 1,
+      maxAttempts: 3,
+      latencyMs: 120,
+      createdAt: '1m ago',
+    },
+    {
+      id: 'job_q_103',
+      queueName: 'vector-embedding',
+      taskType: 'chunk_embedding_upsert',
+      payloadSummary: 'Vectorize 32 chunks from SupremeAI Core Architecture Spec.md',
+      status: 'completed',
+      attempts: 1,
+      maxAttempts: 3,
+      latencyMs: 840,
+      createdAt: '3m ago',
+    },
+    {
+      id: 'job_q_104',
+      queueName: 'code-audit',
+      taskType: 'security_fuzz_batch',
+      payloadSummary: 'Automated security rule scan across gateway endpoints',
+      status: 'completed',
+      attempts: 1,
+      maxAttempts: 3,
+      latencyMs: 1420,
+      createdAt: '5m ago',
+    },
+    {
+      id: 'job_q_105',
+      queueName: 'github-sync',
+      taskType: 'webhook_event_dispatch',
+      payloadSummary: 'Sync PR commit status to webhook endpoint hooks.slack.com',
+      status: 'failed',
+      attempts: 3,
+      maxAttempts: 3,
+      latencyMs: 5000,
+      createdAt: '10m ago',
+      errorDetails: 'Gateway timeout: upstream webhook target unreachable after 5000ms',
+    },
+    {
+      id: 'job_q_106',
+      queueName: 'ai-reasoning',
+      taskType: 'high_demand_fallback',
+      payloadSummary: 'Multi-agent debate consensus validation for critical task #31',
+      status: 'dlq',
+      attempts: 3,
+      maxAttempts: 3,
+      latencyMs: 15200,
+      createdAt: '15m ago',
+      errorDetails: 'Rate limit exhausted on fallback tier; moved to DLQ for admin inspection',
+    },
+  ];
+
+  app.get('/api/admin/swarm', (_req: Request, res: Response) => {
+    res.json({ workers: devSwarmWorkers });
+  });
+
+  app.post('/api/admin/swarm/:id/toggle', (req: Request, res: Response) => {
+    const worker = devSwarmWorkers.find((w) => w.id === req.params.id);
+    if (worker) {
+      worker.status = worker.status === 'active' ? 'paused' : 'active';
+      res.json({ success: true, worker });
+      return;
+    }
+    res.status(404).json({ error: 'Worker not found' });
+  });
+
+  app.post('/api/admin/swarm/:id/scale', (req: Request, res: Response) => {
+    const worker = devSwarmWorkers.find((w) => w.id === req.params.id);
+    const delta = Number(req.body?.delta) || 1;
+    if (worker) {
+      worker.cpuPercent = Math.max(1, Math.min(95, Math.round(worker.cpuPercent + delta * 4)));
+      res.json({ success: true, worker });
+      return;
+    }
+    res.status(404).json({ error: 'Worker not found' });
+  });
+
+  app.get('/api/admin/queue', (_req: Request, res: Response) => {
+    res.json({ jobs: devQueueJobs });
+  });
+
+  app.post('/api/admin/queue/retry/:id', (req: Request, res: Response) => {
+    const job = devQueueJobs.find((j) => j.id === req.params.id);
+    if (job) {
+      job.status = 'active';
+      job.attempts = 1;
+      delete (job as any).errorDetails;
+      res.json({ success: true, job });
+      return;
+    }
+    res.status(404).json({ error: 'Job not found' });
+  });
+
+  app.delete('/api/admin/queue/completed', (_req: Request, res: Response) => {
+    devQueueJobs = devQueueJobs.filter((j) => j.status !== 'completed');
+    res.json({ success: true, jobs: devQueueJobs });
+  });
+
   // Provider Mesh & Real Server-Side Health Probe Endpoints
   app.get('/api/admin/providers', (_req: Request, res: Response) => {
     res.json({ providers: providerMesh });

@@ -140,10 +140,12 @@ export const useAdminStore = create<AdminState>((set, get) => {
 
     fetchAdminSync: async () => {
       try {
-        const [customers, blockedIps, auditRecords] = await Promise.all([
+        const [customers, blockedIps, auditRecords, swarmWorkers, queueJobs] = await Promise.all([
           adminService.fetchCustomers(),
           adminService.fetchBlockedIps(),
           adminService.fetchAuditRecords(),
+          adminService.fetchSwarmWorkers(),
+          adminService.fetchQueueJobs(),
         ]);
         if (customers && customers.length > 0) {
           localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
@@ -156,6 +158,14 @@ export const useAdminStore = create<AdminState>((set, get) => {
         if (auditRecords && auditRecords.length > 0) {
           localStorage.setItem(AUDIT_KEY, JSON.stringify(auditRecords));
           set({ auditRecords });
+        }
+        if (swarmWorkers && swarmWorkers.length > 0) {
+          localStorage.setItem(SWARM_KEY, JSON.stringify(swarmWorkers));
+          set({ swarmWorkers });
+        }
+        if (queueJobs && queueJobs.length > 0) {
+          localStorage.setItem(QUEUE_KEY, JSON.stringify(queueJobs));
+          set({ queueJobs });
         }
       } catch (err) {
         console.warn('Admin central sync failed, keeping local cache:', err);
@@ -241,6 +251,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(SWARM_KEY, JSON.stringify(updated));
         return { swarmWorkers: updated };
       });
+      adminService.toggleSwarmWorker(id).catch(() => {});
       toast.info('Swarm Worker Updated', 'Worker state modified.');
     },
 
@@ -254,6 +265,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(SWARM_KEY, JSON.stringify(updated));
         return { swarmWorkers: updated };
       });
+      adminService.scaleSwarmWorker(id, delta).catch(() => {});
     },
 
     retryQueueJob: (id: string) => {
@@ -264,6 +276,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(QUEUE_KEY, JSON.stringify(updated));
         return { queueJobs: updated };
       });
+      adminService.retryQueueJob(id).catch(() => {});
       toast.info('Job Re-queued', 'Task moved back to active ingestion queue.');
     },
 
@@ -285,6 +298,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
         localStorage.setItem(QUEUE_KEY, JSON.stringify(updated));
         return { queueJobs: updated };
       });
+      adminService.clearCompletedQueueJobs().catch(() => {});
       toast.info('Queue Cleaned', 'Completed tasks purged from history.');
     },
 

@@ -7,12 +7,16 @@ import {
   SystemAuditRecord,
   BlockedIpRecord,
   ProviderKeyItem,
+  SwarmWorker,
+  TaskQueueJob,
 } from '../types';
 import { INITIAL_MCP_SERVICES, INITIAL_ADMIN_METRICS } from '../data/mcpTowerData';
 import {
   INITIAL_FEATURE_FLAGS,
   INITIAL_AUDIT_RECORDS,
   INITIAL_PROVIDER_KEYS,
+  INITIAL_SWARM_WORKERS,
+  INITIAL_QUEUE_JOBS,
 } from '../data/adminExpansionData';
 import { INITIAL_CUSTOMERS } from '../data/customerData';
 import { env } from '../config/env';
@@ -293,5 +297,97 @@ export const adminService = {
       direction,
     });
     return res.providers || [];
+  },
+
+  async fetchSwarmWorkers(): Promise<SwarmWorker[]> {
+    if (env.isMockEnabled) {
+      return INITIAL_SWARM_WORKERS;
+    }
+    try {
+      const res = await apiClient.get<{ workers: SwarmWorker[] }>('/api/admin/swarm');
+      return res.workers || INITIAL_SWARM_WORKERS;
+    } catch {
+      return INITIAL_SWARM_WORKERS;
+    }
+  },
+
+  async toggleSwarmWorker(workerId: string): Promise<SwarmWorker | null> {
+    if (env.isMockEnabled) {
+      const match = INITIAL_SWARM_WORKERS.find((w) => w.id === workerId);
+      if (match) {
+        match.status = match.status === 'active' ? 'paused' : 'active';
+        return match;
+      }
+      return null;
+    }
+    try {
+      const res = await apiClient.post<{ success: boolean; worker: SwarmWorker }>(
+        `/api/admin/swarm/${encodeURIComponent(workerId)}/toggle`
+      );
+      return res.worker;
+    } catch {
+      return null;
+    }
+  },
+
+  async scaleSwarmWorker(workerId: string, delta: number): Promise<SwarmWorker | null> {
+    if (env.isMockEnabled) {
+      const match = INITIAL_SWARM_WORKERS.find((w) => w.id === workerId);
+      if (match) {
+        match.cpuPercent = Math.max(1, Math.min(95, Math.round(match.cpuPercent + delta * 4)));
+        return match;
+      }
+      return null;
+    }
+    try {
+      const res = await apiClient.post<{ success: boolean; worker: SwarmWorker }>(
+        `/api/admin/swarm/${encodeURIComponent(workerId)}/scale`,
+        { delta }
+      );
+      return res.worker;
+    } catch {
+      return null;
+    }
+  },
+
+  async fetchQueueJobs(): Promise<TaskQueueJob[]> {
+    if (env.isMockEnabled) {
+      return INITIAL_QUEUE_JOBS;
+    }
+    try {
+      const res = await apiClient.get<{ jobs: TaskQueueJob[] }>('/api/admin/queue');
+      return res.jobs || INITIAL_QUEUE_JOBS;
+    } catch {
+      return INITIAL_QUEUE_JOBS;
+    }
+  },
+
+  async retryQueueJob(jobId: string): Promise<TaskQueueJob | null> {
+    if (env.isMockEnabled) {
+      const match = INITIAL_QUEUE_JOBS.find((j) => j.id === jobId);
+      if (match) {
+        match.status = 'active';
+        match.attempts = 1;
+        return match;
+      }
+      return null;
+    }
+    try {
+      const res = await apiClient.post<{ success: boolean; job: TaskQueueJob }>(
+        `/api/admin/queue/retry/${encodeURIComponent(jobId)}`
+      );
+      return res.job;
+    } catch {
+      return null;
+    }
+  },
+
+  async clearCompletedQueueJobs(): Promise<void> {
+    if (env.isMockEnabled) {
+      return;
+    }
+    try {
+      await apiClient.delete('/api/admin/queue/completed');
+    } catch {}
   },
 };
