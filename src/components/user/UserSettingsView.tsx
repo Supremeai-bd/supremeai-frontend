@@ -34,6 +34,7 @@ import {
   Volume2,
   Loader2,
   ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
 import { SUPREMEAI_MODELS } from '../../data/models';
@@ -272,7 +273,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     setIsProcessingAvatar(true);
     setAvatarError(null);
     try {
-      const { dataUrl, traits, faceDetected } = await processCustomFaceUpload(file);
+      const { dataUrl, traits } = await processCustomFaceUpload(file);
       const next: AvatarPreference = {
         preset: 'custom',
         customImageDataUrl: dataUrl,
@@ -283,15 +284,16 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       saveAvatarPreference(next);
       triggerPreviewPulse();
       toast.success(
-        faceDetected ? 'Face Matched to 3D Avatar' : '3D Face Avatar Created',
-        faceDetected
-          ? 'Detected your face, extracted skin & hair tones, and mapped it onto your 3D avatar.'
-          : 'Your portrait has been mapped onto the 3D avatar.'
+        'Face Verified & Matched',
+        'Detected your face, extracted skin & hair tones, and mapped it onto your 3D avatar.'
       );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to process image.';
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No human face could be detected. Please upload a clear portrait.';
       setAvatarError(msg);
-      toast.error('Upload Failed', msg);
+      toast.error('Face Not Detected', msg);
     } finally {
       setIsProcessingAvatar(false);
     }
@@ -1673,7 +1675,9 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                           Face-Matched 3D
                         </div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                          {avatarPref.customImageName || 'Auto-detects face only'}
+                          {isProcessingAvatar
+                            ? 'Scanning for face...'
+                            : avatarPref.customImageName || 'Requires clear human face'}
                         </div>
                       </div>
                     </div>
@@ -1683,10 +1687,20 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                         type="button"
                         disabled={isProcessingAvatar}
                         onClick={() => avatarFileInputRef.current?.click()}
-                        className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] cursor-pointer whitespace-nowrap"
+                        className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] cursor-pointer whitespace-nowrap disabled:opacity-60"
                       >
-                        <Upload className="w-3 h-3" />
-                        <span>{avatarPref.customImageDataUrl ? 'Change' : 'Upload'}</span>
+                        {isProcessingAvatar ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Upload className="w-3 h-3" />
+                        )}
+                        <span>
+                          {isProcessingAvatar
+                            ? 'Verifying...'
+                            : avatarPref.customImageDataUrl
+                            ? 'Change'
+                            : 'Upload'}
+                        </span>
                       </button>
                       {avatarPref.customImageDataUrl && (
                         <button
@@ -1704,7 +1718,14 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 </div>
 
                 {avatarError && (
-                  <p className="text-xs text-rose-500 font-medium">{avatarError}</p>
+                  <div
+                    role="alert"
+                    data-testid="avatar-upload-error"
+                    className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-600 dark:text-rose-400"
+                  >
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{avatarError}</span>
+                  </div>
                 )}
               </div>
 

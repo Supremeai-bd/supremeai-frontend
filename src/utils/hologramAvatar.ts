@@ -1,5 +1,6 @@
 import maleHologramImg from '../assets/images/avatar_hologram_male_1794610533388.jpg';
 import type { LiveVoiceName } from '../hooks/useLiveVoiceSession';
+import { detectClientFaceInCanvas, type NormalizedFaceBox } from './clientFaceDetection';
 
 export type AvatarPresetId = 'female' | 'male' | 'custom';
 
@@ -145,87 +146,10 @@ function readImageFromFile(file: File): Promise<HTMLImageElement> {
 }
 
 /**
- * Fallback skin-tone centroid finder across the upper 62% of the image so full-body
- * shots without FaceDetector / API key still isolate the head rather than torso/legs.
- */
-function estimateFaceBoxHeuristic(canvas: HTMLCanvasElement): {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-} {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
-  if (!ctx || w < 16 || h < 16) {
-    return { x: 0.25, y: 0.08, width: 0.5, height: 0.5 };
-  }
-  const data = ctx.getImageData(0, 0, w, Math.floor(h * 0.62)).data;
-  const maxY = Math.floor(h * 0.62);
-  let sumX = 0;
-  let sumY = 0;
-  let count = 0;
-  let minX = w;
-  let maxSkinX = 0;
-  let minSkinY = maxY;
-  let maxSkinY = 0;
-
-  for (let y = 0; y < maxY; y += 2) {
-    for (let x = Math.floor(w * 0.15); x < Math.floor(w * 0.85); x += 2) {
-      const idx = (y * w + x) * 4;
-      const r = data[idx];
-      const g = data[idx + 1];
-      const b = data[idx + 2];
-      // Standard YCbCr-inspired human skin hue check
-      const isSkin =
-        r > 70 &&
-        g > 45 &&
-        b > 30 &&
-        r > g &&
-        r > b &&
-        Math.abs(r - g) > 12 &&
-        r - b > 18;
-      if (isSkin) {
-        sumX += x;
-        sumY += y;
-        count++;
-        if (x < minX) minX = x;
-        if (x > maxSkinX) maxSkinX = x;
-        if (y < minSkinY) minSkinY = y;
-        if (y > maxSkinY) maxSkinY = y;
-      }
-    }
-  }
-
-  if (count > 25) {
-    const cx = sumX / count / w;
-    const cy = sumY / count / h;
-    const span = Math.max(
-      0.24,
-      Math.min(0.55, Math.max((maxSkinX - minX) / w, (maxSkinY - minSkinY) / h) * 1.15)
-    );
-    return {
-      x: Math.max(0, Math.min(1 - span, cx - span * 0.5)),
-      y: Math.max(0, Math.min(1 - span, cy - span * 0.48)),
-      width: span,
-      height: span,
-    };
-  }
-
-  // Portrait default: upper-center crop (head zone)
-  const size = w < h ? 0.52 : 0.45;
-  return {
-    x: (1 - size) * 0.5,
-    y: 0.08,
-    width: size,
-    height: size,
-  };
-}
-
-/**
- * Intelligently detects ONLY the human face in any uploaded image (headshot, full-body,
- * wide landscape, or group shot), crops tightly around the face, and extracts skin/hair/eye/lip
- * traits so the 3D Avatar rig matches the user's actual face with zero background/body clutter.
+ * Validates that an uploaded image contains a clearly visible human face using
+ * client-side TensorFlow.js Face Landmarks Detection first (rejecting non-face or
+ * unclear compositions immediately), then enriches skin/hair/eye/lip traits via
+ * `/api/avatar/analyze-face` and crops tightly around ONLY the face.
  */
 export async function processCustomFaceUpload(file: File): Promise<{
   dataUrl: string;
@@ -234,7 +158,7 @@ export async function processCustomFaceUpload(file: File): Promise<{
 }> {
   const img = await readImageFromFile(file);
 
-  // Prepare an analysis JPEG at <= 800px so Gemini/FaceDetector analyze fast
+  // Prepare an analysis JPEG at <= 800px for fast client TFJS + server inspection
   const maxSide = 800;
   const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
   const aw = Math.max(64, Math.round(img.naturalWidth * scale));
@@ -249,15 +173,26 @@ export async function processCustomFaceUpload(file: File): Promise<{
   aCtx.drawImage(img, 0, 0, aw, ah);
   const analysisDataUrl = analysisCanvas.toDataURL('image/jpeg', 0.9);
 
-  let detectedBox: { x: number; y: number; width: number; height: number } | null = null;
+  // Step 1: Client-side face & landmark detection (@tensorflow-models/face-landmarks-detection)
+  const clientCheck = await detectClientFaceInCanvas(analysisCanvas);
+  if (!clientCheck.unavailable && !clientCheck.detected) {
+    throw new Error(
+      clientCheck.reason ||
+        'No human face was clearly detected in this image. Please upload a clear portrait photo showing a human face.'
+    );
+  }
+
+  let detectedBox: NormalizedFaceBox | null = clientCheck.detected ? clientCheck.box : null;
+  let serverChecked = false;
+  let serverFaceFound = false;
   let traits: CustomFaceTraits = {
     genderCue: 'male',
     hairStyle: 'short',
     hasGlasses: false,
-    faceFound: false,
+    faceFound: clientCheck.detected,
   };
 
-  // 1. Server-side Gemini Multimodal Face Detection + Skin/Hair/Eye Trait Extraction
+  // Step 2: Server-side trait extraction (skin/hair/eye/lip colors, hair length, glasses) + cross-check
   try {
     const res = await fetch('/api/avatar/analyze-face', {
       method: 'POST',
@@ -269,7 +204,12 @@ export async function processCustomFaceUpload(file: File): Promise<{
     });
     if (res.ok) {
       const json = await res.json();
-      if (json.faceFound && json.faceBox && Number(json.faceBox.width) > 0.03) {
+      if (!json.fallback) {
+        serverChecked = true;
+        serverFaceFound = Boolean(json.faceFound);
+      }
+
+      if (!detectedBox && json.faceFound && json.faceBox && Number(json.faceBox.width) > 0.05) {
         detectedBox = {
           x: Number(json.faceBox.x) || 0,
           y: Number(json.faceBox.y) || 0,
@@ -286,38 +226,24 @@ export async function processCustomFaceUpload(file: File): Promise<{
         hairStyle:
           json.hairStyle === 'long' || json.hairStyle === 'medium' ? json.hairStyle : 'short',
         hasGlasses: Boolean(json.hasGlasses),
-        faceFound: Boolean(json.faceFound),
+        faceFound: clientCheck.detected || Boolean(json.faceFound),
       };
     }
   } catch {
-    // Fall back to browser FaceDetector / skin heuristic
+    // Client detection result stands if network call fails
   }
 
-  // 2. Native Chrome/Edge FaceDetector fallback if Gemini didn't return a box
-  if (!detectedBox && typeof (window as unknown as { FaceDetector?: any }).FaceDetector === 'function') {
-    try {
-      const Detector = (window as unknown as { FaceDetector: any }).FaceDetector;
-      const detector = new Detector({ fastMode: false, maxDetectedFaces: 1 });
-      const faces = await detector.detect(analysisCanvas);
-      if (Array.isArray(faces) && faces.length > 0 && faces[0]?.boundingBox) {
-        const b = faces[0].boundingBox;
-        detectedBox = {
-          x: b.x / aw,
-          y: b.y / ah,
-          width: b.width / aw,
-          height: b.height / ah,
-        };
-        traits.faceFound = true;
-      }
-    } catch {
-      // Proceed to heuristic fallback
-    }
+  // Step 3: Strict validation gate — reject any image where no human face was verified
+  if (serverChecked && !serverFaceFound && !clientCheck.detected) {
+    throw new Error(
+      'No human face was clearly detected in this image. Please upload a photo with a clear, front-facing human face.'
+    );
   }
 
-  // 3. Skin-centroid upper portrait heuristic fallback
-  const usedHeuristic = !detectedBox;
-  if (!detectedBox) {
-    detectedBox = estimateFaceBoxHeuristic(analysisCanvas);
+  if (!detectedBox || (!clientCheck.detected && !serverFaceFound)) {
+    throw new Error(
+      'Unable to confirm a clear human face in this image. Please upload a well-lit portrait with a visible face.'
+    );
   }
 
   // Convert normalized face box -> tight padded square crop focused ONLY on the face
@@ -328,7 +254,10 @@ export async function processCustomFaceUpload(file: File): Promise<{
     detectedBox.height * img.naturalHeight
   );
   // Generous enough for forehead & chin, tight enough to exclude chest/arms/scenery
-  const cropSide = Math.max(96, Math.min(Math.min(img.naturalWidth, img.naturalHeight), faceMaxDim * 1.28));
+  const cropSide = Math.max(
+    96,
+    Math.min(Math.min(img.naturalWidth, img.naturalHeight), faceMaxDim * 1.28)
+  );
   const sx = Math.max(0, Math.min(img.naturalWidth - cropSide, boxCx - cropSide * 0.5));
   const sy = Math.max(0, Math.min(img.naturalHeight - cropSide, boxCy - cropSide * 0.5));
 
@@ -338,11 +267,11 @@ export async function processCustomFaceUpload(file: File): Promise<{
   cropCanvas.height = outSize;
   const cCtx = cropCanvas.getContext('2d');
   if (!cCtx) {
-    return { dataUrl: analysisDataUrl, traits, faceDetected: !usedHeuristic };
+    return { dataUrl: analysisDataUrl, traits, faceDetected: true };
   }
   cCtx.drawImage(img, sx, sy, cropSide, cropSide, 0, 0, outSize, outSize);
 
-  // Sample natural skin tone from central cheek area if Gemini didn't supply skinHex
+  // Sample natural skin tone from central cheek area if trait extraction omitted skinHex
   if (!traits.skinHex) {
     const sample = cCtx.getImageData(Math.round(outSize * 0.38), Math.round(outSize * 0.54), 12, 12).data;
     let sr = 0;
@@ -362,8 +291,8 @@ export async function processCustomFaceUpload(file: File): Promise<{
 
   return {
     dataUrl: cropCanvas.toDataURL('image/jpeg', 0.92),
-    traits,
-    faceDetected: Boolean(traits.faceFound || !usedHeuristic),
+    traits: { ...traits, faceFound: true },
+    faceDetected: true,
   };
 }
 
