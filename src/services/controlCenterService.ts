@@ -23,6 +23,9 @@ import type {
   CronTaskItem,
   FinOpsMeshService,
   DataProvenance,
+  McpHealthMonitorSnapshot,
+  ProactiveHealthThresholds,
+  GatewayTrafficPoint,
 } from '../types/controlCenter';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -54,6 +57,14 @@ export const controlCenterService = {
       pendingHitlCount: number;
       activeTakeoversCount: number;
       unclaimedBridgeCount: number;
+      serviceHealthSummary?: McpHealthMonitorSnapshot['summary'] | null;
+      trafficSummary?: {
+        rpm: number;
+        avgLatencyMs: number;
+        errorRatePercent: number;
+        totalRequests: number;
+        history: GatewayTrafficPoint[];
+      };
     }>('/api/admin/control-plane/overview');
   },
 
@@ -250,6 +261,45 @@ export const controlCenterService = {
     return requestJson<{ success: boolean; dryRun?: boolean; message?: string; cronTasks?: CronTaskItem[] }>(
       `/api/admin/control-plane/cron/${encodeURIComponent(id)}/trigger`,
       { method: 'POST', body: JSON.stringify({ ...gate }) }
+    );
+  },
+
+  async fetchServiceHealth(refresh: boolean = false) {
+    return requestJson<{
+      snapshot: McpHealthMonitorSnapshot;
+      traffic: {
+        rpm: number;
+        avgLatencyMs: number;
+        errorRatePercent: number;
+        totalRequests: number;
+        history: GatewayTrafficPoint[];
+      };
+    }>(`/api/admin/control-plane/service-health${refresh ? '?refresh=1' : ''}`);
+  },
+
+  async probeServiceHealth(actor?: string) {
+    return requestJson<{
+      snapshot: McpHealthMonitorSnapshot;
+      traffic: {
+        rpm: number;
+        avgLatencyMs: number;
+        errorRatePercent: number;
+        totalRequests: number;
+        history: GatewayTrafficPoint[];
+      };
+    }>('/api/admin/control-plane/service-health/probe', {
+      method: 'POST',
+      body: JSON.stringify({ actor }),
+    });
+  },
+
+  async updateHealthThresholds(thresholds: Partial<ProactiveHealthThresholds>, actor?: string) {
+    return requestJson<{ success: boolean; thresholds: ProactiveHealthThresholds }>(
+      '/api/admin/control-plane/service-health/thresholds',
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...thresholds, actor }),
+      }
     );
   },
 };

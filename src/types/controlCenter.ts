@@ -264,3 +264,112 @@ export interface FinOpsMeshService {
   currentSpendUsd: number;
   detail: string;
 }
+
+// --- Real-Time MCP Resource & Latency Health Monitor Types ---
+export type ServiceMetricSource = 'local-runtime' | 'live-http-probe' | 'mcp-tower-sweep';
+
+export interface ServiceResourcePoint {
+  ts: string;
+  epochMs: number;
+  latencyMs: number | null;
+  cpuPercent: number | null;
+  memoryMb: number | null;
+  memoryPercent: number | null;
+}
+
+export interface McpServiceHealthMetric {
+  id: string;
+  name: string;
+  displayName: string;
+  provider: string;
+  category: 'compute' | 'gateway' | 'database' | 'cache' | 'edge' | 'ai-provider' | 'integration' | 'runtime';
+  source: ServiceMetricSource;
+  status: 'healthy' | 'degraded' | 'critical' | 'unreachable';
+  rawStatus?: string;
+  cpuPercent: number | null;
+  memoryMb: number | null;
+  memoryPercent: number | null;
+  latencyMs: number | null;
+  p50LatencyMs: number | null;
+  p95LatencyMs: number | null;
+  consecutiveFailures: number;
+  errorMessage?: string;
+  evidenceSummary?: string;
+  checkedAt: string;
+  history: ServiceResourcePoint[];
+}
+
+export interface ProactiveHealthThresholds {
+  cpuWarnPct: number;
+  cpuCritPct: number;
+  memWarnPct: number;
+  memCritPct: number;
+  latencyWarnMs: number;
+  latencyCritMs: number;
+}
+
+export interface ProactiveHealthAlert {
+  id: string;
+  serviceId: string;
+  displayName: string;
+  metric: 'cpu' | 'memory' | 'latency' | 'availability';
+  severity: 'warning' | 'critical';
+  valueLabel: string;
+  thresholdLabel: string;
+  message: string;
+  detectedAt: string;
+}
+
+export interface HostRuntimeSnapshot {
+  hostname: string;
+  platform: string;
+  nodeVersion: string;
+  cpuCores: number;
+  cpuPercent: number;
+  loadAvg1m: number;
+  loadAvg5m: number;
+  totalMemMb: number;
+  freeMemMb: number;
+  systemMemUsedPct: number;
+  processRssMb: number;
+  processHeapUsedMb: number;
+  processHeapTotalMb: number;
+  uptimeSec: number;
+  sampledAt: string;
+}
+
+export interface GatewayTrafficPoint {
+  time: string;
+  rpm: number;
+  avgLatencyMs: number;
+  errorRatePct: number;
+}
+
+export interface McpHealthMonitorSnapshot {
+  provenance: DataProvenance;
+  collectedAt: string;
+  mcpTowerStatus: string;
+  sweepCompletions?: number;
+  lastTowerSweepAt?: string;
+  host: HostRuntimeSnapshot;
+  thresholds: ProactiveHealthThresholds;
+  summary: {
+    total: number;
+    healthy: number;
+    degraded: number;
+    critical: number;
+    unreachable: number;
+    avgLatencyMs: number;
+    p95LatencyMs: number;
+    activeAlertCount: number;
+  };
+  services: McpServiceHealthMetric[];
+  alerts: ProactiveHealthAlert[];
+  hostHistory: Array<{
+    ts: string;
+    cpuPercent: number;
+    memoryPercent: number;
+    avgLatencyMs: number;
+  }>;
+}
+

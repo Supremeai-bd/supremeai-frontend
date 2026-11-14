@@ -59,6 +59,7 @@ import { ControlCenterAgentBridgeView } from './components/admin/ControlCenterAg
 import { ControlCenterMemoryGraphView } from './components/admin/ControlCenterMemoryGraphView';
 import { ControlCenterComputeFleetView } from './components/admin/ControlCenterComputeFleetView';
 import { ControlCenterFinOpsOmnichannelView } from './components/admin/ControlCenterFinOpsOmnichannelView';
+import { ControlCenterHealthMonitorView } from './components/admin/ControlCenterHealthMonitorView';
 import { useHitlApproval } from './hooks/useHitlApproval';
 import { PromptLibraryModal } from './components/user/PromptLibraryModal';
 import { AuthPage } from './components/auth/AuthPage';
@@ -78,6 +79,7 @@ import { useCustomerStore } from './stores/useCustomerStore';
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { useThemeStore } from './stores/useThemeStore';
 import { usePlatformStore } from './stores/usePlatformStore';
+import { useControlCenterStore } from './stores/useControlCenterStore';
 import { useTabRouter } from './hooks/useTabRouter';
 import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { useOsThemeSync } from './hooks/useOsThemeSync';
@@ -92,6 +94,8 @@ const ADMIN_ONLY_TABS = new Set([
   'memory-graph',
   'compute-fleet',
   'finops-omnichannel',
+  'health-monitor',
+  'mcp-tower',
   'agent-swarm',
   'task-queue',
   'schema-parity',
@@ -129,6 +133,7 @@ const SUBVIEW_TITLES: Record<string, string> = {
   'memory-graph': 'Memory, Qdrant & AST Graph',
   'compute-fleet': 'Kaggle GPU & CDP Browser Audit',
   'finops-omnichannel': 'FinOps Mesh, Telegram & Cron',
+  'health-monitor': 'MCP Resource & Latency Monitor',
   'agent-swarm': 'Autonomous Agent Swarm',
   'task-queue': 'Distributed Task Queue',
   'schema-parity': 'Schema Parity Matrix',
@@ -266,6 +271,8 @@ export default function App() {
     fetchConfig,
     dismissBanner,
   } = usePlatformStore();
+
+  const healthAlertCount = useControlCenterStore((s) => s.healthSnapshot?.alerts?.length ?? 0);
 
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 900 : true
@@ -718,6 +725,8 @@ export default function App() {
             activePluginsCount={activePluginsCount}
             customersCount={customers.length}
             mcpAlertCount={mcpAlertCount}
+            mcpTotalCount={mcpServices.length}
+            healthAlertCount={healthAlertCount || mcpAlertCount}
             authUser={authUser}
             onSignOut={handleSignOut}
             darkMode={darkMode}
@@ -1307,6 +1316,8 @@ export default function App() {
               }}
             />
           )}
+
+          {activeTab === 'health-monitor' && <ControlCenterHealthMonitorView />}
 
           {activeTab === 'mcp-tower' && (
             <AdminMcpTowerView

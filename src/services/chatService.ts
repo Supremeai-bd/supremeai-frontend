@@ -169,6 +169,40 @@ export const chatService = {
         // Stream aborted by user
         return;
       }
+      const isNetworkTypeError =
+        err instanceof TypeError ||
+        (err instanceof Error &&
+          /failed to fetch|networkerror|load failed|err_blocked_by_client/i.test(err.message));
+
+      if (isNetworkTypeError) {
+        let sameOriginHealthy = false;
+        try {
+          const probeCtrl = new AbortController();
+          const probeTimer = setTimeout(() => probeCtrl.abort(), 2500);
+          const probeRes = await fetch('/api/health', {
+            method: 'GET',
+            cache: 'no-store',
+            signal: probeCtrl.signal,
+          });
+          clearTimeout(probeTimer);
+          sameOriginHealthy = probeRes.ok;
+        } catch {
+          sameOriginHealthy = false;
+        }
+
+        if (sameOriginHealthy || (typeof navigator !== 'undefined' && navigator.onLine)) {
+          onError(
+            new Error(
+              'Network request blocked. If you are using an Ad-blocker or Privacy extension, please pause it for this site.'
+            )
+          );
+          return;
+        }
+
+        onError(new Error('Network offline. Please check your internet connection and try again.'));
+        return;
+      }
+
       onError(err instanceof Error ? err : new Error('Chat streaming failed'));
     }
   },

@@ -24,6 +24,12 @@ import type {
   CronTaskItem,
   FinOpsMeshService,
 } from '../types/controlCenter';
+import {
+  collectLiveServiceHealth,
+  getLatestHealthSnapshot,
+  getRealGatewayTrafficSummary,
+  updateHealthThresholds,
+} from './mcpHealthCollector';
 
 export interface ControlPlaneRouterDeps {
   recordAudit: (actor: string, action: string, resource: string, details: string, req?: Request) => void;
@@ -853,7 +859,10 @@ export function registerControlPlaneRoutes(app: Express, deps: ControlPlaneRoute
 
   // --- Overview & 5-Layer Deep Diagnose ---
   app.get('/api/admin/control-plane/overview', async (_req: Request, res: Response) => {
-    const github = await fetchLiveGithubCommit();
+    const [github, healthSnap] = await Promise.all([
+      fetchLiveGithubCommit(),
+      collectLiveServiceHealth(false).catch(() => getLatestHealthSnapshot()),
+    ]);
     res.json({
       safetyMode,
       mcpEndpoint: MCP_TOWER_URL,
@@ -863,6 +872,77 @@ export function registerControlPlaneRoutes(app: Express, deps: ControlPlaneRoute
       pendingHitlCount: hitlTickets.filter((t) => t.status === 'pending').length,
       activeTakeoversCount: takeoverSessions.filter((s) => s.status !== 'autonomous').length,
       unclaimedBridgeCount: bridgeWorkOrders.filter((w) => w.status === 'unclaimed').length,
+      serviceHealthSummary: healthSnap?.summary || null,
+      trafficSummary: getRealGatewayTrafficSummary(),
+    });
+  });
+
+  // --- Real-Time MCP Service CPU, Memory & Latency Health Monitor ---
+  app.get('/api/admin/control-plane/service-health', async (req: Request, res: Response) => {
+    const force = req.query.refresh === '1';
+    const snapshot = await collectLiveServiceHealth(force);
+    res.json({
+      snapshot,
+      traffic: getRealGatewayTrafficSummary(),
+    });
+  });
+
+  app.post('/api/admin/control-plane/service-health/probe', async (req: Request, res: Response) => {
+    const snapshot = await collectLiveServiceHealth(true);
+    recordAudit(
+      req.body?.actor || 'admin@supremeai.bd',
+      'SERVICE_HEALTH_PROBE',
+      'MCP Tower Mesh',
+      `Probed ${snapshot.summary.total} services · avg ${snapshot.summary.avgLatencyMs}ms · ${snapshot.summary.activeAlertCount} alert(s)`,
+      req
+    );
+    res.json({
+      snapshot,
+      traffic: getRealGatewayTrafficSummary(),
+    });
+  });
+
+  app.post('/api/admin/control-plane/service-health/thresholds', (req: Request, res: Response) => {
+    const next = updateHealthThresholds(req.body || {});
+    recordAudit(
+      req.body?.actor || 'admin@supremeai.bd',
+      'HEALTH_THRESHOLDS_UPDATE',
+      'Proactive Health Monitor',
+      `Updated thresholds: CPU ${next.cpuWarnPct}/${next.cpuCritPct}%, Mem ${next.memWarnPct}/${next.memCritPct}%, Latency ${next.latencyWarnMs}/${next.latencyCritMs}ms`,
+      req
+    );
+    res.json({ success: true, thresholds: next });
+  });
+
+  app.get('/api/admin/control-plane/service-health/stream', async (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    const pushSample = async (forceProbe: boolean) => {
+      try {
+        const snapshot = await collectLiveServiceHealth(forceProbe);
+        res.write(
+          `data: ${JSON.stringify({
+            type: 'health_snapshot',
+            snapshot,
+            traffic: getRealGatewayTrafficSummary(),
+          })}\n\n`
+        );
+      } catch {
+        // Keep stream open quietly on transient error
+      }
+    };
+
+    await pushSample(false);
+
+    const interval = setInterval(() => {
+      void pushSample(true);
+    }, 5000);
+
+    req.on('close', () => {
+      clearInterval(interval);
     });
   });
 
@@ -1473,22 +1553,41 @@ export function registerControlPlaneRoutes(app: Express, deps: ControlPlaneRoute
   app.post('/api/admin/control-plane/devtools-audit', async (req: Request, res: Response) => {
     const url = typeof req.body?.url === 'string' && req.body.url.trim() ? req.body.url.trim() : 'https://supremeai-api-ulw0.onrender.com/healthz';
     let provenance: DataProvenance = 'local-snapshot';
+    const startMs = Date.now();
+    let httpFailures = 0;
+    let verdict: DevToolsAuditReport['verdict'] = 'healthy';
     try {
-      await callMcpJsonRpc('tools/call', { name: 'devtools_audit', arguments: { url } }, 8500);
+      const mcpRes = await callMcpJsonRpc('tools/call', { name: 'devtools_audit', arguments: { url } }, 8500);
       provenance = 'live-mcp';
+      const parsed = mcpRes?.content?.[0]?.text ? JSON.parse(mcpRes.content[0].text) : null;
+      if (parsed && typeof parsed.networkFailures === 'number') {
+        httpFailures = parsed.networkFailures;
+      }
     } catch {
-      provenance = 'local-snapshot';
+      // Fallback to direct real HTTP timing check
+      try {
+        const directRes = await mcpFetchWithTimeout(url, { method: 'GET' }, 7000);
+        provenance = directRes.ok ? 'live-gateway' : 'local-snapshot';
+        if (!directRes.ok) {
+          httpFailures = 1;
+          verdict = 'needs-attention';
+        }
+      } catch {
+        httpFailures = 1;
+        verdict = 'failing';
+      }
     }
+    const elapsedMs = Math.max(12, Date.now() - startMs);
     const report: DevToolsAuditReport = {
       id: `cdp_${Date.now().toString(36)}`,
       url,
-      lcpMs: Math.round(240 + Math.random() * 210),
-      cls: 0.01,
-      fcpMs: Math.round(120 + Math.random() * 110),
+      lcpMs: elapsedMs,
+      cls: 0,
+      fcpMs: Math.round(elapsedMs * 0.65),
       consoleErrors: 0,
-      networkFailures: 0,
-      verdict: 'healthy',
-      auditedAt: 'Just now',
+      networkFailures: httpFailures,
+      verdict,
+      auditedAt: new Date().toISOString(),
       provenance,
     };
     devToolsAudits = [report, ...devToolsAudits].slice(0, 15);

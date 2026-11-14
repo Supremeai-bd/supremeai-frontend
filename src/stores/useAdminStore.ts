@@ -9,7 +9,6 @@ import {
   SystemAuditRecord,
   CustomerRecord,
 } from '../types';
-import { INITIAL_MCP_SERVICES } from '../data/mcpTowerData';
 import { INITIAL_CUSTOMERS } from '../data/customerData';
 import {
   INITIAL_SWARM_WORKERS,
@@ -91,7 +90,7 @@ export const useAdminStore = create<AdminState>((set, get) => {
     return fallback;
   };
 
-  const initialMcpServices = getInitialStorage<McpTowerService[]>(MCP_SERVICES_KEY, INITIAL_MCP_SERVICES);
+  const initialMcpServices = getInitialStorage<McpTowerService[]>(MCP_SERVICES_KEY, []);
   const initialSwarmWorkers = getInitialStorage<SwarmWorker[]>(SWARM_KEY, INITIAL_SWARM_WORKERS);
   const initialQueueJobs = getInitialStorage<TaskQueueJob[]>(QUEUE_KEY, INITIAL_QUEUE_JOBS);
   const initialSchemaTables = getInitialStorage<SchemaParityTable[]>(SCHEMA_KEY, INITIAL_SCHEMA_PARITY);

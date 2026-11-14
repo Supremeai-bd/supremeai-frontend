@@ -89,8 +89,7 @@ export const adminService = {
       return INITIAL_MCP_SERVICES;
     }
     const data = await apiClient.get<{ services: any[] }>('/api/mcp-tower/services');
-    const mapped = (data.services || []).map((s) => this.mapTowerService(s));
-    return mapped.length > 0 ? mapped : INITIAL_MCP_SERVICES;
+    return (data.services || []).map((s) => this.mapTowerService(s));
   },
 
   async rebootMcpService(serviceId: string): Promise<McpTowerService> {

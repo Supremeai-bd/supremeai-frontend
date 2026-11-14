@@ -37,12 +37,14 @@ const getRuntimeMockOverride = (): boolean | null => {
 
 export const env: AppEnvConfig = {
   isMockEnabled: import.meta.env.PROD ? false : (getRuntimeMockOverride() ?? getEnvBool('VITE_USE_MOCK', false)),
-  apiBaseUrl: getEnvString('VITE_API_BASE_URL', import.meta.env.PROD ? 'https://supremeai-api-ulw0.onrender.com' : ''),
-  wsBaseUrl: getEnvString('VITE_WS_BASE_URL', import.meta.env.PROD ? 'wss://supremeai-api-ulw0.onrender.com' : 'ws://localhost:3000'),
+  // Same-origin by default (routed via Vite/Express in preview and Cloudflare Pages Functions `/api/*` in prod)
+  // to avoid cross-domain CORS preflights and ad-blocker false positives. Set VITE_API_BASE_URL to override.
+  apiBaseUrl: getEnvString('VITE_API_BASE_URL', ''),
+  wsBaseUrl: getEnvString('VITE_WS_BASE_URL', import.meta.env.PROD ? '' : 'ws://localhost:3000'),
   mockBaseUrl: getEnvString('VITE_MOCK_BASE_URL', '/api/mock'),
   supabaseUrl: getEnvString('VITE_SUPABASE_URL', 'https://auth.supremeai.bd'),
-  gatewayUrl: getEnvString('VITE_GATEWAY_URL', import.meta.env.PROD ? 'https://supremeai-api-ulw0.onrender.com/v1' : '/v1'),
-  mcpTowerUrl: getEnvString('VITE_MCP_TOWER_URL', import.meta.env.PROD ? 'https://supremeai-mcp-tower.onrender.com/mcp' : '/api/mcp-tower'),
+  gatewayUrl: getEnvString('VITE_GATEWAY_URL', '/v1'),
+  mcpTowerUrl: getEnvString('VITE_MCP_TOWER_URL', '/api/mcp-tower'),
   version: 'v2.4.0-prod',
 };
 

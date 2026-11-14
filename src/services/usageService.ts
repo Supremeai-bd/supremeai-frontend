@@ -61,7 +61,7 @@ export const usageService = {
     }
 
     try {
-      const data = await apiClient.get<any>('/api/billing/analytics');
+      const data = await apiClient.get<any>('/api/billing/summary');
       return {
         totalSpent: typeof data.total_spent === 'number' ? data.total_spent : 0,
         totalSaved: typeof data.total_saved === 'number' ? data.total_saved : 0,

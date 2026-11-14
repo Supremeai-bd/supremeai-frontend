@@ -26,6 +26,9 @@ import type {
   TelegramDispatchRecord,
   CronTaskItem,
   FinOpsMeshService,
+  McpHealthMonitorSnapshot,
+  ProactiveHealthThresholds,
+  GatewayTrafficPoint,
 } from '../types/controlCenter';
 
 export interface SafetyGatePrompt {
@@ -92,6 +95,18 @@ interface ControlCenterState {
   cronTasks: CronTaskItem[];
   isLoadingFinOps: boolean;
 
+  // Real-Time MCP Resource & Latency Health Monitor
+  healthSnapshot: McpHealthMonitorSnapshot | null;
+  trafficSummary: {
+    rpm: number;
+    avgLatencyMs: number;
+    errorRatePercent: number;
+    totalRequests: number;
+    history: GatewayTrafficPoint[];
+  } | null;
+  isLoadingHealth: boolean;
+  isProbingHealth: boolean;
+
   // Safety Gate Modal
   pendingGate: SafetyGatePrompt | null;
   isExecutingGate: boolean;
@@ -113,6 +128,10 @@ interface ControlCenterState {
   loadComputeAndBrowser: () => Promise<void>;
   runDevToolsAudit: (url: string) => Promise<void>;
   loadFinOpsAndOmnichannel: () => Promise<void>;
+  loadServiceHealth: (refresh?: boolean) => Promise<void>;
+  runServiceHealthProbe: (actor?: string) => Promise<void>;
+  saveHealthThresholds: (thresholds: Partial<ProactiveHealthThresholds>, actor?: string) => Promise<void>;
+  applyHealthStreamSnapshot: (snapshot: McpHealthMonitorSnapshot, traffic?: ControlCenterState['trafficSummary']) => void;
 
   requestGuardedAction: (prompt: SafetyGatePrompt) => void;
   closeGuardedAction: () => void;
@@ -168,6 +187,11 @@ export const useControlCenterStore = create<ControlCenterState>((set, get) => ({
   cronTasks: [],
   isLoadingFinOps: false,
 
+  healthSnapshot: null,
+  trafficSummary: null,
+  isLoadingHealth: false,
+  isProbingHealth: false,
+
   pendingGate: null,
   isExecutingGate: false,
 
@@ -184,6 +208,7 @@ export const useControlCenterStore = create<ControlCenterState>((set, get) => ({
         pendingHitlCount: data.pendingHitlCount,
         activeTakeoversCount: data.activeTakeoversCount,
         unclaimedBridgeCount: data.unclaimedBridgeCount,
+        trafficSummary: data.trafficSummary || get().trafficSummary,
       });
     } catch {
       // Keep prior state cleanly
@@ -401,6 +426,52 @@ export const useControlCenterStore = create<ControlCenterState>((set, get) => ({
     } finally {
       set({ isLoadingFinOps: false });
     }
+  },
+
+  loadServiceHealth: async (refresh = false) => {
+    set({ isLoadingHealth: true });
+    try {
+      const res = await controlCenterService.fetchServiceHealth(refresh);
+      set({ healthSnapshot: res.snapshot, trafficSummary: res.traffic });
+    } catch (err: unknown) {
+      toast.error('Health Monitor Error', err instanceof Error ? err.message : 'Unable to probe services.');
+    } finally {
+      set({ isLoadingHealth: false });
+    }
+  },
+
+  runServiceHealthProbe: async (actor) => {
+    set({ isProbingHealth: true });
+    try {
+      const res = await controlCenterService.probeServiceHealth(actor);
+      set({ healthSnapshot: res.snapshot, trafficSummary: res.traffic });
+      toast.success(
+        'Live Health Probe Complete',
+        `${res.snapshot.summary.healthy}/${res.snapshot.summary.total} healthy · avg ${res.snapshot.summary.avgLatencyMs}ms`
+      );
+    } catch (err: unknown) {
+      toast.error('Live Probe Failed', err instanceof Error ? err.message : 'Upstream probe error.');
+    } finally {
+      set({ isProbingHealth: false });
+    }
+  },
+
+  saveHealthThresholds: async (thresholds, actor) => {
+    try {
+      await controlCenterService.updateHealthThresholds(thresholds, actor);
+      const res = await controlCenterService.fetchServiceHealth(true);
+      set({ healthSnapshot: res.snapshot, trafficSummary: res.traffic });
+      toast.success('Alert Thresholds Saved', 'Proactive health monitor thresholds updated.');
+    } catch (err: unknown) {
+      toast.error('Threshold Update Error', err instanceof Error ? err.message : 'Failed to save thresholds.');
+    }
+  },
+
+  applyHealthStreamSnapshot: (snapshot, traffic) => {
+    set((state) => ({
+      healthSnapshot: snapshot,
+      trafficSummary: traffic || state.trafficSummary,
+    }));
   },
 
   requestGuardedAction: (prompt) => {

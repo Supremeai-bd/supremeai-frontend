@@ -51,15 +51,6 @@ interface AdminOverviewViewProps {
   onOpenDangerConfirm: (action: string, title: string, description: string) => void;
 }
 
-const LIVE_TRAFFIC_DATA = [
-  { time: '06:00', qps: 180, latency: 22, cost: 4.2 },
-  { time: '07:00', qps: 240, latency: 24, cost: 6.8 },
-  { time: '08:00', qps: 390, latency: 29, cost: 12.1 },
-  { time: '09:00', qps: 480, latency: 34, cost: 18.5 },
-  { time: '10:00', qps: 420, latency: 28, cost: 24.8 },
-  { time: '11:00', qps: 450, latency: 26, cost: 32.4 },
-];
-
 export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
   customers,
   services,
@@ -76,8 +67,11 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
     pendingHitlCount,
     activeTakeoversCount,
     unclaimedBridgeCount,
+    healthSnapshot,
+    trafficSummary,
     isDiagnosing,
     loadOverview,
+    loadServiceHealth,
     runDeepDiagnose,
     generateDagPlan,
   } = useControlCenterStore();
@@ -90,7 +84,8 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
 
   useEffect(() => {
     loadOverview();
-  }, [loadOverview]);
+    loadServiceHealth(false);
+  }, [loadOverview, loadServiceHealth]);
 
   useEffect(() => {
     setMaintenanceMessage(config.maintenanceMessage);
@@ -101,10 +96,36 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
   const unhealthyServices = services.filter((s) => s.status !== 'healthy');
   const dlqJobs = jobs.filter((j) => j.status === 'dlq' || j.status === 'failed');
   const activeWorkers = workers.filter((w) => w.status === 'active').length;
+  const healthyJobRate =
+    jobs.length > 0 ? Math.round(((jobs.length - dlqJobs.length) / jobs.length) * 100) : 100;
 
   const totalMrr = customers.reduce((sum, c) => sum + (c.mrr || 0), 0);
   const activeCustomers = customers.filter((c) => c.status === 'active').length;
   const suspendedCustomers = customers.filter((c) => c.status === 'suspended').length;
+
+  const observedRpm = trafficSummary?.rpm ?? 0;
+  const observedLatencyMs =
+    trafficSummary?.avgLatencyMs ?? healthSnapshot?.summary.avgLatencyMs ?? 0;
+  const observedErrPct = trafficSummary?.errorRatePercent ?? 0;
+  const totalObservedRequests = trafficSummary?.totalRequests ?? 0;
+  const trafficSeries =
+    trafficSummary?.history && trafficSummary.history.length > 0
+      ? trafficSummary.history.map((pt) => ({
+          time: pt.time,
+          rpm: pt.rpm,
+          latency: pt.avgLatencyMs,
+        }))
+      : (healthSnapshot?.hostHistory || []).map((pt) => ({
+          time: pt.ts,
+          rpm: pt.cpuPercent,
+          latency: pt.avgLatencyMs,
+        }));
+  const isUsingHostSeries = !(trafficSummary?.history && trafficSummary.history.length > 0);
+  const totalConnectedMcp = healthSnapshot?.summary.total ?? services.length;
+  const healthyMcpCount =
+    healthSnapshot?.summary.healthy ?? Math.max(0, services.length - unhealthyServices.length);
+  const mcpAlertCount =
+    healthSnapshot?.alerts.length ?? unhealthyServices.length;
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-8 max-w-7xl mx-auto space-y-6 text-slate-800 dark:text-slate-200">
@@ -248,6 +269,7 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
         {/* 1-Click Consolidated Control Center Console Jump Links */}
         <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
           {[
+            { tab: 'health-monitor', label: `CPU, Mem & Latency (${mcpAlertCount})` },
             { tab: 'hitl-policies', label: `HITL & Policies (${pendingHitlCount})` },
             { tab: 'release-gate', label: 'Release Gate & Render' },
             { tab: 'external-agents', label: `Bridge Orders (${unclaimedBridgeCount})` },
@@ -290,46 +312,50 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
         </div>
 
         <div
-          onClick={() => onNavigateTab('llm-gateway')}
-          className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 hover:border-blue-400 transition-all cursor-pointer space-y-2 group"
+          onClick={() => onNavigateTab('health-monitor')}
+          className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 transition-all cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Gateway Traffic</span>
+            <span>Gateway & Host Load</span>
             <Cpu className="w-4 h-4 text-blue-500" />
           </div>
           <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">
-            420 QPS
+            {observedRpm} RPM
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono tabular-nums">
-            <span>Latency: 28ms</span>
-            <span className="text-emerald-500">0.02% Err</span>
+            <span>
+              {observedLatencyMs}ms · CPU {healthSnapshot?.host?.cpuPercent ?? 0}%
+            </span>
+            <span className={observedErrPct > 2 ? 'text-rose-500' : 'text-emerald-500'}>
+              {observedErrPct}% Err ({totalObservedRequests})
+            </span>
           </div>
         </div>
 
         <div
-          onClick={() => onNavigateTab('mcp-tower')}
-          className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
+          onClick={() => onNavigateTab('health-monitor')}
+          className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>MCP Microservices</span>
+            <span>MCP Services Health</span>
             <Radio className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">
-            {services.length - unhealthyServices.length} / {services.length} Healthy
+            {healthyMcpCount} / {totalConnectedMcp} Healthy
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
-            <span>8 Microservices</span>
-            {unhealthyServices.length > 0 ? (
-              <span className="text-rose-500 font-semibold">{unhealthyServices.length} Degraded</span>
+          <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono tabular-nums">
+            <span>{totalConnectedMcp} Connected Nodes</span>
+            {mcpAlertCount > 0 ? (
+              <span className="text-rose-500 font-semibold">{mcpAlertCount} Alert{mcpAlertCount > 1 ? 's' : ''}</span>
             ) : (
-              <span className="text-emerald-500 font-semibold">All OK</span>
+              <span className="text-emerald-500 font-semibold">All Nominal</span>
             )}
           </div>
         </div>
 
         <div
           onClick={() => onNavigateTab('agent-swarm')}
-          className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 hover:border-purple-400 transition-all cursor-pointer space-y-2 group"
+          className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-400 transition-all cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Autonomous Swarm</span>
@@ -338,9 +364,9 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
           <div className="text-2xl font-bold font-mono tabular-nums text-purple-600 dark:text-purple-400">
             {activeWorkers} Daemons
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono tabular-nums">
             <span>{dlqJobs.length} failed/DLQ jobs</span>
-            <span className="text-emerald-500 font-semibold">99.1% Pass</span>
+            <span className="text-emerald-500 font-semibold">{healthyJobRate}% Healthy</span>
           </div>
         </div>
       </div>
@@ -580,49 +606,77 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
 
       {/* Main Charts & Command Strip */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 p-6 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 space-y-4">
+        <div className="lg:col-span-2 p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-600" />
-                <span>Real-Time LLM Gateway QPS & Latency Telemetry</span>
+                <span>Real-Time Backend Gateway & Cluster Latency Telemetry</span>
               </h2>
-              <p className="text-[11px] text-slate-400">Aggregated requests/min over the last 6 hours</p>
+              <p className="text-[11px] text-slate-400">
+                {isUsingHostSeries
+                  ? 'Live measured MCP cluster latency (ms) and runtime host CPU (%)'
+                  : 'Observed Express /api requests/min and response latency (ms)'}
+              </p>
             </div>
-            <span className="text-xs font-mono text-blue-600 dark:text-blue-400 font-semibold">
-              Live Stream Broker
-            </span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('health-monitor')}
+              className="text-xs font-mono text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+            >
+              Open Full Health Monitor →
+            </button>
           </div>
 
           <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={LIVE_TRAFFIC_DATA}>
-                <defs>
-                  <linearGradient id="qpsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                    color: '#f8fafc',
-                  }}
-                />
-                <Area type="monotone" dataKey="qps" stroke="#3b82f6" strokeWidth={2} fill="url(#qpsGradient)" name="Requests/min" />
-                <Area type="monotone" dataKey="latency" stroke="#a855f7" strokeWidth={2} fill="none" name="Latency (ms)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {trafficSeries.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trafficSeries}>
+                  <defs>
+                    <linearGradient id="qpsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#334155',
+                      borderRadius: '0.75rem',
+                      fontSize: '12px',
+                      color: '#f8fafc',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="rpm"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fill="url(#qpsGradient)"
+                    name={isUsingHostSeries ? 'Host CPU (%)' : 'Requests/min'}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="latency"
+                    stroke="#a855f7"
+                    strokeWidth={2}
+                    fill="none"
+                    name="Latency (ms)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400 font-mono">
+                Collecting live /api & MCP Tower samples...
+              </div>
+            )}
           </div>
         </div>
 
         {/* Quick Command Hub & Danger Zone */}
-        <div className="p-6 rounded-2xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 space-y-4 flex flex-col justify-between">
+        <div className="p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 font-mono">
@@ -632,6 +686,18 @@ export const AdminOverviewView: React.FC<AdminOverviewViewProps> = ({
             </div>
 
             <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => onNavigateTab('health-monitor')}
+                className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left text-xs text-slate-800 dark:text-slate-200 flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Activity className="w-4 h-4 text-emerald-500" />
+                  <span>CPU, Memory & Latency Monitor</span>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => onNavigateTab('mcp-tower')}

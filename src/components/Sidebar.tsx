@@ -61,6 +61,8 @@ interface SidebarProps {
   activePluginsCount?: number;
   customersCount?: number;
   mcpAlertCount?: number;
+  mcpTotalCount?: number;
+  healthAlertCount?: number;
   authUser?: AuthUser | null;
   onSignOut?: () => void;
   darkMode?: boolean;
@@ -95,6 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activePluginsCount = 4,
   customersCount = 12,
   mcpAlertCount = 0,
+  mcpTotalCount = 0,
+  healthAlertCount = 0,
   authUser,
   onSignOut,
   layoutMode = 'sidebar-focus',
@@ -437,7 +441,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Agent Swarm</span>
               </div>
               <span className="text-[10px] font-mono tabular-nums text-purple-600 dark:text-purple-400">
-                4 active
+                Swarm
               </span>
             </button>
 
@@ -452,6 +456,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <GitBranch className="w-4 h-4 text-blue-500" />
               <span>External Agents & Bridge</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('health-monitor')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'health-monitor'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Cpu className={`w-4 h-4 shrink-0 ${healthAlertCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
+                <span className="truncate">CPU, Mem & Latency</span>
+              </div>
+              {healthAlertCount > 0 ? (
+                <span className="text-[10px] font-mono tabular-nums text-amber-600 dark:text-amber-400 font-semibold shrink-0">
+                  {healthAlertCount} alert{healthAlertCount > 1 ? 's' : ''}
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono tabular-nums text-emerald-600 dark:text-emerald-400 shrink-0">
+                  Live
+                </span>
+              )}
             </button>
 
             <button
@@ -473,7 +501,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </span>
               ) : (
                 <span className="text-[10px] font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
-                  8/8 OK
+                  {mcpTotalCount > 0 ? `${mcpTotalCount}/${mcpTotalCount} OK` : 'Live'}
                 </span>
               )}
             </button>

@@ -11,6 +11,13 @@ import dotenv from 'dotenv';
 import { GoogleGenAI, LiveServerMessage, Modality, ThinkingLevel, Type } from '@google/genai';
 import { WebSocketServer, WebSocket } from 'ws';
 import { registerControlPlaneRoutes } from './src/server/controlPlaneRouter';
+import {
+  collectLiveServiceHealth,
+  getLiveMcpTowerServices,
+  getRealGatewayTrafficSummary,
+  recordHttpRequestMetric,
+  sampleHostRuntime,
+} from './src/server/mcpHealthCollector';
 
 const execAsync = promisify(exec);
 dotenv.config();
@@ -76,6 +83,19 @@ interface ChatRequestBody {
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '15mb' }));
+
+  // Real HTTP request throughput & latency instrumentation (excludes SSE streams)
+  app.use('/api', (req, res, next) => {
+    if (req.path.includes('/stream') || req.path === '/health') {
+      next();
+      return;
+    }
+    const start = Date.now();
+    res.on('finish', () => {
+      recordHttpRequestMetric(Date.now() - start, res.statusCode >= 500);
+    });
+    next();
+  });
 
   // Health and metadata endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
@@ -313,142 +333,105 @@ async function startServer() {
     },
   ];
 
-  // GET /api/mcp-tower/services - List all MCP Tower microservices and overall cluster status
-  app.get('/api/mcp-tower/services', (_req: Request, res: Response) => {
-    const total = mcpClusterServices.length;
-    const healthy = mcpClusterServices.filter((s) => s.status === 'healthy').length;
-    const degraded = mcpClusterServices.filter((s) => s.status === 'degraded').length;
-    const unhealthy = mcpClusterServices.filter((s) => s.status === 'unhealthy').length;
-    const totalLatency = mcpClusterServices.reduce((sum, s) => sum + s.latencyMs, 0);
-    const avgLatency = Math.round(totalLatency / total);
-    const healthScore = Math.round((healthy / total) * 100);
+  // GET /api/mcp-tower/services - Live services from MCP Tower & HTTP health probes
+  app.get('/api/mcp-tower/services', async (req: Request, res: Response) => {
+    try {
+      const force = req.query.refresh === '1';
+      const liveServices = await getLiveMcpTowerServices(force);
+      const total = liveServices.length;
+      const healthy = liveServices.filter((s) => s.status === 'healthy').length;
+      const degraded = liveServices.filter((s) => s.status === 'degraded').length;
+      const unhealthy = liveServices.filter((s) => s.status === 'unhealthy').length;
+      const totalLatency = liveServices.reduce((sum, s) => sum + s.latencyMs, 0);
+      const avgLatency = total > 0 ? Math.round(totalLatency / total) : 0;
+      const healthScore = total > 0 ? Math.round((healthy / total) * 100) : 100;
 
-    res.json({
-      summary: {
-        total,
-        healthy,
-        degraded,
-        unhealthy,
-        avgLatency,
-        healthScore,
-        lastClusterAudit: new Date().toISOString(),
-      },
-      services: mcpClusterServices,
-    });
+      res.json({
+        summary: {
+          total,
+          healthy,
+          degraded,
+          unhealthy,
+          avgLatency,
+          healthScore,
+          lastClusterAudit: new Date().toISOString(),
+        },
+        services: liveServices,
+      });
+    } catch (err: unknown) {
+      res.status(502).json({
+        error: err instanceof Error ? err.message : 'Failed to reach MCP Tower',
+        services: [],
+      });
+    }
   });
 
-  // POST /api/mcp-tower/reboot - Reboot a specific service by ID
-  app.post('/api/mcp-tower/reboot', (req: Request<{}, {}, { serviceId: string }>, res: Response) => {
+  // POST /api/mcp-tower/reboot - Guarded reboot/refresh via MCP Tower
+  app.post('/api/mcp-tower/reboot', async (req: Request<{}, {}, { serviceId: string }>, res: Response) => {
     const { serviceId } = req.body;
     if (!serviceId) {
       res.status(400).json({ error: 'serviceId is required' });
       return;
     }
 
-    const serviceIndex = mcpClusterServices.findIndex((s) => s.id === serviceId);
-    if (serviceIndex === -1) {
+    const liveServices = await getLiveMcpTowerServices(true);
+    const matched = liveServices.find((s) => s.id === serviceId) || mcpClusterServices.find((s) => s.id === serviceId);
+    if (!matched) {
       res.status(404).json({ error: `Service '${serviceId}' not found in MCP Tower cluster` });
       return;
     }
 
-    const prev = mcpClusterServices[serviceIndex];
-    const nowTime = new Date().toLocaleTimeString();
-
-    const rebootLog = {
-      id: `reboot-${Date.now()}`,
-      timestamp: nowTime,
-      level: 'INFO' as const,
-      message: `Service process gracefully rebooted via SupremeAI Admin Dashboard. Memory garbage collected, connection pool drained and re-initialized.`,
-      details: `PID reset. Cold boot latency: 28ms. All 0 previous error locks released.`,
-    };
-
-    const rebootedService = {
-      ...prev,
-      status: 'healthy' as const,
-      errorCount: 0,
-      latencyMs: serviceId === 'code-auditor-worker' ? 38 : serviceId === 'sse-stream-broker' ? 26 : Math.max(12, Math.round(prev.latencyMs * 0.4)),
-      cpuPercent: serviceId === 'code-auditor-worker' ? 3.2 : serviceId === 'sse-stream-broker' ? 4.1 : 1.5,
-      memoryMb: serviceId === 'code-auditor-worker' ? 240 : serviceId === 'sse-stream-broker' ? 180 : prev.memoryMb,
-      uptime: '100%',
-      lastChecked: 'Just now (Clean reboot)',
-      logs: [rebootLog, ...prev.logs],
-    };
-
-    mcpClusterServices[serviceIndex] = rebootedService;
+    recordAudit('admin@supremeai.bd', 'MCP_SERVICE_REFRESH', matched.displayName, `Triggered active service probe & pool refresh`, req);
 
     res.json({
       success: true,
-      message: `Service '${prev.displayName}' rebooted successfully.`,
-      service: rebootedService,
+      message: `Service '${matched.displayName}' re-probed and synchronized.`,
+      service: matched,
     });
   });
 
-  // POST /api/mcp-tower/reboot-all - Reboot all degraded/unhealthy services
-  app.post('/api/mcp-tower/reboot-all', (_req: Request, res: Response) => {
-    const nowTime = new Date().toLocaleTimeString();
-    mcpClusterServices = mcpClusterServices.map((s) => {
-      if (s.status === 'unhealthy' || s.status === 'degraded') {
-        const rebootLog = {
-          id: `reboot-all-${Date.now()}-${s.id}`,
-          timestamp: nowTime,
-          level: 'INFO' as const,
-          message: `Cluster-wide recovery sweep rebooted service daemon. Memory flushed and health checks passed.`,
-        };
-        return {
-          ...s,
-          status: 'healthy' as const,
-          errorCount: 0,
-          latencyMs: s.id === 'code-auditor-worker' ? 35 : s.id === 'sse-stream-broker' ? 24 : 20,
-          cpuPercent: 2.4,
-          memoryMb: s.id === 'code-auditor-worker' ? 230 : 190,
-          uptime: '100%',
-          lastChecked: 'Just now (Cluster reboot)',
-          logs: [rebootLog, ...s.logs],
-        };
-      }
-      return s;
-    });
-
+  // POST /api/mcp-tower/reboot-all - Active cluster recovery sweep
+  app.post('/api/mcp-tower/reboot-all', async (req: Request, res: Response) => {
+    const liveServices = await getLiveMcpTowerServices(true);
+    recordAudit('admin@supremeai.bd', 'MCP_CLUSTER_SWEEP', 'MCP Tower Mesh', `Executed cluster-wide live health recovery sweep`, req);
     res.json({
       success: true,
-      message: 'All degraded and unhealthy services in MCP Tower were successfully rebooted and recovered.',
-      services: mcpClusterServices,
+      message: 'Executed cluster-wide live probe across all MCP Tower services.',
+      services: liveServices,
     });
   });
 
-  // POST /api/mcp-tower/probe - Force an immediate health check probe
-  app.post('/api/mcp-tower/probe', (_req: Request, res: Response) => {
-    mcpClusterServices = mcpClusterServices.map((s) => ({
-      ...s,
-      lastChecked: 'Just now (Active probe)',
-    }));
+  // POST /api/mcp-tower/probe - Force an immediate live health check probe
+  app.post('/api/mcp-tower/probe', async (_req: Request, res: Response) => {
+    const liveServices = await getLiveMcpTowerServices(true);
     res.json({
       success: true,
       timestamp: new Date().toISOString(),
-      services: mcpClusterServices,
+      services: liveServices,
     });
   });
 
-  // GET /api/mcp-tower/stream - Live Server-Sent Events (SSE) telemetry pipeline
-  app.get('/api/mcp-tower/stream', (req: Request, res: Response) => {
+  // GET /api/mcp-tower/stream - Live Server-Sent Events (SSE) using real MCP Tower & HTTP probes
+  app.get('/api/mcp-tower/stream', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    // Initial heartbeat
-    res.write(`data: ${JSON.stringify({ type: 'init', timestamp: Date.now(), services: mcpClusterServices })}\n\n`);
+    const pushLiveServices = async (force: boolean) => {
+      try {
+        const services = await getLiveMcpTowerServices(force);
+        res.write(`data: ${JSON.stringify({ type: force ? 'live_tick' : 'init', timestamp: Date.now(), services })}\n\n`);
+      } catch {
+        // Keep SSE socket open on transient upstream errors
+      }
+    };
+
+    await pushLiveServices(false);
 
     const interval = setInterval(() => {
-      // Jitter telemetry slightly to reflect real-time live service activity
-      const jittered = mcpClusterServices.map((s) => ({
-        ...s,
-        latencyMs: Math.max(8, s.latencyMs + Math.floor(Math.random() * 5 - 2)),
-        cpuPercent: Number(Math.max(0.5, s.cpuPercent + (Math.random() * 0.4 - 0.2)).toFixed(1)),
-        lastChecked: 'Just now (Live SSE)',
-      }));
-      res.write(`data: ${JSON.stringify({ type: 'telemetry_tick', timestamp: Date.now(), services: jittered })}\n\n`);
-    }, 4000);
+      void pushLiveServices(true);
+    }, 6000);
 
     req.on('close', () => {
       clearInterval(interval);
@@ -465,17 +448,19 @@ async function startServer() {
     res.write(`data: ${JSON.stringify({ type: 'swarm_connected', timestamp: Date.now(), status: 'active' })}\n\n`);
 
     const interval = setInterval(() => {
+      const traffic = getRealGatewayTrafficSummary();
+      const activeWorkersCount = devSwarmWorkers.filter((w) => w.status === 'active').length;
       const swarmHeartbeat = {
         type: 'swarm_pulse',
         timestamp: Date.now(),
-        activeWorkers: 4,
-        throughputRps: Math.floor(Math.random() * 40 + 110),
+        activeWorkers: activeWorkersCount,
+        throughputRps: traffic.rpm,
         logEvent: {
           id: `log-${Date.now()}`,
           timestamp: new Date().toLocaleTimeString(),
           source: 'autonomous-swarm-orchestrator',
           level: 'INFO',
-          message: `Swarm heartbeat check passed. Queue drain latency 12ms.`,
+          message: `Swarm heartbeat verified (${activeWorkersCount} active daemons · gateway ${traffic.rpm} RPM · avg ${traffic.avgLatencyMs}ms).`,
         },
       };
       res.write(`data: ${JSON.stringify(swarmHeartbeat)}\n\n`);
@@ -1499,10 +1484,13 @@ async function startServer() {
     });
   });
 
-  // GET /api/admin/overview - Real-time metrics for Admin Command Center
-  app.get('/api/admin/overview', (_req: Request, res: Response) => {
-    const healthyCount = mcpClusterServices.filter((s) => s.status === 'healthy').length;
-    const unhealthyCount = mcpClusterServices.filter((s) => s.status !== 'healthy').length;
+  // GET /api/admin/overview - Real-time live metrics for Admin Command Center
+  app.get('/api/admin/overview', async (_req: Request, res: Response) => {
+    const [healthSnap] = await Promise.all([
+      collectLiveServiceHealth(false).catch(() => null),
+    ]);
+    const traffic = getRealGatewayTrafficSummary();
+    const host = sampleHostRuntime();
     const totalMrr = customerDirectory.reduce((sum, c) => sum + c.mrr, 0);
     const activeCustomers = customerDirectory.filter((c) => c.status === 'active').length;
 
@@ -1512,18 +1500,25 @@ async function startServer() {
         activeCustomers,
         suspendedCustomers: customerDirectory.filter((c) => c.status === 'suspended').length,
         totalMrr,
-        activeSessions: 28,
-        gatewayQps: 420,
-        errorRatePercent: 0.02,
-        costTodayUsd: 32.4,
-        revenueTodayUsd: 148.6,
-        grossMarginPercent: 78.2,
-        healthyServices: healthyCount,
-        unhealthyServices: unhealthyCount,
+        gatewayRpm: traffic.rpm,
+        totalRequestsObserved: traffic.totalRequests,
+        avgLatencyMs: healthSnap?.summary.avgLatencyMs ?? traffic.avgLatencyMs,
+        errorRatePercent: traffic.errorRatePercent,
+        healthyServices: healthSnap?.summary.healthy ?? 0,
+        unhealthyServices:
+          (healthSnap?.summary.degraded ?? 0) +
+          (healthSnap?.summary.critical ?? 0) +
+          (healthSnap?.summary.unreachable ?? 0),
+        totalServices: healthSnap?.summary.total ?? 0,
         blockedIpCount: blockedIps.length,
         auditCount: auditRecords.length,
-        uptimeOverall: '99.98%',
+        hostCpuPercent: host.cpuPercent,
+        hostMemUsedPct: host.systemMemUsedPct,
+        hostProcessRssMb: host.processRssMb,
+        uptimeSec: host.uptimeSec,
       },
+      trafficHistory: traffic.history,
+      hostHistory: healthSnap?.hostHistory || [],
       featureFlags: runtimeFeatureFlags,
       platformConfig,
     });
@@ -2533,7 +2528,7 @@ async function startServer() {
     });
   });
 
-  app.get('/api/billing/analytics', (_req: Request, res: Response) => {
+  app.get(['/api/billing/summary', '/api/billing/analytics'], (_req: Request, res: Response) => {
     res.json({
       total_spent: 14.85,
       total_saved: 32.4,
@@ -2543,6 +2538,105 @@ async function startServer() {
 
   app.get('/metrics/usage', (_req: Request, res: Response) => {
     res.json({ items: [], total: 0 });
+  });
+
+  // Same-origin /api/v1/stream/chat proxy & preview SSE handler (supports live upstream token or local Gemini streaming)
+  app.post('/api/v1/stream/chat', async (req: Request, res: Response) => {
+    const remoteGatewayUrl =
+      process.env.SUPREMEAI_BACKEND_URL?.trim() || 'https://supremeai-api-ulw0.onrender.com';
+    const authHeader = String(req.headers.authorization || '');
+    const apiKeyHeader = String(req.headers['x-supremeai-key'] || '');
+    const hasRemoteBackendToken =
+      Boolean(apiKeyHeader) || (authHeader.startsWith('Bearer ') && !authHeader.startsWith('Bearer tok_'));
+
+    if (hasRemoteBackendToken) {
+      try {
+        const upstreamRes = await fetch(`${remoteGatewayUrl}/api/v1/stream/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+            ...(authHeader ? { Authorization: authHeader } : {}),
+            ...(apiKeyHeader ? { 'X-SupremeAI-Key': apiKeyHeader } : {}),
+          },
+          body: JSON.stringify(req.body || {}),
+        });
+
+        if (upstreamRes.ok && upstreamRes.body) {
+          res.status(upstreamRes.status);
+          res.setHeader('Content-Type', upstreamRes.headers.get('content-type') || 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Connection', 'keep-alive');
+          res.flushHeaders?.();
+
+          const reader = upstreamRes.body.getReader();
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) res.write(Buffer.from(value));
+          }
+          res.end();
+          return;
+        }
+      } catch (proxyErr) {
+        console.warn('Upstream /api/v1/stream/chat proxy fell back to local studio handler:', proxyErr);
+      }
+    }
+
+    // Local preview / guest / Studio token streaming path (uses GEMINI_API_KEY via @google/genai)
+    const body = req.body || {};
+    const messages = Array.isArray(body.messages) && body.messages.length > 0
+      ? body.messages
+      : [{ role: 'user', content: String(body.prompt || body.message || '') }];
+    const activeApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+    const isValidKey = Boolean(activeApiKey && activeApiKey !== 'MY_GEMINI_API_KEY');
+    const reqModel = String(body.model || 'gemini-2.5-flash');
+    const upstreamModel = reqModel.includes('pro') || reqModel === 'supreme-reason' || reqModel === 'supreme-deep'
+      ? 'gemini-2.5-pro'
+      : 'gemini-2.5-flash';
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    if (isValidKey) {
+      try {
+        const clientAi = new GoogleGenAI({
+          apiKey: activeApiKey,
+          httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+        });
+        const contents = messages
+          .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .map((m: any) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: String(m.content || '') }],
+          }));
+        const systemMsg = messages.find((m: any) => m.role === 'system')?.content;
+        const streamRes = await clientAi.models.generateContentStream({
+          model: upstreamModel,
+          contents,
+          config: systemMsg ? { systemInstruction: String(systemMsg) } : undefined,
+        });
+        for await (const chunk of streamRes) {
+          const textChunk = chunk.text || '';
+          if (textChunk) {
+            res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: textChunk } }], text: textChunk })}\n\n`);
+          }
+        }
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : 'Streaming inference failed';
+        res.write(`data: ${JSON.stringify({ error: { message: errMsg } })}\n\n`);
+        res.end();
+        return;
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ error: { message: 'No GEMINI_API_KEY or remote backend token configured for inference.' } })}\n\n`);
+    res.end();
   });
 
   // Multi-turn chat endpoint (Enforces central Admin governance policies)

@@ -95,6 +95,37 @@ class ApiClient {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new ApiError(`Request timeout exceeded (${timeoutMs}ms) for ${endpoint}`, 408);
       }
+
+      const isNetworkTypeError =
+        err instanceof TypeError ||
+        (err instanceof Error &&
+          /failed to fetch|networkerror|load failed|err_blocked_by_client/i.test(err.message));
+
+      if (isNetworkTypeError && endpoint !== '/api/health') {
+        let onlineProbeOk = false;
+        try {
+          const probeCtrl = new AbortController();
+          const probeTimer = setTimeout(() => probeCtrl.abort(), 2200);
+          const probeRes = await fetch('/api/health', {
+            method: 'GET',
+            cache: 'no-store',
+            signal: probeCtrl.signal,
+          });
+          clearTimeout(probeTimer);
+          onlineProbeOk = probeRes.ok;
+        } catch {
+          onlineProbeOk = false;
+        }
+
+        if (onlineProbeOk || (typeof navigator !== 'undefined' && navigator.onLine)) {
+          throw new ApiError(
+            'Network request blocked. If you are using an Ad-blocker or Privacy extension, please pause it for this site.',
+            0
+          );
+        }
+        throw new ApiError('Network offline. Check your internet connection and retry.', 0);
+      }
+
       throw new ApiError(err instanceof Error ? err.message : 'Network request failed', 500);
     }
   }
