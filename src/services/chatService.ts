@@ -73,6 +73,10 @@ export const chatService = {
       // Transparent model resolution from SupremeAI native model to backend provider engine
       const resolveBackendModel = (id: string): string => {
         switch (id) {
+          case 'supremeai-web':
+            return 'supremeai-web';
+          case 'supremeai-api':
+            return 'supremeai-api';
           case 'supreme-reason':
             return 'gemini-2.5-pro';
           case 'supreme-spark':

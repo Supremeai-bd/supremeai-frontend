@@ -57,5 +57,33 @@ export const SUPREMEAI_MODELS: ModelDetail[] = [
     reasoningCapability: 'Extreme',
     tier: 'advanced',
   },
+  {
+    id: 'supremeai-web',
+    name: 'SupremeAI Web',
+    alias: 'Stealth Webpool',
+    badge: 'Zero-Cost Web',
+    tagline: 'Stealth web session relay via cookie pool',
+    description:
+      'Direct $0 cookie-authenticated web session relay for uninterrupted high-volume web queries and search synthesis.',
+    idealFor: 'Web scraping, live search synthesis, zero-token cost streaming',
+    latencyRating: 'Balanced',
+    contextTokens: '1,000,000+',
+    reasoningCapability: 'High',
+    tier: 'standard',
+  },
+  {
+    id: 'supremeai-api',
+    name: 'SupremeAI API',
+    alias: 'Multi-Cloud API Squad',
+    badge: 'Enterprise API',
+    tagline: 'High-availability multi-key provider pool',
+    description:
+      'Direct load-balanced multi-provider API squad across Gemini, Groq, OpenRouter, Mistral, and Hugging Face.',
+    idealFor: 'Mission-critical enterprise completions, production APIs, guaranteed failover',
+    latencyRating: 'Ultra-Fast',
+    contextTokens: '2,000,000+',
+    reasoningCapability: 'Extreme',
+    tier: 'standard',
+  },
 ];
 
