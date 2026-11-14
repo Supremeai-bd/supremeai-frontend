@@ -82,6 +82,8 @@ export async function onRequest(context: PagesContext): Promise<Response> {
     responseHeaders.delete('content-encoding');
     responseHeaders.delete('content-length');
     responseHeaders.delete('transfer-encoding');
+    responseHeaders.delete('connection');
+    responseHeaders.delete('keep-alive');
 
     // Keep any upstream redirects same-origin so the Render URL is not exposed to the browser
     const location = responseHeaders.get('location');

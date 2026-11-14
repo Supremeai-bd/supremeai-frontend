@@ -414,8 +414,8 @@ async function startServer() {
   // GET /api/mcp-tower/stream - Live Server-Sent Events (SSE) using real MCP Tower & HTTP probes
   app.get('/api/mcp-tower/stream', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     const pushLiveServices = async (force: boolean) => {
@@ -441,8 +441,8 @@ async function startServer() {
   // GET /api/agent-swarm/stream - Live SSE for Agent Swarm worker heartbeats & terminal events
   app.get('/api/agent-swarm/stream', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     res.write(`data: ${JSON.stringify({ type: 'swarm_connected', timestamp: Date.now(), status: 'active' })}\n\n`);
@@ -2155,7 +2155,10 @@ async function startServer() {
 
     if (target.provider === 'google_ai_studio' && activeKey && activeKey !== 'MY_GEMINI_API_KEY') {
       try {
-        const clientAi = new GoogleGenAI({ apiKey: activeKey });
+        const clientAi = new GoogleGenAI({
+          apiKey: activeKey,
+          httpOptions: { apiVersion: 'v1beta', headers: { 'User-Agent': 'aistudio-build' } },
+        });
         await clientAi.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: 'OK',
@@ -2377,7 +2380,10 @@ async function startServer() {
         message = 'Infisical vault key verified (fallback engine ready).';
       } else {
         try {
-          const clientAi = new GoogleGenAI({ apiKey: activeKey });
+          const clientAi = new GoogleGenAI({
+            apiKey: activeKey,
+            httpOptions: { apiVersion: 'v1beta', headers: { 'User-Agent': 'aistudio-build' } },
+          });
           await clientAi.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: 'OK',
@@ -2426,7 +2432,10 @@ async function startServer() {
       const startedAt = Date.now();
       if (target.provider === 'google_ai_studio' && hasLiveKey) {
         try {
-          const clientAi = new GoogleGenAI({ apiKey: activeKey });
+          const clientAi = new GoogleGenAI({
+            apiKey: activeKey,
+            httpOptions: { apiVersion: 'v1beta', headers: { 'User-Agent': 'aistudio-build' } },
+          });
           await clientAi.models.generateContent({ model: 'gemini-2.5-flash', contents: 'OK' });
           target.status = 'healthy';
           target.latencyMs = Math.max(12, Date.now() - startedAt);
@@ -2559,6 +2568,7 @@ async function startServer() {
             ...(authHeader ? { Authorization: authHeader } : {}),
             ...(apiKeyHeader ? { 'X-SupremeAI-Key': apiKeyHeader } : {}),
           },
+          signal: AbortSignal.timeout(6000),
           body: JSON.stringify(req.body || {}),
         });
 
@@ -2566,7 +2576,7 @@ async function startServer() {
           res.status(upstreamRes.status);
           res.setHeader('Content-Type', upstreamRes.headers.get('content-type') || 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache, no-transform');
-          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Accel-Buffering', 'no');
           res.flushHeaders?.();
 
           const reader = upstreamRes.body.getReader();
@@ -2597,14 +2607,14 @@ async function startServer() {
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
     if (isValidKey) {
       try {
         const clientAi = new GoogleGenAI({
           apiKey: activeApiKey,
-          httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+          httpOptions: { apiVersion: 'v1beta', headers: { 'User-Agent': 'aistudio-build' } },
         });
         const contents = messages
           .filter((m: any) => m.role === 'user' || m.role === 'assistant')
@@ -2745,6 +2755,7 @@ async function startServer() {
         const clientAi = new GoogleGenAI({
           apiKey: activeApiKey,
           httpOptions: {
+            apiVersion: 'v1beta',
             headers: {
               'User-Agent': 'aistudio-build',
             },
@@ -2811,7 +2822,7 @@ async function startServer() {
         if (stream) {
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache, no-transform');
-          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Accel-Buffering', 'no');
           res.flushHeaders?.();
 
           const timeoutPromise = new Promise<never>((_, reject) =>
@@ -2882,7 +2893,7 @@ async function startServer() {
       if (stream) {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache, no-transform');
-        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
         res.flushHeaders?.();
 
         const words = fallbackResponse.split(' ');
@@ -3241,6 +3252,7 @@ async function startServer() {
       const ai = new GoogleGenAI({
         apiKey: activeApiKey,
         httpOptions: {
+          apiVersion: 'v1beta',
           headers: {
             'User-Agent': 'aistudio-build',
           },
@@ -3298,6 +3310,7 @@ async function startServer() {
       const ai = new GoogleGenAI({
         apiKey: activeApiKey,
         httpOptions: {
+          apiVersion: 'v1beta',
           headers: {
             'User-Agent': 'aistudio-build',
           },
@@ -3444,6 +3457,7 @@ async function startServer() {
       const ai = new GoogleGenAI({
         apiKey: activeApiKey,
         httpOptions: {
+          apiVersion: 'v1beta',
           headers: {
             'User-Agent': 'aistudio-build',
           },

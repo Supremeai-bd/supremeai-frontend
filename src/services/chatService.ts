@@ -87,8 +87,10 @@ export const chatService = {
 
       const backendModel = resolveBackendModel(model);
 
+      const streamEndpoint = `${env.apiBaseUrl}/api/v1/stream/chat`;
+
       // Live backend route on deployed gateway: /api/v1/stream/chat
-      const response = await fetch(`${env.apiBaseUrl}/api/v1/stream/chat`, {
+      const response = await fetch(streamEndpoint, {
         method: 'POST',
         headers,
         signal,
@@ -106,12 +108,22 @@ export const chatService = {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMsg =
+        const rawErrText = await response.text().catch(() => '');
+        let errorData: any = {};
+        try {
+          errorData = rawErrText ? JSON.parse(rawErrText) : {};
+        } catch {
+          errorData = {};
+        }
+        const extractedMsg =
           errorData.detail ||
           errorData.error ||
           errorData.message ||
-          `Server error: ${response.status} ${response.statusText}`;
+          (rawErrText && rawErrText.length < 240 ? rawErrText.trim() : '');
+        const errorMsg =
+          response.status === 500
+            ? `Upstream API Gateway returned HTTP 500 (${extractedMsg || 'Internal Server Error'}).`
+            : extractedMsg || `Server error: ${response.status} ${response.statusText}`;
         throw new Error(errorMsg);
       }
 
@@ -137,27 +149,28 @@ export const chatService = {
           if (trimmed.startsWith('data: ')) {
             const dataStr = trimmed.slice(6).trim();
             if (dataStr === '[DONE]') break;
+            let frameError: string | null = null;
             try {
               const parsed = JSON.parse(dataStr);
               if (parsed.error) {
-                const errDetail =
+                frameError =
                   typeof parsed.error === 'object'
                     ? parsed.error.message || JSON.stringify(parsed.error)
                     : String(parsed.error);
-                throw new Error(errDetail);
+              } else {
+                // Standard OpenAI/Gateway SSE delta chunk: parsed.choices[0].delta.content
+                // Fallback legacy proxy chunk: parsed.text
+                const chunk = parsed.choices?.[0]?.delta?.content ?? parsed.text ?? '';
+                if (chunk) {
+                  accumulatedText += chunk;
+                  onChunk(chunk);
+                }
               }
-              // Standard OpenAI/Gateway SSE delta chunk: parsed.choices[0].delta.content
-              // Fallback legacy proxy chunk: parsed.text
-              const chunk = parsed.choices?.[0]?.delta?.content ?? parsed.text ?? '';
-              if (chunk) {
-                accumulatedText += chunk;
-                onChunk(chunk);
-              }
-            } catch (jsonErr: any) {
-              if (jsonErr.message && !jsonErr.message.includes('JSON')) {
-                throw jsonErr;
-              }
+            } catch {
               // Non-json SSE data frame ignored safely
+            }
+            if (frameError) {
+              throw new Error(frameError);
             }
           }
         }
@@ -169,13 +182,15 @@ export const chatService = {
         // Stream aborted by user
         return;
       }
-      const isNetworkTypeError =
-        err instanceof TypeError ||
-        (err instanceof Error &&
-          /failed to fetch|networkerror|load failed|err_blocked_by_client/i.test(err.message));
 
-      if (isNetworkTypeError) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const isFetchNetworkFailure =
+        /failed to fetch|networkerror|load failed|err_blocked_by_client|network error|http2/i.test(errMsg) ||
+        (err instanceof TypeError && /fetch|network|stream|body/i.test(errMsg));
+
+      if (isFetchNetworkFailure) {
         let sameOriginHealthy = false;
+        let isLocalStudioServer = false;
         try {
           const probeCtrl = new AbortController();
           const probeTimer = setTimeout(() => probeCtrl.abort(), 2500);
@@ -186,11 +201,55 @@ export const chatService = {
           });
           clearTimeout(probeTimer);
           sameOriginHealthy = probeRes.ok;
+          if (probeRes.ok) {
+            const probeJson = await probeRes.json().catch(() => null);
+            isLocalStudioServer = probeJson?.app === 'SupremeAI Studio';
+          }
         } catch {
           sameOriginHealthy = false;
         }
 
-        if (sameOriginHealthy || (typeof navigator !== 'undefined' && navigator.onLine)) {
+        // In AI Studio preview, if the SSE transport was interrupted mid-proxy, fall back once to JSON /api/chat
+        if (isLocalStudioServer) {
+          try {
+            const fallbackRes = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal,
+              body: JSON.stringify({
+                model,
+                messages: messages.map((m) => ({ role: m.role, content: m.content })),
+                systemInstruction,
+                groundingContext,
+                stream: false,
+                userContext,
+              }),
+            });
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              const text = String(fallbackData?.text || '');
+              if (text) {
+                onChunk(text);
+                onDone(text);
+                return;
+              }
+            }
+          } catch {
+            // Fall through to accurate diagnostic message below
+          }
+        }
+
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          onError(new Error('Network offline. Please check your internet connection and try again.'));
+          return;
+        }
+
+        const wasCrossOriginBlocked =
+          !sameOriginHealthy ||
+          /err_blocked_by_client/i.test(errMsg) ||
+          Boolean(env.apiBaseUrl && typeof window !== 'undefined' && !env.apiBaseUrl.startsWith(window.location.origin));
+
+        if (wasCrossOriginBlocked) {
           onError(
             new Error(
               'Network request blocked. If you are using an Ad-blocker or Privacy extension, please pause it for this site.'
@@ -199,7 +258,11 @@ export const chatService = {
           return;
         }
 
-        onError(new Error('Network offline. Please check your internet connection and try again.'));
+        onError(
+          new Error(
+            `Streaming transport error on /api/v1/stream/chat (${errMsg || 'connection reset'}). Same-origin /api/health is reachable.`
+          )
+        );
         return;
       }
 

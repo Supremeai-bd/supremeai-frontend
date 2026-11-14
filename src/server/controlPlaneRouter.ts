@@ -916,8 +916,8 @@ export function registerControlPlaneRoutes(app: Express, deps: ControlPlaneRoute
 
   app.get('/api/admin/control-plane/service-health/stream', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
     const pushSample = async (forceProbe: boolean) => {

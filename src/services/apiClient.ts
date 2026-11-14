@@ -96,12 +96,12 @@ class ApiClient {
         throw new ApiError(`Request timeout exceeded (${timeoutMs}ms) for ${endpoint}`, 408);
       }
 
-      const isNetworkTypeError =
-        err instanceof TypeError ||
-        (err instanceof Error &&
-          /failed to fetch|networkerror|load failed|err_blocked_by_client/i.test(err.message));
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const isFetchNetworkError =
+        /failed to fetch|networkerror|load failed|err_blocked_by_client|network error|http2/i.test(errMsg) ||
+        (err instanceof TypeError && /fetch|network/i.test(errMsg));
 
-      if (isNetworkTypeError && endpoint !== '/api/health') {
+      if (isFetchNetworkError && endpoint !== '/api/health') {
         let onlineProbeOk = false;
         try {
           const probeCtrl = new AbortController();
@@ -117,13 +117,26 @@ class ApiClient {
           onlineProbeOk = false;
         }
 
-        if (onlineProbeOk || (typeof navigator !== 'undefined' && navigator.onLine)) {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          throw new ApiError('Network offline. Check your internet connection and retry.', 0);
+        }
+
+        const isCrossOriginCall =
+          url.startsWith('http') &&
+          typeof window !== 'undefined' &&
+          !url.startsWith(window.location.origin);
+
+        if (!onlineProbeOk || isCrossOriginCall || /err_blocked_by_client/i.test(errMsg)) {
           throw new ApiError(
             'Network request blocked. If you are using an Ad-blocker or Privacy extension, please pause it for this site.',
             0
           );
         }
-        throw new ApiError('Network offline. Check your internet connection and retry.', 0);
+
+        throw new ApiError(
+          `Request to ${endpoint} interrupted (${errMsg || 'connection reset'}).`,
+          0
+        );
       }
 
       throw new ApiError(err instanceof Error ? err.message : 'Network request failed', 500);
