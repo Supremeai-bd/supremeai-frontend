@@ -153,6 +153,9 @@ export function useLiveVoiceSession({
 
   const pendingUserTextRef = useRef<string>('');
   const pendingModelTextRef = useRef<string>('');
+  const queuedTextPromptsRef = useRef<string[]>([]);
+  const isLiveReadyRef = useRef<boolean>(false);
+  const ttsPulseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const levelsRef = useRef<{ input: number; output: number }>({ input: 0, output: 0 });
   const teardownGuardRef = useRef<boolean>(false);
 
@@ -192,6 +195,15 @@ export function useLiveVoiceSession({
   }, []);
 
   const stopAllPlayback = useCallback(() => {
+    if (ttsPulseTimerRef.current) {
+      clearInterval(ttsPulseTimerRef.current);
+      ttsPulseTimerRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
     for (const src of activeSourcesRef.current) {
       try {
         src.onended = null;
@@ -213,6 +225,8 @@ export function useLiveVoiceSession({
   const cleanupMediaAndSocket = useCallback(
     (preserveError: boolean = false) => {
       teardownGuardRef.current = true;
+      isLiveReadyRef.current = false;
+      queuedTextPromptsRef.current = [];
 
       flushPendingTurn();
       stopAllPlayback();
@@ -458,7 +472,15 @@ export function useLiveVoiceSession({
           }
 
           if (msg.type === 'connected' || msg.type === 'setup_complete') {
+            isLiveReadyRef.current = true;
             setStatus(isMutedRef.current ? 'muted' : 'listening');
+            if (queuedTextPromptsRef.current.length > 0 && ws.readyState === WebSocket.OPEN) {
+              const queued = [...queuedTextPromptsRef.current];
+              queuedTextPromptsRef.current = [];
+              for (const qText of queued) {
+                ws.send(JSON.stringify({ type: 'text', text: qText }));
+              }
+            }
           } else if (msg.type === 'audio' && typeof msg.data === 'string') {
             playAudioChunk(msg.data);
           } else if (msg.type === 'input_transcript' && typeof msg.text === 'string') {
@@ -538,22 +560,82 @@ export function useLiveVoiceSession({
     });
   }, [hasMicrophone]);
 
-  const sendTextPrompt = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || wsRef.current?.readyState !== WebSocket.OPEN) return;
+  const sendTextPrompt = useCallback(
+    (text: string, options?: { recordUserTranscript?: boolean }): boolean => {
+      const trimmed = text.trim();
+      const ws = wsRef.current;
+      if (
+        !trimmed ||
+        !ws ||
+        (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING)
+      ) {
+        return false;
+      }
 
-    const now = Date.now();
-    setTranscripts((prev) => [
-      ...prev,
-      {
-        id: `live_txt_${now}`,
-        role: 'user',
-        text: trimmed,
-        timestamp: now,
-      },
-    ]);
-    wsRef.current.send(JSON.stringify({ type: 'text', text: trimmed }));
-  }, []);
+      stopAllPlayback();
+      const now = Date.now();
+      if (options?.recordUserTranscript !== false) {
+        setTranscripts((prev) => [
+          ...prev,
+          {
+            id: `live_txt_${now}`,
+            role: 'user',
+            text: trimmed,
+            timestamp: now,
+          },
+        ]);
+      }
+
+      if (isLiveReadyRef.current && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'text', text: trimmed }));
+      } else {
+        queuedTextPromptsRef.current.push(trimmed);
+      }
+      return true;
+    },
+    [stopAllPlayback]
+  );
+
+  const speakFallbackText = useCallback(
+    (text: string) => {
+      const clean = text.replace(/```[\s\S]*?```/g, ' ').replace(/[#*_`>]/g, '').trim();
+      if (!clean || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+      stopAllPlayback();
+      const utterance = new SpeechSynthesisUtterance(clean.slice(0, 1400));
+      utterance.rate = 1.03;
+
+      const startPulse = () => {
+        setStatus('speaking');
+        const t0 = performance.now();
+        if (ttsPulseTimerRef.current) clearInterval(ttsPulseTimerRef.current);
+        ttsPulseTimerRef.current = setInterval(() => {
+          const s = (performance.now() - t0) / 1000;
+          levelsRef.current.output = 0.42 + 0.28 * Math.sin(s * 12) + 0.16 * Math.cos(s * 19);
+        }, 65);
+      };
+
+      const finishPulse = () => {
+        if (ttsPulseTimerRef.current) {
+          clearInterval(ttsPulseTimerRef.current);
+          ttsPulseTimerRef.current = null;
+        }
+        levelsRef.current.output = 0;
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          setStatus(isMutedRef.current ? 'muted' : 'listening');
+        } else {
+          setStatus('idle');
+        }
+      };
+
+      utterance.onstart = startPulse;
+      utterance.onend = finishPulse;
+      utterance.onerror = finishPulse;
+      startPulse();
+      window.speechSynthesis.speak(utterance);
+    },
+    [stopAllPlayback]
+  );
 
   const interruptPlayback = useCallback(() => {
     stopAllPlayback();
@@ -593,6 +675,7 @@ export function useLiveVoiceSession({
     connect,
     disconnect,
     sendTextPrompt,
+    speakFallbackText,
     interruptPlayback,
     clearTranscripts,
   };

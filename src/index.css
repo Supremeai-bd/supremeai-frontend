@@ -974,6 +974,15 @@ mark.search-highlight {
   }
 }
 
+@keyframes avatar-analytical-focus {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(1px) rotate(1.8deg);
+  }
+}
+
 .avatar-eye-sim {
   transform-origin: center center;
   animation: avatar-eye-blink 4.2s ease-in-out infinite;
@@ -993,18 +1002,36 @@ mark.search-highlight {
 }
 
 /* Expression states mapped by useAvatarExpression */
+.avatar-expression-joyful .avatar-expression-badge,
 .avatar-expression-happy .avatar-expression-badge {
   border-color: rgba(16, 185, 129, 0.48);
   color: #34d399;
   box-shadow: 0 0 14px -3px rgba(16, 185, 129, 0.35);
 }
 
+.avatar-expression-joyful .avatar-face-shell,
 .avatar-expression-happy .avatar-face-shell {
-  animation: avatar-happy-float 2.4s ease-in-out infinite;
+  animation: avatar-happy-float 2.2s ease-in-out infinite;
 }
 
+.avatar-expression-joyful .avatar-mouth-sim,
 .avatar-expression-happy .avatar-mouth-sim {
   border-radius: 2px 2px 9999px 9999px;
+}
+
+.avatar-expression-analytical .avatar-expression-badge {
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #818cf8;
+  box-shadow: 0 0 14px -3px rgba(99, 102, 241, 0.34);
+}
+
+.avatar-expression-analytical .avatar-face-shell {
+  animation: avatar-analytical-focus 3.4s ease-in-out infinite;
+}
+
+.avatar-expression-analytical .avatar-mouth-sim {
+  width: 0.65rem;
+  border-radius: 9999px;
 }
 
 .avatar-expression-thinking .avatar-expression-badge {

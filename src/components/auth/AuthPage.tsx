@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, AlertCircle, X } from 'lucide-react';
 import { AuthUser } from '../../types';
 import { LiveScreenBackdrop } from '../theme/LiveScreenBackdrop';
 import { ThemeControlPopover } from '../theme/ThemeControlPopover';
@@ -7,14 +7,21 @@ import { usePlatformStore } from '../../stores/usePlatformStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useCustomerStore } from '../../stores/useCustomerStore';
 import { authService } from '../../services/authService';
-import { env } from '../../config/env';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser, token?: string) => void;
   darkMode?: boolean;
+  isModal?: boolean;
+  onClose?: () => void;
+  authReason?: string | null;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({
+  onLoginSuccess,
+  isModal = false,
+  onClose,
+  authReason,
+}) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,15 +95,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const signupPaused = mode === 'signup' && !config.allowNewSignups;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors">
-      <LiveScreenBackdrop isEmpty isChatView />
+    <div
+      className={
+        isModal
+          ? 'fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/65 backdrop-blur-md overflow-y-auto'
+          : 'min-h-screen flex items-center justify-center p-4 sm:p-6 text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors'
+      }
+      onClick={isModal && onClose ? onClose : undefined}
+    >
+      {!isModal && <LiveScreenBackdrop isEmpty isChatView />}
 
-      <div className="fixed top-4 right-4 z-30">
-        <ThemeControlPopover />
-      </div>
+      {!isModal && (
+        <div className="fixed top-4 right-4 z-30">
+          <ThemeControlPopover />
+        </div>
+      )}
 
-      <div className="w-full max-w-md relative z-10 space-y-6">
-        <div className="text-center space-y-2">
+      <div
+        className="w-full max-w-md relative z-10 space-y-5 my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-center space-y-2 relative">
+          {isModal && onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close sign in dialog"
+              className="absolute right-0 top-0 p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 text-xs font-semibold mb-1">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
             <span>SupremeAI Studio</span>
@@ -120,13 +149,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
           </h1>
 
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-            {mode === 'login'
-              ? 'Sign in to access your workspace, chats, and SupremeAI reasoning models.'
-              : 'Create your account to get started with SupremeAI Studio.'}
+            {authReason
+              ? `Sign in or create a free account to access ${authReason}.`
+              : mode === 'login'
+              ? 'Sign in to access your workspace, settings, and SupremeAI reasoning models.'
+              : 'Create your account to unlock Settings, History, and full Workspace tools.'}
           </p>
         </div>
 
-        <div className="rounded-3xl bg-white/85 dark:bg-[#111622]/85 backdrop-blur-2xl border border-white/60 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5">
+        <div className="rounded-3xl bg-white/95 dark:bg-[#111622]/95 backdrop-blur-2xl border border-white/60 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5">
           {config.maintenanceMode && (
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-300 text-xs">
               Scheduled maintenance is currently active. Only administrator accounts can access the workspace.
@@ -345,6 +376,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
               </button>
             </div>
           </div>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/70 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+            >
+              Continue as Guest (Chat & Voice)
+            </button>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">

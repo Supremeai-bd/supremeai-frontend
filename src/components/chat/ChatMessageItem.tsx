@@ -36,8 +36,11 @@ function createMarkdownProcessor(showDockButtons: boolean) {
         const encodedCode = encodeURIComponent(text);
 
         const dockActions = showDockButtons
-          ? `<button type="button" class="preview-code-btn flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
+          ? `<button type="button" class="run-code-btn flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
               <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              <span>Run in Sandbox</span>
+            </button>
+            <button type="button" class="preview-code-btn flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">
               <span>Preview</span>
             </button>
             <button type="button" class="edit-code-btn flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition-colors text-[11px] cursor-pointer" data-code="${encodedCode}" data-lang="${escapeHtml(cleanLang)}">

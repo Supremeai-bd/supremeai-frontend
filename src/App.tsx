@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Home,
   Pin,
+  LogIn,
 } from 'lucide-react';
 import { WorkspaceTipBar, WorkspaceMicroSurvey } from './components/chat/WorkspaceTipsAndSurvey';
 import { shareService } from './services/shareService';
@@ -25,6 +26,7 @@ import { ChatEmptyState } from './components/chat/ChatEmptyState';
 import { ChatHistoryView } from './components/chat/ChatHistoryView';
 import { LiveVoicePanel } from './components/chat/LiveVoicePanel';
 import { ChatInput } from './components/ChatInput';
+import { useLiveVoiceSession } from './hooks/useLiveVoiceSession';
 import { RoleModal } from './components/RoleModal';
 import { RoleLab } from './components/RoleLab';
 import { ModelMatrix } from './components/ModelMatrix';
@@ -154,6 +156,7 @@ export default function App() {
     isStreaming,
     streamingContent,
     inferenceError,
+    generatingTitleIds,
     isPromptModalOpen,
     isRoleModalOpen,
     selectSession,
@@ -250,6 +253,24 @@ export default function App() {
   );
   const [isDeepResearchActive, setIsDeepResearchActive] = useState<boolean>(false);
   const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState<boolean>(false);
+  const liveVoiceSystemInstruction =
+    customInstruction.trim() ||
+    userSettings.customInstructions?.trim() ||
+    activeRole.systemInstruction;
+  const liveVoice = useLiveVoiceSession({
+    systemInstruction: liveVoiceSystemInstruction,
+    onTurnCommitted: appendVoiceTurn,
+  });
+
+  useEffect(() => {
+    if (isLiveVoiceOpen) {
+      liveVoice.connect();
+    } else {
+      liveVoice.disconnect();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLiveVoiceOpen]);
+  const [authModal, setAuthModal] = useState<{ open: boolean; reason?: string }>({ open: false });
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general');
   const [settingsSubTabKey, setSettingsSubTabKey] = useState<number>(0);
   const [isSurveyForceOpen, setIsSurveyForceOpen] = useState<boolean>(false);
@@ -262,11 +283,25 @@ export default function App() {
   const [isDangerRunning, setIsDangerRunning] = useState(false);
 
   const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
-  const layoutMode = userSettings.layoutMode || 'sidebar-focus';
-  const isDeveloperEligible = Boolean(authUser?.isDeveloperEligible || currentRole === 'admin');
+  const isGuest = !authUser;
+  const effectiveRole = isGuest ? 'user' : currentRole;
+  const layoutMode = isGuest ? 'sidebar-focus' : userSettings.layoutMode || 'sidebar-focus';
+  const isDeveloperEligible =
+    !isGuest && Boolean(authUser?.isDeveloperEligible || effectiveRole === 'admin');
   const developerMode = isDeveloperEligible && Boolean(userSettings.developerMode);
-  const enableKnowledgeGrounding = Boolean(userSettings.enableKnowledgeGrounding);
-  const showWorkspaceTips = userSettings.showWorkspaceTips !== false;
+  const enableKnowledgeGrounding = !isGuest && Boolean(userSettings.enableKnowledgeGrounding);
+  const showWorkspaceTips = !isGuest && userSettings.showWorkspaceTips !== false;
+
+  const openAuthModal = (reason?: string) => {
+    setAuthModal({ open: true, reason });
+  };
+
+  const handleSignOut = () => {
+    logout();
+    setDockOpen(false);
+    setActiveTab('chat', true);
+    setAuthModal({ open: true });
+  };
 
   const {
     activeRequest: hitlActiveRequest,
@@ -308,22 +343,30 @@ export default function App() {
     }
   }, [currentRole, fetchAdminSync]);
 
-  // Smooth tab routing when switching roles
-  const prevRoleRef = useRef(currentRole);
+  // Smooth tab routing guard: keep default landing page as 'chat' for all roles;
+  // only downgrade away from admin-only tabs when leaving admin role.
+  const prevRoleRef = useRef(effectiveRole);
   useEffect(() => {
-    if (prevRoleRef.current !== currentRole) {
-      if (currentRole === 'admin') {
-        setActiveTab('admin-overview');
-      } else if (ADMIN_ONLY_TABS.has(activeTab)) {
+    if (prevRoleRef.current !== effectiveRole) {
+      if (effectiveRole !== 'admin' && ADMIN_ONLY_TABS.has(activeTab)) {
         setActiveTab('chat');
       }
-      prevRoleRef.current = currentRole;
+      prevRoleRef.current = effectiveRole;
     }
-  }, [currentRole, activeTab, setActiveTab]);
+  }, [effectiveRole, activeTab, setActiveTab]);
 
-  // Route & dock safety guard: prevent non-developers or disabled developerMode from staying on dev-only views/dock
+  // Route & dock safety guard for Guest, Standard, and Developer workspaces
   useEffect(() => {
-    if (currentRole !== 'admin') {
+    if (isGuest) {
+      if (isDockOpen) setDockOpen(false);
+      if (activeTab !== 'chat') {
+        const label = SUBVIEW_TITLES[activeTab] || 'Workspace Features';
+        setActiveTab('chat', true);
+        setAuthModal({ open: true, reason: label });
+      }
+      return;
+    }
+    if (effectiveRole !== 'admin') {
       if (!developerMode && isDockOpen) {
         setDockOpen(false);
       }
@@ -334,9 +377,25 @@ export default function App() {
         setActiveTab('chat');
       }
     }
-  }, [currentRole, developerMode, enableKnowledgeGrounding, isDockOpen, setDockOpen, activeTab, setActiveTab]);
+  }, [
+    isGuest,
+    effectiveRole,
+    developerMode,
+    enableKnowledgeGrounding,
+    isDockOpen,
+    setDockOpen,
+    activeTab,
+    setActiveTab,
+  ]);
 
   const handleSelectTab = (tab: any) => {
+    if (isGuest && tab !== 'chat') {
+      openAuthModal(SUBVIEW_TITLES[tab] || 'Settings & Workspace Features');
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setSidebarOpen(false);
+      }
+      return;
+    }
     setActiveTab(tab);
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setSidebarOpen(false);
@@ -419,10 +478,41 @@ export default function App() {
 
   const handleSendMessageWrapper = async (text: string, attachment?: ChatAttachment) => {
     setSidebarOpen(false);
-    const estimatedTokens = Math.ceil(text.length / 4) + (attachment ? 258 : 0);
+    const trimmed = text.trim();
+    const estimatedTokens = Math.ceil(trimmed.length / 4) + (attachment ? 258 : 0);
     recordTokenUsage(estimatedTokens);
+
+    // When Voice Mode is active, both voice and text inputs trigger spoken voice responses
+    if (isLiveVoiceOpen && !attachment && trimmed) {
+      appendVoiceTurn(trimmed, '');
+      const routed = liveVoice.sendTextPrompt(trimmed, { recordUserTranscript: false });
+      if (routed) {
+        return;
+      }
+      // Fallback: generate via standard chat model and speak the response aloud via TTS
+      const activeDocs = enableKnowledgeGrounding ? knowledgeDocs : [];
+      await sendMessage(trimmed, undefined, activeDocs, isDeepResearchActive);
+      const updatedSession = useChatStore
+        .getState()
+        .sessions.find((s) => s.id === activeSessionId);
+      const lastMsg = updatedSession?.messages?.[updatedSession.messages.length - 1];
+      if (lastMsg?.role === 'assistant' && lastMsg.content) {
+        liveVoice.speakFallbackText(lastMsg.content);
+      }
+      return;
+    }
+
     const activeDocs = enableKnowledgeGrounding ? knowledgeDocs : [];
     await sendMessage(text, attachment, activeDocs, isDeepResearchActive);
+    if (isLiveVoiceOpen) {
+      const updatedSession = useChatStore
+        .getState()
+        .sessions.find((s) => s.id === activeSessionId);
+      const lastMsg = updatedSession?.messages?.[updatedSession.messages.length - 1];
+      if (lastMsg?.role === 'assistant' && lastMsg.content) {
+        liveVoice.speakFallbackText(lastMsg.content);
+      }
+    }
   };
 
   const handleExecuteDangerAction = async () => {
@@ -440,20 +530,6 @@ export default function App() {
     }
   };
 
-  if (!authUser) {
-    return (
-      <ErrorBoundary>
-        <AuthPage
-          onLoginSuccess={(loggedInUser) => {
-            setActiveTab(loggedInUser.role === 'admin' ? 'admin-overview' : 'chat');
-          }}
-          darkMode={darkMode}
-        />
-        <ToastContainer />
-      </ErrorBoundary>
-    );
-  }
-
   const mcpAlertCount = getMcpAlertCount();
   const activePluginsCount = userPlugins.filter((p) => p.isEnabled).length;
   const isChatEmpty = (currentSession?.messages?.length || 0) === 0 && !isStreaming;
@@ -465,7 +541,7 @@ export default function App() {
     platformConfig.announcementBanner.active &&
     platformConfig.announcementBanner.message.trim().length > 0 &&
     dismissedBannerMessage !== platformConfig.announcementBanner.message;
-  const isMaintenanceBlocked = platformConfig.maintenanceMode && currentRole !== 'admin';
+  const isMaintenanceBlocked = platformConfig.maintenanceMode && effectiveRole !== 'admin';
 
   const bannerToneClasses =
     platformConfig.announcementBanner.level === 'critical'
@@ -529,22 +605,24 @@ export default function App() {
           <div className="relative z-10">
             <Navbar
               activeTab={activeTab}
-              onSelectTab={setActiveTab}
+              onSelectTab={handleSelectTab}
               onNewSession={createNewSession}
               darkMode={darkMode}
               onToggleDarkMode={toggleDarkMode}
               sidebarOpen={sidebarOpen}
               onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
               activeModel={activeModel}
-              currentRole={currentRole}
+              currentRole={effectiveRole}
               onToggleRole={() => handleToggleRole()}
               mcpAlertCount={mcpAlertCount}
               authUser={authUser}
-              onSignOut={logout}
+              onSignOut={handleSignOut}
               trustedUntil={trustedBrowserUntil}
               isDeveloperEligible={isDeveloperEligible}
               developerMode={developerMode}
               onToggleDeveloperMode={handleToggleDeveloperMode}
+              isGuest={isGuest}
+              onRequestAuth={openAuthModal}
             />
           </div>
         )}
@@ -567,7 +645,7 @@ export default function App() {
                   </p>
                 </div>
                 <div className="flex items-center justify-center gap-2 pt-2">
-                  {(authUser.isAdminEligible || impersonatedCustomer) && (
+                  {(authUser?.isAdminEligible || impersonatedCustomer) && (
                     <button
                       type="button"
                       onClick={() => {
@@ -586,10 +664,10 @@ export default function App() {
                   )}
                   <button
                     type="button"
-                    onClick={logout}
+                    onClick={() => (isGuest ? openAuthModal('Account Access') : handleSignOut())}
                     className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    Sign Out
+                    {isGuest ? 'Sign In' : 'Sign Out'}
                   </button>
                 </div>
               </div>
@@ -606,19 +684,23 @@ export default function App() {
             onTogglePinSession={togglePinSession}
             onNewSession={createNewSession}
             activeRole={activeRole}
-            onOpenRoleModal={() => setIsRoleModalOpen(true)}
+            onOpenRoleModal={() =>
+              isGuest
+                ? openAuthModal('Role & Model Customization')
+                : setIsRoleModalOpen(true)
+            }
             isOpen={sidebarOpen}
             onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
             onSelectTab={handleSelectTab}
             activeTab={activeTab}
-            currentRole={currentRole}
+            currentRole={effectiveRole}
             onToggleRole={() => handleToggleRole()}
             projectsCount={userProjects.length}
             activePluginsCount={activePluginsCount}
             customersCount={customers.length}
             mcpAlertCount={mcpAlertCount}
             authUser={authUser}
-            onSignOut={logout}
+            onSignOut={handleSignOut}
             darkMode={darkMode}
             onToggleDarkMode={toggleDarkMode}
             layoutMode={layoutMode}
@@ -628,6 +710,9 @@ export default function App() {
             onToggleDeveloperMode={handleToggleDeveloperMode}
             tokensUsed={userSettings.monthlyTokensUsed}
             tokensLimit={userSettings.monthlyTokensLimit}
+            isGuest={isGuest}
+            onRequestAuth={openAuthModal}
+            generatingTitleIds={generatingTitleIds}
           />
 
           {/* Floating Sidebar Expand Button for Chat in Sidebar Focus Mode */}
@@ -646,7 +731,7 @@ export default function App() {
           {/* 1. Chat Workspace */}
           {activeTab === 'chat' && (
             <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden relative">
-              <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative bg-transparent">
+              <main className="@container/chat flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative bg-transparent">
                 {/* Streamlined Top-Right Chat Controls */}
                 <div
                   className={`relative z-20 px-3 sm:px-4 pt-3 flex items-center justify-end gap-1.5 flex-wrap pointer-events-none shrink-0 ${
@@ -654,12 +739,26 @@ export default function App() {
                   }`}
                 >
                   <div className="pointer-events-auto flex items-center gap-1.5 flex-wrap justify-end">
+                    {isGuest && (
+                      <button
+                        type="button"
+                        onClick={() => openAuthModal('Settings & Full Workspace')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold theme-btn-primary cursor-pointer shadow-xs"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>Sign In / Sign Up</span>
+                      </button>
+                    )}
 
                     {(currentSession?.messages?.length || 0) > 0 && (
                       <>
                         <button
                           type="button"
                           onClick={() => {
+                            if (isGuest) {
+                              openAuthModal('Pinned Conversations');
+                              return;
+                            }
                             if (currentSession?.id) {
                               togglePinSession(currentSession.id);
                             }
@@ -694,6 +793,10 @@ export default function App() {
                         <button
                           type="button"
                           onClick={async () => {
+                            if (isGuest) {
+                              openAuthModal('Sharing Conversations');
+                              return;
+                            }
                             if (currentSession?.id) {
                               try {
                                 const res = await shareService.generateShareLink(currentSession.id);
@@ -801,7 +904,7 @@ export default function App() {
                       <ChatEmptyState
                         activeRole={activeRole}
                         activeModel={activeModel}
-                        userName={authUser?.name}
+                        userName={authUser?.name || (isGuest ? 'Guest' : undefined)}
                         developerMode={developerMode}
                       />
                       <div className="workspace-input-container mt-2">
@@ -811,30 +914,43 @@ export default function App() {
                           isStreaming={isStreaming}
                           activeModel={activeModel}
                           onSelectModel={selectModel}
-                          onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+                          onOpenPromptLibrary={() =>
+                            isGuest
+                              ? openAuthModal('Prompt Library')
+                              : setIsPromptModalOpen(true)
+                          }
                           isGroundingActive={knowledgeDocs.some((d) => d.isGroundingActive)}
                           onToggleGrounding={() => {
+                            if (isGuest) {
+                              openAuthModal('Knowledge Base & RAG Grounding');
+                              return;
+                            }
                             if (knowledgeDocs.length > 0) {
                               toggleKnowledgeGrounding(knowledgeDocs[0].id);
                             } else {
-                              setActiveTab('user-knowledge');
+                              handleSelectTab('user-knowledge');
                             }
                           }}
                           isDeepResearchActive={isDeepResearchActive}
-                          onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
+                          onToggleDeepResearch={() =>
+                            isGuest
+                              ? openAuthModal('Deep Research')
+                              : setIsDeepResearchActive((v) => !v)
+                          }
                           developerMode={developerMode}
                           enableKnowledgeGrounding={enableKnowledgeGrounding}
                           onOpenLiveVoice={() => setIsLiveVoiceOpen((v) => !v)}
                           isLiveVoiceOpen={isLiveVoiceOpen}
+                          voiceStatus={liveVoice.status}
                         />
                       </div>
                       <WorkspaceTipBar
-                        visible={showWorkspaceTips && currentRole === 'user'}
+                        visible={showWorkspaceTips && effectiveRole === 'user'}
                         onAction={(actionType) => {
                           if (actionType === 'open-settings') {
-                            setActiveTab('user-settings');
+                            handleSelectTab('user-settings');
                           } else if (actionType === 'open-knowledge') {
-                            setActiveTab('user-knowledge');
+                            handleSelectTab('user-knowledge');
                           } else if (actionType === 'open-recipes') {
                             setIsPromptModalOpen(true);
                           } else if (actionType === 'toggle-research') {
@@ -858,7 +974,7 @@ export default function App() {
                       streamingContent={streamingContent}
                       onSendPrompt={handleSendMessageWrapper}
                       error={inferenceError}
-                      userName={authUser?.name}
+                      userName={authUser?.name || (isGuest ? 'Guest' : undefined)}
                       developerMode={developerMode}
                     />
 
@@ -868,21 +984,34 @@ export default function App() {
                       isStreaming={isStreaming}
                       activeModel={activeModel}
                       onSelectModel={selectModel}
-                      onOpenPromptLibrary={() => setIsPromptModalOpen(true)}
+                      onOpenPromptLibrary={() =>
+                        isGuest
+                          ? openAuthModal('Prompt Library')
+                          : setIsPromptModalOpen(true)
+                      }
                       isGroundingActive={knowledgeDocs.some((d) => d.isGroundingActive)}
                       onToggleGrounding={() => {
+                        if (isGuest) {
+                          openAuthModal('Knowledge Base & RAG Grounding');
+                          return;
+                        }
                         if (knowledgeDocs.length > 0) {
                           toggleKnowledgeGrounding(knowledgeDocs[0].id);
                         } else {
-                          setActiveTab('user-knowledge');
+                          handleSelectTab('user-knowledge');
                         }
                       }}
                       isDeepResearchActive={isDeepResearchActive}
-                      onToggleDeepResearch={() => setIsDeepResearchActive((v) => !v)}
+                      onToggleDeepResearch={() =>
+                        isGuest
+                          ? openAuthModal('Deep Research')
+                          : setIsDeepResearchActive((v) => !v)
+                      }
                       developerMode={developerMode}
                       enableKnowledgeGrounding={enableKnowledgeGrounding}
                       onOpenLiveVoice={() => setIsLiveVoiceOpen((v) => !v)}
                       isLiveVoiceOpen={isLiveVoiceOpen}
+                      voiceStatus={liveVoice.status}
                     />
                   </div>
                 )}
@@ -890,23 +1019,15 @@ export default function App() {
 
               <LiveVoicePanel
                 isOpen={isLiveVoiceOpen}
-                onClose={() => setIsLiveVoiceOpen(false)}
-                systemInstruction={
-                  customInstruction.trim() ||
-                  userSettings.customInstructions?.trim() ||
-                  activeRole.systemInstruction
-                }
-                roleName={activeRole.name}
-                onCommitTurn={appendVoiceTurn}
-                onSendChatPrompt={(text) => void handleSendMessageWrapper(text)}
-                onOpenVoiceSettings={() => {
-                  setSettingsSubTab('voice-avatar');
-                  setSettingsSubTabKey((k) => k + 1);
-                  setActiveTab('user-settings');
-                }}
+                status={liveVoice.status}
+                voiceName={liveVoice.voiceName}
+                liveModelText={liveVoice.liveModelText}
+                levelsRef={liveVoice.levelsRef}
               />
 
-              {(developerMode || currentRole === 'admin') && <WorkspaceDock />}
+              {(developerMode || effectiveRole === 'admin') && (
+                <WorkspaceDock developerMode={developerMode} />
+              )}
             </div>
           )}
 
@@ -927,7 +1048,7 @@ export default function App() {
                     </button>
                   )}
 
-                  {currentRole === 'admin' && activeTab !== 'admin-overview' && (
+                  {effectiveRole === 'admin' && activeTab !== 'admin-overview' && (
                     <button
                       type="button"
                       onClick={() => setActiveTab('admin-overview')}
@@ -943,12 +1064,12 @@ export default function App() {
                     onClick={() => setActiveTab('chat')}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-900/80 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] transition-colors cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    {currentRole === 'admin' ? (
+                    {effectiveRole === 'admin' ? (
                       <Home className="w-3.5 h-3.5 theme-accent-text" />
                     ) : (
                       <ArrowLeft className="w-3.5 h-3.5 theme-accent-text" />
                     )}
-                    <span>{currentRole === 'admin' ? 'Chat Home' : 'Back to Chat'}</span>
+                    <span>{effectiveRole === 'admin' ? 'Chat Home' : 'Back to Chat'}</span>
                   </button>
 
                   <span aria-hidden="true" className="hidden sm:inline text-slate-300 dark:text-slate-700">/</span>
@@ -1034,9 +1155,9 @@ export default function App() {
             />
           )}
 
-          {(activeTab === 'user-billing' || (activeTab === 'usage' && currentRole !== 'admin')) && (
+          {(activeTab === 'user-billing' || (activeTab === 'usage' && effectiveRole !== 'admin')) && (
             <UserPlanUsageView
-              planTier={authUser.plan || userSettings.plan}
+              planTier={authUser?.plan || userSettings.plan}
               invoices={invoices}
               currentTokensUsed={userSettings.monthlyTokensUsed}
               tokensLimit={userSettings.monthlyTokensLimit}
@@ -1290,13 +1411,28 @@ export default function App() {
           developerMode={developerMode}
         />
 
-        <WorkspaceMicroSurvey
-          totalUserMessages={totalUserMessages}
-          userEmail={authUser?.email}
-          developerMode={developerMode}
-          forceOpen={isSurveyForceOpen}
-          onCloseForceOpen={() => setIsSurveyForceOpen(false)}
-        />
+        {!isGuest && (
+          <WorkspaceMicroSurvey
+            totalUserMessages={totalUserMessages}
+            userEmail={authUser?.email}
+            developerMode={developerMode}
+            forceOpen={isSurveyForceOpen}
+            onCloseForceOpen={() => setIsSurveyForceOpen(false)}
+          />
+        )}
+
+        {isGuest && authModal.open && (
+          <AuthPage
+            isModal
+            authReason={authModal.reason}
+            onClose={() => setAuthModal({ open: false })}
+            onLoginSuccess={() => {
+              setAuthModal({ open: false });
+              setActiveTab('chat');
+            }}
+            darkMode={darkMode}
+          />
+        )}
 
         <ToastContainer />
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PanelLeft, PanelRight, ShieldCheck, LogOut, ChevronDown, Laptop, Code2 } from 'lucide-react';
+import { PanelLeft, PanelRight, ShieldCheck, LogOut, LogIn, ChevronDown, Laptop, Code2 } from 'lucide-react';
 import { ModelDetail, UserRole, AuthUser } from '../types';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
@@ -22,6 +22,8 @@ interface NavbarProps {
   isDeveloperEligible?: boolean;
   developerMode?: boolean;
   onToggleDeveloperMode?: () => void;
+  isGuest?: boolean;
+  onRequestAuth?: (reason?: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -39,6 +41,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDeveloperEligible = false,
   developerMode: developerModeProp,
   onToggleDeveloperMode,
+  isGuest = false,
+  onRequestAuth,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
@@ -62,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <div
-          onClick={() => onSelectTab(currentRole === 'admin' ? 'admin-overview' : 'chat')}
+          onClick={() => onSelectTab('chat')}
           className="flex items-center gap-2 cursor-pointer group"
         >
           <div className="relative w-6 h-6 flex items-center justify-center">
@@ -273,7 +277,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Zone 3: Mode/Role Switchers + Model + Workspace Dock (if dev/admin) + Theme + Profile */}
       <div className="flex items-center gap-2.5 shrink-0">
-        {currentRole === 'user' && isDeveloperEligible && onToggleDeveloperMode && (
+        {!isGuest && isDeveloperEligible && onToggleDeveloperMode && (
           <button
             type="button"
             onClick={onToggleDeveloperMode}
@@ -343,7 +347,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* User Account & Sign Out Dropdown */}
+        {/* User Account / Guest Sign In CTA */}
+        {isGuest ? (
+          <button
+            type="button"
+            onClick={() => onRequestAuth?.('Settings & Workspace Features')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full theme-btn-primary text-xs font-semibold cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In / Sign Up</span>
+          </button>
+        ) : (
         <div className="relative">
           <button
             type="button"
@@ -461,6 +475,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </>
           )}
         </div>
+        )}
       </div>
     </header>
   );

@@ -3277,6 +3277,112 @@ async function startServer() {
     }
   });
 
+  // Concise Automatic Chat Session Title Generator (gemini-4-hydrogen + deterministic fallback)
+  app.post('/api/chat/title', async (req: Request, res: Response) => {
+    try {
+      if (isIpBlocked(req)) {
+        res.status(403).json({ error: 'Request rejected by platform WAF IP blacklist.' });
+        return;
+      }
+
+      const rawMessage = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      const attachmentName =
+        typeof req.body?.attachmentName === 'string' ? req.body.attachmentName.trim() : '';
+      const attachmentMimeType =
+        typeof req.body?.attachmentMimeType === 'string' ? req.body.attachmentMimeType.trim() : '';
+
+      if (!rawMessage && !attachmentName) {
+        res.status(400).json({ error: 'message or attachmentName is required.' });
+        return;
+      }
+
+      const sanitizeTitle = (raw: string): string => {
+        const line =
+          raw
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .find((l) => l.length > 0) || '';
+        let cleaned = line
+          .replace(/^(?:title|topic|subject|summary|chat\s*title)\s*[:\-–—]\s*/i, '')
+          .replace(/^[#>*\-\d.)\s]+/, '')
+          .replace(/[`*_~"]/g, '')
+          .replace(/^['‘’“”]+|['‘’“”]+$/g, '')
+          .replace(/\s+/g, ' ')
+          .replace(/[.?!:;,\-–—]+$/g, '')
+          .trim();
+        if (cleaned.length > 46) {
+          const sliced = cleaned.slice(0, 46);
+          const lastSpace = sliced.lastIndexOf(' ');
+          cleaned = (lastSpace >= 24 ? sliced.slice(0, lastSpace) : sliced)
+            .replace(/[.?!:;,\-–—]+$/g, '')
+            .trim();
+        }
+        return cleaned;
+      };
+
+      const buildFallbackTitle = (): string => {
+        if (!rawMessage && attachmentName) {
+          const base = attachmentName.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+          const prefix = attachmentMimeType.startsWith('image/') ? 'Image' : 'File';
+          return sanitizeTitle(`${prefix}: ${base || attachmentName}`) || 'File Analysis';
+        }
+        const cleanedText = rawMessage
+          .replace(/```[\s\S]*?```/g, ' ')
+          .replace(/https?:\/\/([^\s/]+)[^\s]*/gi, '$1')
+          .replace(/^(?:hey|hi|hello|please|can you|could you|help me|how do i|what is)\s+/i, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const words = cleanedText.split(/\s+/).filter(Boolean).slice(0, 6);
+        return sanitizeTitle(words.join(' ')) || 'New Conversation';
+      };
+
+      const fallbackTitle = buildFallbackTitle();
+      const activeApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+      if (!activeApiKey || activeApiKey === 'MY_GEMINI_API_KEY') {
+        res.json({ title: fallbackTitle, source: 'heuristic' });
+        return;
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const promptSnippet = rawMessage.slice(0, 800);
+      const userPrompt = attachmentName
+        ? `User message: "${promptSnippet || '(No text)'}"\nAttachment: ${attachmentName} (${attachmentMimeType || 'file'})`
+        : `User message: "${promptSnippet}"`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: userPrompt,
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          systemInstruction:
+            'Generate a concise, relevant, scannable chat sidebar title (2 to 5 words, max 42 characters) capturing the core topic or task of the user message. Return ONLY the plain-text title in Title Case, with no quotation marks, no markdown, no emojis, and no trailing punctuation.',
+        },
+      });
+
+      const aiTitle = sanitizeTitle(response.text || '');
+      res.json({
+        title: aiTitle || fallbackTitle,
+        source: aiTitle ? 'gemini' : 'heuristic',
+      });
+    } catch (err: unknown) {
+      console.warn('Chat title generation fallback:', err instanceof Error ? err.message : err);
+      const rawMessage = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      const words = rawMessage.replace(/\s+/g, ' ').split(' ').filter(Boolean).slice(0, 5);
+      res.json({
+        title: words.join(' ').slice(0, 42) || 'New Conversation',
+        source: 'heuristic',
+      });
+    }
+  });
+
   // Express Vite Dev Server or Production Static Serving
   if (isProduction) {
     app.use(express.static(path.resolve(__dirname, 'dist')));

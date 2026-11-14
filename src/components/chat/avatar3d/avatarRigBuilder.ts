@@ -15,6 +15,8 @@ export interface AvatarPoseInput {
   smileAmount: number;
   browRaise: number;
   browAsym: number;
+  browKnit?: number;
+  eyeSquint?: number;
   headYaw: number;
   headPitch: number;
   headRoll: number;
@@ -220,10 +222,10 @@ function buildSculptedHeadGeometry(isFemale: boolean): THREE.BufferGeometry {
       const philtrum = Math.exp(-(x * x / 0.0005 + Math.pow(y + 0.122, 2) / 0.0014));
       z -= philtrum * 0.012;
 
-      // Recessed 3D Mouth Cavity Pocket centered at (0, -0.178)
-      const mouthDist = Math.hypot(x / 0.105, (y + 0.178) / 0.034);
+      // Subtle recessed mouth seam centered at (0, -0.178)
+      const mouthDist = Math.hypot(x / 0.082, (y + 0.178) / 0.018);
       const mouthPocket = 1 - smoothstep(0.45, 1.05, mouthDist);
-      z -= mouthPocket * 0.118;
+      z -= mouthPocket * 0.045;
 
       // --- Morph Target 0: jawOpen (drops lower lip border, mandible & chin smoothly) ---
       const chinDropMask =
@@ -596,12 +598,12 @@ export function createArticulatedAvatarRig(
   headMesh.receiveShadow = true;
   headGroup.add(headMesh);
 
-  // Dark inner mouth backing shell inside oral pocket
+  // Dark inner mouth backing shell tucked neatly behind closed lips
   const oralBackingGeo = new THREE.SphereGeometry(0.11, 20, 16);
-  oralBackingGeo.scale(1.05, 0.65, 0.55);
+  oralBackingGeo.scale(0.82, 0.44, 0.35);
   disposables.geometries.push(oralBackingGeo);
   const oralBackingMesh = new THREE.Mesh(oralBackingGeo, mouthInnerMat);
-  oralBackingMesh.position.set(0, -0.185, 0.355);
+  oralBackingMesh.position.set(0, -0.178, 0.335);
   headGroup.add(oralBackingMesh);
 
   // 4. Sculpted Ears
@@ -650,34 +652,34 @@ export function createArticulatedAvatarRig(
   // 7. Articulated 3D Lips, Jaw Pivot, Upper/Lower Teeth & Tongue
   const upperLipGeo = createTaperedTubeGeometry(
     [
-      new THREE.Vector3(-0.098, -0.009, -0.036),
-      new THREE.Vector3(-0.056, 0.001, -0.01),
-      new THREE.Vector3(-0.022, 0.007, 0.004), // Left Cupid's peak
+      new THREE.Vector3(-0.086, -0.007, -0.028),
+      new THREE.Vector3(-0.048, 0.001, -0.008),
+      new THREE.Vector3(-0.019, 0.006, 0.004), // Left Cupid's peak
       new THREE.Vector3(0.0, 0.002, 0.006), // Central bow dip
-      new THREE.Vector3(0.022, 0.007, 0.004), // Right Cupid's peak
-      new THREE.Vector3(0.056, 0.001, -0.01),
-      new THREE.Vector3(0.098, -0.009, -0.036),
+      new THREE.Vector3(0.019, 0.006, 0.004), // Right Cupid's peak
+      new THREE.Vector3(0.048, 0.001, -0.008),
+      new THREE.Vector3(0.086, -0.007, -0.028),
     ],
     32,
     12,
     (t) => {
       const env = Math.sin(t * Math.PI);
-      return (isFemale ? 0.0155 : 0.0135) * (0.22 + 0.78 * Math.pow(env, 0.75));
+      return (isFemale ? 0.0125 : 0.011) * (0.24 + 0.76 * Math.pow(env, 0.75));
     }
   );
   disposables.geometries.push(upperLipGeo);
   const upperLipPivot = new THREE.Group();
-  upperLipPivot.position.set(0, -0.166, 0.455);
+  upperLipPivot.position.set(0, -0.171, 0.456);
   headGroup.add(upperLipPivot);
   const upperLipMesh = new THREE.Mesh(upperLipGeo, upperLipMat);
-  upperLipMesh.scale.set(1, 0.88, 0.85);
+  upperLipMesh.scale.set(1, 0.86, 0.85);
   upperLipPivot.add(upperLipMesh);
 
   // Upper teeth arc tucked cleanly behind upper lip
-  const upperTeethGeo = new THREE.CylinderGeometry(0.072, 0.072, 0.024, 24, 1, true, -0.78, 1.56);
+  const upperTeethGeo = new THREE.CylinderGeometry(0.068, 0.068, 0.022, 24, 1, true, -0.76, 1.52);
   disposables.geometries.push(upperTeethGeo);
   const upperTeethMesh = new THREE.Mesh(upperTeethGeo, teethMat);
-  upperTeethMesh.position.set(0, -0.171, 0.365);
+  upperTeethMesh.position.set(0, -0.171, 0.362);
   headGroup.add(upperTeethMesh);
 
   // Pivoted Jaw Group at condyle axis
@@ -687,25 +689,25 @@ export function createArticulatedAvatarRig(
 
   const lowerLipGeo = createTaperedTubeGeometry(
     [
-      new THREE.Vector3(-0.092, 0.006, -0.032),
-      new THREE.Vector3(-0.048, -0.005, -0.005),
-      new THREE.Vector3(0.0, -0.009, 0.005),
-      new THREE.Vector3(0.048, -0.005, -0.005),
-      new THREE.Vector3(0.092, 0.006, -0.032),
+      new THREE.Vector3(-0.082, 0.005, -0.026),
+      new THREE.Vector3(-0.044, -0.004, -0.004),
+      new THREE.Vector3(0.0, -0.007, 0.005),
+      new THREE.Vector3(0.044, -0.004, -0.004),
+      new THREE.Vector3(0.082, 0.005, -0.026),
     ],
     28,
     12,
     (t) => {
       const env = Math.sin(t * Math.PI);
-      return (isFemale ? 0.0175 : 0.0155) * (0.2 + 0.8 * Math.pow(env, 0.7));
+      return (isFemale ? 0.0145 : 0.013) * (0.22 + 0.78 * Math.pow(env, 0.7));
     }
   );
   disposables.geometries.push(lowerLipGeo);
   const lowerLipPivot = new THREE.Group();
-  lowerLipPivot.position.set(0, -0.077, 0.312);
+  lowerLipPivot.position.set(0, -0.069, 0.314);
   jawGroup.add(lowerLipPivot);
   const lowerLipMesh = new THREE.Mesh(lowerLipGeo, lowerLipMat);
-  lowerLipMesh.scale.set(1, 0.88, 0.88);
+  lowerLipMesh.scale.set(1, 0.86, 0.88);
   lowerLipPivot.add(lowerLipMesh);
 
   // Lower teeth & tongue inside jaw
@@ -731,65 +733,65 @@ export function createArticulatedAvatarRig(
     : isFemale;
 
   if (useLongHair) {
-    // Sleek crown cap covering top & back of skull cleanly
-    const hairCapGeo = new THREE.SphereGeometry(1, 56, 40, 0, Math.PI * 2, 0, Math.PI * 0.64);
-    hairCapGeo.scale(0.478, 0.585, 0.535);
+    // Sleek crown cap tilted BACKWARD (-0.42 rad) so front hairline sits high above forehead
+    const hairCapGeo = new THREE.SphereGeometry(1, 56, 40, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    hairCapGeo.scale(0.482, 0.575, 0.525);
     disposables.geometries.push(hairCapGeo);
     const hairCap = new THREE.Mesh(hairCapGeo, hairMat);
-    hairCap.position.set(0, 0.035, -0.048);
-    hairCap.rotation.x = -0.24;
+    hairCap.position.set(0, 0.065, -0.055);
+    hairCap.rotation.x = -0.42;
     hairCap.castShadow = true;
     hairGroup.add(hairCap);
 
-    // Swept side-locks framing cheeks + chin
+    // Swept side-locks framing outer temples, cheeks & jawline cleanly
     [-1, 1].forEach((side) => {
       const lockPts = [
-        new THREE.Vector3(side * 0.14, 0.54, 0.18),
-        new THREE.Vector3(side * 0.42, 0.36, 0.22),
-        new THREE.Vector3(side * 0.47, 0.02, 0.16),
-        new THREE.Vector3(side * 0.42, -0.34, 0.08),
-        new THREE.Vector3(side * 0.3, -0.62, -0.02),
+        new THREE.Vector3(side * 0.16, 0.54, 0.02),
+        new THREE.Vector3(side * 0.44, 0.35, 0.08),
+        new THREE.Vector3(side * 0.48, 0.02, 0.06),
+        new THREE.Vector3(side * 0.44, -0.34, 0.01),
+        new THREE.Vector3(side * 0.34, -0.6, -0.08),
       ];
-      const lockGeo = createTaperedTubeGeometry(lockPts, 28, 12, (t) => 0.088 * (0.45 + 0.55 * Math.sin(t * Math.PI * 0.92)));
+      const lockGeo = createTaperedTubeGeometry(lockPts, 28, 12, (t) => 0.084 * (0.45 + 0.55 * Math.sin(t * Math.PI * 0.92)));
       disposables.geometries.push(lockGeo);
       const lockMesh = new THREE.Mesh(lockGeo, hairMat);
-      lockMesh.scale.set(0.65, 1.0, 1.25);
+      lockMesh.scale.set(0.55, 1.0, 1.15);
       lockMesh.castShadow = true;
       hairGroup.add(lockMesh);
     });
 
-    // Swept side-parted fringe across forehead
+    // High swept side-parted hairline fringe well above eyebrows
     const fringePts = [
-      new THREE.Vector3(-0.36, 0.36, 0.26),
-      new THREE.Vector3(-0.14, 0.42, 0.39),
-      new THREE.Vector3(0.08, 0.36, 0.41),
-      new THREE.Vector3(0.32, 0.26, 0.34),
-      new THREE.Vector3(0.44, 0.14, 0.2),
+      new THREE.Vector3(-0.36, 0.32, 0.2),
+      new THREE.Vector3(-0.14, 0.39, 0.31),
+      new THREE.Vector3(0.08, 0.36, 0.33),
+      new THREE.Vector3(0.3, 0.3, 0.25),
+      new THREE.Vector3(0.42, 0.2, 0.12),
     ];
-    const fringeGeo = createTaperedTubeGeometry(fringePts, 26, 10, (t) => 0.07 * (0.35 + 0.65 * Math.sin(t * Math.PI)));
+    const fringeGeo = createTaperedTubeGeometry(fringePts, 26, 10, (t) => 0.058 * (0.35 + 0.65 * Math.sin(t * Math.PI)));
     disposables.geometries.push(fringeGeo);
     const fringeMesh = new THREE.Mesh(fringeGeo, hairMat);
     hairGroup.add(fringeMesh);
   } else {
-    // Sharp sculpted male crown + swept architectural crest + tapered temples
-    const crownGeo = new THREE.SphereGeometry(1, 52, 36, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    crownGeo.scale(0.495, 0.578, 0.525);
+    // Sharp sculpted male crown tilted backward (-0.40 rad) + swept architectural crest
+    const crownGeo = new THREE.SphereGeometry(1, 52, 36, 0, Math.PI * 2, 0, Math.PI * 0.48);
+    crownGeo.scale(0.49, 0.572, 0.52);
     disposables.geometries.push(crownGeo);
     const crown = new THREE.Mesh(crownGeo, hairMat);
-    crown.position.set(0, 0.048, -0.042);
-    crown.rotation.x = -0.2;
+    crown.position.set(0, 0.075, -0.052);
+    crown.rotation.x = -0.4;
     crown.castShadow = true;
     hairGroup.add(crown);
 
-    // Sculpted swept front hair wave
+    // Sculpted swept front hair wave above forehead
     const crestPts = [
-      new THREE.Vector3(-0.38, 0.32, 0.2),
-      new THREE.Vector3(-0.16, 0.44, 0.36),
-      new THREE.Vector3(0.08, 0.49, 0.38),
-      new THREE.Vector3(0.3, 0.4, 0.28),
-      new THREE.Vector3(0.42, 0.24, 0.12),
+      new THREE.Vector3(-0.36, 0.34, 0.14),
+      new THREE.Vector3(-0.14, 0.44, 0.27),
+      new THREE.Vector3(0.08, 0.48, 0.29),
+      new THREE.Vector3(0.28, 0.41, 0.21),
+      new THREE.Vector3(0.4, 0.28, 0.08),
     ];
-    const crestGeo = createTaperedTubeGeometry(crestPts, 26, 12, (t) => 0.082 * (0.35 + 0.65 * Math.sin(t * Math.PI)));
+    const crestGeo = createTaperedTubeGeometry(crestPts, 26, 12, (t) => 0.072 * (0.35 + 0.65 * Math.sin(t * Math.PI)));
     disposables.geometries.push(crestGeo);
     const crestMesh = new THREE.Mesh(crestGeo, hairMat);
     crestMesh.castShadow = true;
@@ -798,14 +800,14 @@ export function createArticulatedAvatarRig(
     // Tapered temple sideburns
     [-1, 1].forEach((side) => {
       const sbPts = [
-        new THREE.Vector3(side * 0.46, 0.24, 0.08),
-        new THREE.Vector3(side * 0.47, 0.09, 0.11),
-        new THREE.Vector3(side * 0.44, -0.04, 0.09),
+        new THREE.Vector3(side * 0.46, 0.22, 0.04),
+        new THREE.Vector3(side * 0.47, 0.08, 0.06),
+        new THREE.Vector3(side * 0.44, -0.04, 0.04),
       ];
-      const sbGeo = createTaperedTubeGeometry(sbPts, 14, 8, (t) => 0.036 * (1 - t * 0.6));
+      const sbGeo = createTaperedTubeGeometry(sbPts, 14, 8, (t) => 0.032 * (1 - t * 0.6));
       disposables.geometries.push(sbGeo);
       const sbMesh = new THREE.Mesh(sbGeo, hairMat);
-      sbMesh.scale.set(0.45, 1, 1.3);
+      sbMesh.scale.set(0.45, 1, 1.2);
       hairGroup.add(sbMesh);
     });
   }
@@ -871,6 +873,8 @@ export function createArticulatedAvatarRig(
       smileAmount,
       browRaise,
       browAsym,
+      browKnit = 0,
+      eyeSquint = 0,
       headYaw,
       headPitch,
       headRoll,
@@ -908,13 +912,15 @@ export function createArticulatedAvatarRig(
     rightEye.gazePivot.rotation.x = eyePitch;
 
     const effectiveBlink = isMuted ? Math.max(blinkAmount, 0.62) : blinkAmount;
-    // Open resting lid sits around -0.78 rad (looking slightly tracks vertical gaze too), closed = +0.34 rad
+    // Natural relaxed upper lid sits slightly over top iris edge (-0.46 rad), closed = +0.34 rad
     const gazeLidFollow = -eyePitch * 0.35;
-    const upperOpenAngle = -0.78 + gazeLidFollow - listenEnergy * 0.08;
+    const upperOpenAngle =
+      -0.46 + gazeLidFollow - listenEnergy * 0.08 + clamp01(eyeSquint) * 0.14;
     const upperClosedAngle = 0.34;
     const upperLidAngle = THREE.MathUtils.lerp(upperOpenAngle, upperClosedAngle, clamp01(effectiveBlink));
 
-    const lowerOpenAngle = 0.14 + gazeLidFollow * 0.25 - smileAmount * 0.14;
+    const lowerOpenAngle =
+      0.08 + gazeLidFollow * 0.25 - smileAmount * 0.12 - clamp01(eyeSquint) * 0.08;
     const lowerClosedAngle = -0.18;
     const lowerLidAngle = THREE.MathUtils.lerp(lowerOpenAngle, lowerClosedAngle, clamp01(effectiveBlink));
 
@@ -923,13 +929,16 @@ export function createArticulatedAvatarRig(
     leftEye.lowerLidPivot.rotation.x = lowerLidAngle;
     rightEye.lowerLidPivot.rotation.x = lowerLidAngle;
 
-    // 4. Articulated Eyebrows (expressive raise + inquisitive tilt)
+    // 4. Articulated Eyebrows (expressive raise + inquisitive/analytical knit)
     const browYBase = 0.172;
-    const connectKnit = isConnecting ? -0.008 : 0;
+    const connectKnit = (isConnecting ? -0.008 : 0) - clamp01(browKnit) * 0.007;
+    const analyticTilt = clamp01(browKnit) * 0.075;
     leftBrow.position.y = browYBase + browRaise * 0.022 + browAsym * 0.008 + connectKnit;
     rightBrow.position.y = browYBase + browRaise * 0.022 - browAsym * 0.008 + connectKnit;
-    leftBrow.rotation.z = -browRaise * 0.08 - browAsym * 0.09 + (isConnecting ? -0.08 : 0);
-    rightBrow.rotation.z = browRaise * 0.08 - browAsym * 0.09 + (isConnecting ? 0.08 : 0);
+    leftBrow.rotation.z =
+      -browRaise * 0.08 - browAsym * 0.09 + (isConnecting ? -0.08 : 0) - analyticTilt;
+    rightBrow.rotation.z =
+      browRaise * 0.08 - browAsym * 0.09 + (isConnecting ? 0.08 : 0) + analyticTilt;
 
     // 5. Articulated Jaw, Lips, Teeth & Head Facial Morph Targets
     const safeJaw = clamp01(jawOpen);
@@ -946,19 +955,19 @@ export function createArticulatedAvatarRig(
     jawGroup.rotation.x = safeJaw * 0.25;
 
     // Upper lip lifts subtly when speaking wide/smiling and rounds/protrudes on Oh
-    upperLipPivot.position.y = -0.166 + safeJaw * 0.011 + safeSmile * 0.005;
-    upperLipPivot.position.z = 0.455 + safeOh * 0.016;
+    upperLipPivot.position.y = -0.171 + safeJaw * 0.011 + safeSmile * 0.005;
+    upperLipPivot.position.z = 0.456 + safeOh * 0.016;
     upperLipMesh.scale.set(
       1 + safeSmile * 0.09 - safeOh * 0.24,
-      0.88 + safeOh * 0.18,
+      0.86 + safeOh * 0.18,
       0.85 + safeOh * 0.24
     );
 
     // Lower lip widens/smiles or purses into rounded O shape
-    lowerLipPivot.position.z = 0.312 + safeOh * 0.016 - safeJaw * 0.006;
+    lowerLipPivot.position.z = 0.314 + safeOh * 0.016 - safeJaw * 0.006;
     lowerLipMesh.scale.set(
       1 + safeSmile * 0.08 - safeOh * 0.24,
-      0.88 + safeOh * 0.16 + safeJaw * 0.12,
+      0.86 + safeOh * 0.16 + safeJaw * 0.12,
       0.88 + safeOh * 0.24
     );
   };

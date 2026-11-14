@@ -59,8 +59,20 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
     }
   };
 
-  // Event delegation for code block copy, preview, and workspace dock buttons inside markdown
+  // Event delegation for code block copy, sandbox run, preview, and workspace dock buttons inside markdown
   const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    const runBtn = (e.target as HTMLElement).closest('.run-code-btn') as HTMLButtonElement | null;
+    if (runBtn) {
+      const encodedCode = runBtn.getAttribute('data-code');
+      const lang = runBtn.getAttribute('data-lang') || 'javascript';
+      if (encodedCode) {
+        useWorkspaceStore
+          .getState()
+          .loadCodeIntoWorkspace(decodeURIComponent(encodedCode), lang, 'sandbox', true);
+      }
+      return;
+    }
+
     const previewBtn = (e.target as HTMLElement).closest('.preview-code-btn') as HTMLButtonElement | null;
     if (previewBtn) {
       const encodedCode = previewBtn.getAttribute('data-code');

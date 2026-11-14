@@ -36,6 +36,7 @@ import {
   ShieldCheck,
   AlertCircle,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
 import { SUPREMEAI_MODELS } from '../../data/models';
 import {
@@ -148,9 +149,12 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [isPreviewPulsing, setIsPreviewPulsing] = useState(false);
+  const [outgoingPreviewSrc, setOutgoingPreviewSrc] = useState<string | null>(null);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
   const previewLevelsRef = useRef({ input: 0, output: 0 });
   const pulseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastAvatarSrcRef = useRef<string | null>(null);
+  const crossFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleSync = () => {
@@ -161,6 +165,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     return () => {
       window.removeEventListener(VOICE_AVATAR_SYNC_EVENT, handleSync);
       if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
+      if (crossFadeTimeoutRef.current) clearTimeout(crossFadeTimeoutRef.current);
     };
   }, []);
 
@@ -196,6 +201,17 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const isAnimating = liveMotion && (!prefersReducedMotion || overrideReducedMotion);
   const activeThemeMeta = LIVE_THEMES.find((t) => t.id === liveTheme) || LIVE_THEMES[0];
   const activeAvatarSource = resolveAvatarSource(avatarPref);
+
+  useEffect(() => {
+    if (lastAvatarSrcRef.current && lastAvatarSrcRef.current !== activeAvatarSource.src) {
+      setOutgoingPreviewSrc(lastAvatarSrcRef.current);
+      if (crossFadeTimeoutRef.current) clearTimeout(crossFadeTimeoutRef.current);
+      crossFadeTimeoutRef.current = setTimeout(() => {
+        setOutgoingPreviewSrc(null);
+      }, 420);
+    }
+    lastAvatarSrcRef.current = activeAvatarSource.src;
+  }, [activeAvatarSource.src]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1546,18 +1562,43 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 </button>
               </div>
 
-              {/* Clean WebGL stage — no backdrop-filter over canvas */}
-              <div className="relative h-72 w-full bg-transparent">
-                <LiveVoiceAvatarCanvas
-                  status={isPreviewPulsing ? 'speaking' : 'idle'}
-                  voiceName={voiceName}
-                  levelsRef={previewLevelsRef}
-                  avatarSrc={activeAvatarSource.src}
-                  isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
-                  avatarPreset={avatarPref.preset}
-                  customTraits={avatarPref.customTraits}
-                  isDark={resolvedScheme === 'dark'}
-                />
+              {/* Clean WebGL stage with smooth cross-fade transition on avatar image switch */}
+              <div className="relative h-72 w-full bg-transparent overflow-hidden">
+                <motion.div
+                  key={`${avatarPref.preset}-${activeAvatarSource.src.slice(-24)}`}
+                  initial={{ opacity: 0.25, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.44, ease: [0.22, 1, 0.36, 1] }}
+                  className="w-full h-full"
+                >
+                  <LiveVoiceAvatarCanvas
+                    status={isPreviewPulsing ? 'speaking' : 'idle'}
+                    voiceName={voiceName}
+                    levelsRef={previewLevelsRef}
+                    avatarSrc={activeAvatarSource.src}
+                    isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
+                    avatarPreset={avatarPref.preset}
+                    customTraits={avatarPref.customTraits}
+                    isDark={resolvedScheme === 'dark'}
+                  />
+                </motion.div>
+
+                <AnimatePresence>
+                  {outgoingPreviewSrc && (
+                    <motion.img
+                      key={outgoingPreviewSrc.slice(-32)}
+                      src={outgoingPreviewSrc}
+                      alt=""
+                      aria-hidden="true"
+                      referrerPolicy="no-referrer"
+                      initial={{ opacity: 0.55, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.05 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.42, ease: 'easeOut' }}
+                      className="pointer-events-none absolute inset-0 m-auto h-52 w-52 rounded-full object-cover object-top blur-[2px]"
+                    />
+                  )}
+                </AnimatePresence>
               </div>
 
               {onOpenLiveVoice && (
@@ -1601,7 +1642,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                         key={preset.id}
                         type="button"
                         onClick={() => handleSelectPresetAvatar(preset.id)}
-                        className={`rounded-xl border p-2.5 text-left transition-all cursor-pointer flex flex-col gap-2 ${
+                        className={`rounded-xl border p-2.5 text-left transition-all duration-300 cursor-pointer flex flex-col gap-2 ${
                           isSelected
                             ? 'theme-accent-active ring-2 ring-[var(--theme-accent-ring)]'
                             : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-600'
@@ -1612,13 +1653,23 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                             src={preset.imageSrc}
                             alt={preset.label}
                             referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover object-top"
+                            className={`w-full h-full object-cover object-top transition-all duration-400 ${
+                              isSelected ? 'scale-105 opacity-100' : 'opacity-80 hover:opacity-100'
+                            }`}
                           />
-                          {isSelected && (
-                            <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm">
-                              <Check className="w-3 h-3" />
-                            </span>
-                          )}
+                          <AnimatePresence>
+                            {isSelected && (
+                              <motion.span
+                                initial={{ opacity: 0, scale: 0.7 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.7 }}
+                                transition={{ duration: 0.22 }}
+                                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm"
+                              >
+                                <Check className="w-3 h-3" />
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
                         </div>
                         <div>
                           <div className="text-xs font-semibold text-slate-900 dark:text-white">
@@ -1634,7 +1685,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
 
                   {/* Custom Photo-to-Hologram Card */}
                   <div
-                    className={`rounded-xl border p-2.5 text-left transition-all flex flex-col gap-2 ${
+                    className={`rounded-xl border p-2.5 text-left transition-all duration-300 flex flex-col gap-2 ${
                       avatarPref.preset === 'custom'
                         ? 'theme-accent-active ring-2 ring-[var(--theme-accent-ring)]'
                         : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40'
@@ -1645,28 +1696,50 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                       onClick={handleSelectCustomAvatar}
                       className="relative h-28 w-full rounded-lg overflow-hidden bg-slate-900/90 border border-dashed border-slate-700 flex items-center justify-center cursor-pointer group"
                     >
-                      {avatarPref.customImageDataUrl ? (
-                        <img
-                          src={avatarPref.customImageDataUrl}
-                          alt="Custom avatar preview"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover object-top"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1.5 text-slate-400 group-hover:text-cyan-400 transition-colors px-2 text-center">
-                          {isProcessingAvatar ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Upload className="w-5 h-5" />
-                          )}
-                          <span className="text-[11px] font-medium">Upload Portrait</span>
-                        </div>
-                      )}
-                      {avatarPref.preset === 'custom' && avatarPref.customImageDataUrl && (
-                        <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm">
-                          <Check className="w-3 h-3" />
-                        </span>
-                      )}
+                      <AnimatePresence mode="wait">
+                        {avatarPref.customImageDataUrl ? (
+                          <motion.img
+                            key={avatarPref.customImageDataUrl.slice(-32)}
+                            src={avatarPref.customImageDataUrl}
+                            alt="Custom avatar preview"
+                            referrerPolicy="no-referrer"
+                            initial={{ opacity: 0, scale: 0.96 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 1.03 }}
+                            transition={{ duration: 0.34, ease: 'easeInOut' }}
+                            className="w-full h-full object-cover object-top"
+                          />
+                        ) : (
+                          <motion.div
+                            key="upload-empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.22 }}
+                            className="flex flex-col items-center gap-1.5 text-slate-400 group-hover:text-cyan-400 transition-colors px-2 text-center"
+                          >
+                            {isProcessingAvatar ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Upload className="w-5 h-5" />
+                            )}
+                            <span className="text-[11px] font-medium">Upload Portrait</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {avatarPref.preset === 'custom' && avatarPref.customImageDataUrl && (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.7 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.7 }}
+                            transition={{ duration: 0.22 }}
+                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full theme-btn-primary flex items-center justify-center shadow-sm"
+                          >
+                            <Check className="w-3 h-3" />
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </button>
 
                     <div className="flex items-start justify-between gap-1.5">

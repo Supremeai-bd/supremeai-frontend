@@ -8,6 +8,11 @@ import { researchService } from '../services/researchService';
 import { useAuthStore } from './useAuthStore';
 import { useCustomerStore } from './useCustomerStore';
 import { toast } from './useToastStore';
+import {
+  generateHeuristicChatTitle,
+  isDefaultSessionTitle,
+  requestAutoChatTitle,
+} from '../utils/chatTitleGenerator';
 
 const STORAGE_KEY = 'supremeai_studio_sessions_v1';
 
@@ -20,6 +25,7 @@ interface ChatState {
   isStreaming: boolean;
   streamingContent: string;
   inferenceError: string | null;
+  generatingTitleIds: string[];
   isPromptModalOpen: boolean;
   isRoleModalOpen: boolean;
 
@@ -82,6 +88,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     isStreaming: false,
     streamingContent: '',
     inferenceError: null,
+    generatingTitleIds: [],
     isPromptModalOpen: false,
     isRoleModalOpen: false,
 
@@ -135,10 +142,18 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     renameSession: (id: string, newTitle: string) => {
-      const { sessions } = get();
-      const updated = sessions.map((s) => (s.id === id ? { ...s, title: newTitle } : s));
+      const trimmed = newTitle.trim();
+      if (!trimmed) return;
+      const { sessions, generatingTitleIds } = get();
+      const updated = sessions.map((s) => (s.id === id ? { ...s, title: trimmed } : s));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      set({ sessions: updated });
+      set({
+        sessions: updated,
+        generatingTitleIds: generatingTitleIds.filter((gid) => gid !== id),
+      });
+      if (localStorage.getItem('supremeai_access_token')) {
+        conversationService.renameConversation(id, trimmed).catch(() => {});
+      }
     },
 
     togglePinSession: (id: string) => {
@@ -304,9 +319,9 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       const updatedMessages = [...current.messages, userMsg];
       const isFirstUserMessage = current.messages.filter((m) => m.role === 'user').length === 0;
-      const sessionTitle = isFirstUserMessage
-        ? (text.slice(0, 32).trim() || (attachment ? `Analysis: ${attachment.name}` : 'New Chat')) +
-          (text.length > 32 ? '...' : '')
+      const shouldAutoTitle = isFirstUserMessage && isDefaultSessionTitle(current.title);
+      const sessionTitle = shouldAutoTitle
+        ? generateHeuristicChatTitle(text, attachment)
         : current.title;
 
       const updatedSessions = sessions.map((s) =>
@@ -323,11 +338,50 @@ export const useChatStore = create<ChatState>((set, get) => {
       );
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
-      set({
+      set((state) => ({
         sessions: updatedSessions,
         isStreaming: true,
         streamingContent: '',
-      });
+        generatingTitleIds: shouldAutoTitle
+          ? Array.from(new Set([...state.generatingTitleIds, current.id]))
+          : state.generatingTitleIds,
+      }));
+
+      if (shouldAutoTitle) {
+        const targetId = current.id;
+        const provisionalTitle = sessionTitle;
+        void requestAutoChatTitle({
+          message: text,
+          attachmentName: attachment?.name,
+          attachmentMimeType: attachment?.mimeType,
+        })
+          .then((aiTitle) => {
+            if (!aiTitle) return;
+            const latestSessions = get().sessions;
+            const targetSession = latestSessions.find((s) => s.id === targetId);
+            if (!targetSession) return;
+            // Respect manual user renames performed before the AI title resolved
+            if (targetSession.title !== provisionalTitle && !isDefaultSessionTitle(targetSession.title)) {
+              return;
+            }
+            if (targetSession.title === aiTitle) return;
+
+            const nextSessions = latestSessions.map((s) =>
+              s.id === targetId ? { ...s, title: aiTitle } : s
+            );
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSessions));
+            set({ sessions: nextSessions });
+
+            if (localStorage.getItem('supremeai_access_token')) {
+              conversationService.renameConversation(targetId, aiTitle).catch(() => {});
+            }
+          })
+          .finally(() => {
+            set((state) => ({
+              generatingTitleIds: state.generatingTitleIds.filter((gid) => gid !== targetId),
+            }));
+          });
+      }
 
       // Collect grounding context
       const activeGrounding = (groundingDocs || []).filter((d) => d.isGroundingActive);
@@ -370,8 +424,9 @@ export const useChatStore = create<ChatState>((set, get) => {
           });
 
           // Ensure remote conversation exists before syncing exchange
+          const latestTitle = get().sessions.find((s) => s.id === current.id)?.title || sessionTitle;
           conversationService
-            .createConversation(current.title, current.id, activeModel.id)
+            .createConversation(latestTitle, current.id, activeModel.id)
             .then(() => {
               conversationService.syncMessage(current.id, 'user', text);
               conversationService.syncMessage(current.id, 'assistant', assistantMsg.content);
@@ -445,8 +500,9 @@ export const useChatStore = create<ChatState>((set, get) => {
           abortController = null;
 
           // Ensure remote conversation exists before syncing exchange
+          const latestTitle = get().sessions.find((s) => s.id === current.id)?.title || sessionTitle;
           conversationService
-            .createConversation(current.title, current.id, activeModel.id)
+            .createConversation(latestTitle, current.id, activeModel.id)
             .then(() => {
               conversationService.syncMessage(current.id, 'user', text);
               conversationService.syncMessage(current.id, 'assistant', fullText);
@@ -525,10 +581,11 @@ export const useChatStore = create<ChatState>((set, get) => {
       }
 
       const isFirstUserMessage = current.messages.filter((m) => m.role === 'user').length === 0;
-      const sessionTitle =
-        isFirstUserMessage && cleanUser
-          ? cleanUser.slice(0, 32).trim() + (cleanUser.length > 32 ? '...' : '')
-          : current.title;
+      const shouldAutoTitle =
+        isFirstUserMessage && Boolean(cleanUser) && isDefaultSessionTitle(current.title);
+      const sessionTitle = shouldAutoTitle
+        ? generateHeuristicChatTitle(cleanUser)
+        : current.title;
 
       const updatedSessions = sessions.map((s) =>
         s.id === current.id
@@ -542,7 +599,39 @@ export const useChatStore = create<ChatState>((set, get) => {
       );
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
-      set({ sessions: updatedSessions });
+      set((state) => ({
+        sessions: updatedSessions,
+        generatingTitleIds: shouldAutoTitle
+          ? Array.from(new Set([...state.generatingTitleIds, current.id]))
+          : state.generatingTitleIds,
+      }));
+
+      if (shouldAutoTitle) {
+        const targetId = current.id;
+        const provisionalTitle = sessionTitle;
+        void requestAutoChatTitle({ message: cleanUser })
+          .then((aiTitle) => {
+            if (!aiTitle) return;
+            const latestSessions = get().sessions;
+            const targetSession = latestSessions.find((s) => s.id === targetId);
+            if (!targetSession) return;
+            if (targetSession.title !== provisionalTitle && !isDefaultSessionTitle(targetSession.title)) {
+              return;
+            }
+            if (targetSession.title === aiTitle) return;
+
+            const nextSessions = latestSessions.map((s) =>
+              s.id === targetId ? { ...s, title: aiTitle } : s
+            );
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSessions));
+            set({ sessions: nextSessions });
+          })
+          .finally(() => {
+            set((state) => ({
+              generatingTitleIds: state.generatingTitleIds.filter((gid) => gid !== targetId),
+            }));
+          });
+      }
     },
 
     syncRemoteSessions: async () => {

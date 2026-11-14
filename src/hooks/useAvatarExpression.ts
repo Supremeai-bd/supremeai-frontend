@@ -1,25 +1,29 @@
 import { useMemo } from 'react';
 
-export type AvatarExpression = 'happy' | 'thinking' | 'neutral';
+export type AvatarExpression = 'joyful' | 'analytical' | 'happy' | 'thinking' | 'neutral';
 
 export interface UseAvatarExpressionOptions {
   streamingContent?: string;
   isStreaming?: boolean;
   voiceText?: string;
+  latestAssistantContent?: string;
   isConnecting?: boolean;
 }
 
 export interface AvatarExpressionResult {
   expression: AvatarExpression;
   expressionClass: string;
+  intensity: number;
   matchedKeywords: string[];
 }
 
-const HAPPY_KEYWORDS = [
+const JOYFUL_KEYWORDS = [
   'great',
   'awesome',
   'excellent',
   'happy',
+  'joy',
+  'joyful',
   'glad',
   'wonderful',
   'love',
@@ -44,18 +48,95 @@ const HAPPY_KEYWORDS = [
   'nice',
   'good job',
   'well done',
+  'excited',
+  'thrilled',
+  'enjoy',
+  'pleased',
+  'beautiful',
+  'hurray',
+  'smoothly',
+  'appreciate',
+];
+
+const JOYFUL_EMOJIS = ['🎉', '✨', '😊', '😄', '🥳', '🚀', '❤️', '👍', '🌟', '🙌'];
+
+const ANALYTICAL_KEYWORDS = [
+  'algorithm',
+  'architecture',
+  'benchmark',
+  'complexity',
+  'compile',
+  'compiler',
+  'config',
+  'configuration',
+  'database',
+  'debug',
+  'debugging',
+  'deployment',
+  'distribution',
+  'docker',
+  'endpoint',
+  'equation',
+  'exception',
+  'function',
+  'implementation',
+  'index',
+  'interface',
+  'javascript',
+  'json',
+  'kubernetes',
+  'latency',
+  'matrix',
+  'memory',
+  'metrics',
+  'middleware',
+  'parameter',
+  'payload',
+  'performance',
+  'pipeline',
+  'postgres',
+  'protocol',
+  'python',
+  'query',
+  'refactor',
+  'regex',
+  'runtime',
+  'schema',
+  'sql',
+  'stack trace',
+  'syntax',
+  'telemetry',
+  'throughput',
+  'token',
+  'typescript',
+  'variance',
+  'vector',
+  'websocket',
+];
+
+const CODE_SYNTAX_PATTERNS: Array<{ label: string; regex: RegExp; weight: number }> = [
+  { label: 'code-fence', regex: /```[\s\S]*?/, weight: 5 },
+  { label: 'inline-code', regex: /`[^`\n]{2,}`/, weight: 2 },
+  {
+    label: 'code-keywords',
+    regex: /\b(const|let|var|function|async|await|import|export|interface|type|class|def|return|SELECT|FROM|WHERE)\b/,
+    weight: 3,
+  },
+  { label: 'arrow-or-strict-op', regex: /=>|===|!==|\b0x[0-9a-f]+\b/i, weight: 2 },
+  { label: 'api-path', regex: /\/api\/[a-z0-9/_-]+/i, weight: 2 },
+  { label: 'json-structure', regex: /\{\s*"[a-z0-9_-]+"\s*:/i, weight: 3 },
+  { label: 'markdown-table', regex: /\|[\s:-]{3,}\|/, weight: 3 },
+  { label: 'big-o', regex: /O\((1|n|log n|n log n|n\^2)\)/i, weight: 3 },
 ];
 
 const THINKING_KEYWORDS = [
   'thinking',
   'think',
   'let me',
-  'analyz',
   'consider',
   'checking',
   'check',
   'evaluat',
-  'calculat',
   'research',
   'investigat',
   'synthesiz',
@@ -66,19 +147,15 @@ const THINKING_KEYWORDS = [
   'maybe',
   'ponder',
   'reason',
-  'because',
-  'therefore',
-  'inspect',
-  'debugging',
-  'debug',
   'hmm',
   'wait',
   'comparing',
 ];
 
 /**
- * Analyzes sentiment and cognitive cues from streaming chat/voice text via
- * keyword matching and maps it to deterministic CSS avatar expression states.
+ * Analyzes sentiment, conversational warmth, and technical/code cues from the
+ * active AI response (streaming, live voice transcript, or latest assistant reply)
+ * and maps it to expressive avatar states ('joyful', 'analytical', 'thinking', 'neutral').
  */
 export function useAvatarExpression(
   streamingContentOrOptions?: string | UseAvatarExpressionOptions,
@@ -89,7 +166,10 @@ export function useAvatarExpression(
       ? { streamingContent: streamingContentOrOptions, isStreaming: isStreamingArg }
       : streamingContentOrOptions || {};
 
-  const content = (options.voiceText || options.streamingContent || '').trim();
+  const primaryStream = (options.streamingContent || '').trim();
+  const voiceTranscript = (options.voiceText || '').trim();
+  const latestReply = (options.latestAssistantContent || '').trim();
+  const content = primaryStream || voiceTranscript || latestReply;
   const isStreaming = Boolean(options.isStreaming);
   const isConnecting = Boolean(options.isConnecting);
 
@@ -100,6 +180,7 @@ export function useAvatarExpression(
       return {
         expression: 'thinking',
         expressionClass: 'avatar-expression-thinking',
+        intensity: 0.65,
         matchedKeywords: ['connecting'],
       };
     }
@@ -109,41 +190,94 @@ export function useAvatarExpression(
         return {
           expression: 'thinking',
           expressionClass: 'avatar-expression-thinking',
+          intensity: 0.6,
           matchedKeywords: ['streaming-init'],
         };
       }
       return {
         expression: 'neutral',
         expressionClass: 'avatar-expression-neutral',
+        intensity: 0,
         matchedKeywords: [],
       };
     }
 
-    // Focus slightly more weight on the most recent clause so expression shifts dynamically mid-stream
-    const recentTail = normalized.slice(-320);
+    // Evaluate both the overall response structure (code blocks/tables) and recent clause
+    const recentTail = normalized.slice(-420);
+    const fullCheckWindow = normalized.slice(-1800);
+    const rawTail = content.slice(-420);
 
-    const happyMatches = HAPPY_KEYWORDS.filter((kw) => recentTail.includes(kw));
+    const joyfulMatches = JOYFUL_KEYWORDS.filter((kw) => recentTail.includes(kw));
+    const joyfulEmojiMatches = JOYFUL_EMOJIS.filter((emoji) => rawTail.includes(emoji));
+    const analyticalKeywordMatches = ANALYTICAL_KEYWORDS.filter((kw) =>
+      recentTail.includes(kw)
+    );
+    const codePatternMatches: string[] = [];
+    let codeScore = 0;
+
+    for (const pattern of CODE_SYNTAX_PATTERNS) {
+      if (pattern.regex.test(fullCheckWindow)) {
+        codePatternMatches.push(pattern.label);
+        codeScore += pattern.weight;
+      }
+    }
+
     const thinkingMatches = THINKING_KEYWORDS.filter((kw) => recentTail.includes(kw));
 
-    let happyScore = happyMatches.length * 2;
+    let joyfulScore = joyfulMatches.length * 2 + joyfulEmojiMatches.length * 2;
+    let analyticalScore = analyticalKeywordMatches.length * 2 + codeScore;
     let thinkingScore = thinkingMatches.length * 2;
 
-    if (recentTail.includes('!')) happyScore += 1;
-    if (recentTail.includes('?') || recentTail.includes('...')) thinkingScore += 1;
-    if (isStreaming && normalized.length < 36) thinkingScore += 1;
+    if (recentTail.includes('!')) joyfulScore += 1;
+    if ((recentTail.match(/!/g) || []).length >= 2) joyfulScore += 1;
 
-    if (happyScore > 0 && happyScore >= thinkingScore) {
+    // Quantitative / numeric telemetry density boosts analytical recognition
+    const numericTokens = recentTail.match(/\b\d+(\.\d+)?\s*(ms|s|%|kb|mb|gb|hz|fps|rows|ops)\b/gi);
+    if (numericTokens && numericTokens.length > 0) {
+      analyticalScore += Math.min(4, numericTokens.length * 2);
+      codePatternMatches.push('numeric-metrics');
+    }
+
+    if (recentTail.includes('?') || recentTail.includes('...')) thinkingScore += 1;
+    if (isStreaming && normalized.length < 36 && codeScore === 0) thinkingScore += 1;
+
+    // Prioritize analytical when code or substantial technical data is generated
+    if (analyticalScore >= 3 && analyticalScore >= joyfulScore) {
+      const intensity = Math.min(1, 0.45 + analyticalScore * 0.08);
       return {
-        expression: 'happy',
-        expressionClass: 'avatar-expression-happy',
-        matchedKeywords: happyMatches,
+        expression: 'analytical',
+        expressionClass: 'avatar-expression-analytical',
+        intensity,
+        matchedKeywords: [...codePatternMatches, ...analyticalKeywordMatches],
+      };
+    }
+
+    if (joyfulScore > 0 && joyfulScore >= thinkingScore) {
+      const intensity = Math.min(1, 0.45 + joyfulScore * 0.1);
+      return {
+        expression: 'joyful',
+        expressionClass: 'avatar-expression-joyful',
+        intensity,
+        matchedKeywords: [...joyfulMatches, ...joyfulEmojiMatches],
+      };
+    }
+
+    if (analyticalScore > 0 && analyticalScore >= thinkingScore) {
+      const intensity = Math.min(1, 0.4 + analyticalScore * 0.1);
+      return {
+        expression: 'analytical',
+        expressionClass: 'avatar-expression-analytical',
+        intensity,
+        matchedKeywords: [...codePatternMatches, ...analyticalKeywordMatches],
       };
     }
 
     if (thinkingScore > 0) {
+      const intensity = Math.min(1, 0.4 + thinkingScore * 0.1);
       return {
         expression: 'thinking',
         expressionClass: 'avatar-expression-thinking',
+        intensity,
         matchedKeywords: thinkingMatches,
       };
     }
@@ -151,7 +285,9 @@ export function useAvatarExpression(
     return {
       expression: 'neutral',
       expressionClass: 'avatar-expression-neutral',
+      intensity: 0,
       matchedKeywords: [],
     };
   }, [content, isStreaming, isConnecting]);
 }
+

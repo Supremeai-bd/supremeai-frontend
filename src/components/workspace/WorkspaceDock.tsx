@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Eye, Terminal, Globe, Code2, GitGraph, X, GripVertical, Maximize2, Minimize2 } from 'lucide-react';
+import { Eye, Terminal, Globe, Code2, GitGraph, PlaySquare, X, GripVertical, Maximize2, Minimize2 } from 'lucide-react';
 import { useWorkspaceStore, WorkspaceTab } from '../../stores/useWorkspaceStore';
+import { WorkspaceSandboxTab } from './WorkspaceSandboxTab';
 import { WorkspacePreviewTab } from './WorkspacePreviewTab';
 import { WorkspaceTerminalTab } from './WorkspaceTerminalTab';
 import { WorkspaceBrowserTab } from './WorkspaceBrowserTab';
 import { WorkspaceCodeTab } from './WorkspaceCodeTab';
 import { WorkspaceGraphTab } from './WorkspaceGraphTab';
 
-export const WorkspaceDock: React.FC = () => {
+interface WorkspaceDockProps {
+  developerMode?: boolean;
+}
+
+export const WorkspaceDock: React.FC<WorkspaceDockProps> = ({ developerMode = true }) => {
   const {
     isDockOpen,
     dockWidthPercent,
@@ -51,6 +56,7 @@ export const WorkspaceDock: React.FC = () => {
   if (!isDockOpen) return null;
 
   const tabs: { id: WorkspaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    ...(developerMode ? [{ id: 'sandbox' as const, label: 'Sandbox', icon: PlaySquare }] : []),
     { id: 'preview', label: 'Preview', icon: Eye },
     { id: 'terminal', label: 'Terminal', icon: Terminal },
     { id: 'browser', label: 'Browser', icon: Globe },
@@ -144,7 +150,10 @@ export const WorkspaceDock: React.FC = () => {
 
       {/* Active Workspace Tab Content */}
       <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
-        {activeDockTab === 'preview' && <WorkspacePreviewTab />}
+        {activeDockTab === 'sandbox' && developerMode && <WorkspaceSandboxTab />}
+        {(activeDockTab === 'preview' || (activeDockTab === 'sandbox' && !developerMode)) && (
+          <WorkspacePreviewTab />
+        )}
         {activeDockTab === 'terminal' && <WorkspaceTerminalTab />}
         {activeDockTab === 'browser' && <WorkspaceBrowserTab />}
         {activeDockTab === 'code' && <WorkspaceCodeTab />}

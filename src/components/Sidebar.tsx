@@ -26,6 +26,10 @@ import {
   Pin,
   LayoutDashboard,
   History,
+  Lock,
+  LogIn,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole, AuthUser } from '../types';
 import { useThemeStore, LIVE_THEMES } from '../stores/useThemeStore';
@@ -62,6 +66,9 @@ interface SidebarProps {
   onToggleDeveloperMode?: () => void;
   tokensUsed?: number;
   tokensLimit?: number;
+  isGuest?: boolean;
+  onRequestAuth?: (reason?: string) => void;
+  generatingTitleIds?: string[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -91,6 +98,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDeveloperMode,
   tokensUsed = 0,
   tokensLimit = 1000000,
+  isGuest = false,
+  onRequestAuth,
+  generatingTitleIds = [],
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
@@ -98,6 +108,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const activeThemeMeta = LIVE_THEMES.find((t) => t.id === liveTheme) || LIVE_THEMES[0];
 
   const pinnedSessions = sessions.filter((s) => s.isPinned);
+  const recentSessions = [...sessions]
+    .filter((s) => !s.isPinned)
+    .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+    .slice(0, 18);
 
   const usagePercent = Math.min(100, Math.round((tokensUsed / Math.max(1, tokensLimit)) * 100));
 
@@ -163,7 +177,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </form>
           ) : (
-            <span className="truncate text-xs">{session.title}</span>
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span title={session.title} className="truncate text-xs">
+                {session.title}
+              </span>
+              {generatingTitleIds.includes(session.id) && (
+                <Sparkles
+                  aria-label="Generating concise title"
+                  className="w-3 h-3 text-cyan-500 animate-pulse shrink-0"
+                />
+              )}
+            </div>
           )}
         </div>
 
@@ -227,7 +251,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-3.5 pt-3.5 pb-1 flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={() => onSelectTab(currentRole === 'admin' ? 'admin-overview' : 'chat')}
+            onClick={() => onSelectTab('chat')}
             className="flex items-center gap-2 cursor-pointer group min-w-0"
           >
             <svg
@@ -560,48 +584,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <History className="w-4 h-4 text-slate-500" />
                 <span>All Conversations</span>
               </div>
-              <span className="text-[10px] font-mono tabular-nums text-slate-400">
-                {sessions.length}
-              </span>
+              {isGuest ? (
+                <Lock className="w-3 h-3 text-slate-400" />
+              ) : (
+                <span className="text-[10px] font-mono tabular-nums text-slate-400">
+                  {sessions.length}
+                </span>
+              )}
             </button>
 
             <button
               type="button"
               onClick={() => onSelectTab('user-billing')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'user-billing' || activeTab === 'usage'
                   ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <CreditCard className="w-4 h-4 text-emerald-500" />
-              <span>Plan & Usage</span>
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-4 h-4 text-emerald-500" />
+                <span>Plan & Usage</span>
+              </div>
+              {isGuest && <Lock className="w-3 h-3 text-slate-400" />}
             </button>
 
             <button
               type="button"
               onClick={() => onSelectTab('user-team')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'user-team'
                   ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Users className="w-4 h-4 text-indigo-500" />
-              <span>Team & Members</span>
+              <div className="flex items-center gap-3">
+                <Users className="w-4 h-4 text-indigo-500" />
+                <span>Team & Members</span>
+              </div>
+              {isGuest && <Lock className="w-3 h-3 text-slate-400" />}
             </button>
 
             <button
               type="button"
               onClick={() => onSelectTab('user-settings')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'user-settings'
                   ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Settings className="w-4 h-4 text-slate-500" />
-              <span>Settings</span>
+              <div className="flex items-center gap-3">
+                <Settings className="w-4 h-4 text-slate-500" />
+                <span>Settings</span>
+              </div>
+              {isGuest && <Lock className="w-3 h-3 text-slate-400" />}
             </button>
 
             {!developerMode && enableKnowledgeGrounding && (
@@ -703,158 +740,185 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Divider */}
       <div className="my-2 mx-3 border-t border-slate-200/70 dark:border-slate-800/70" />
 
-      {/* Pinned Chats List */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-2 pb-2">
+      {/* Pinned & Recent Chats Lists */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-3 pb-2">
+        {pinnedSessions.length > 0 && (
+          <div className="space-y-0.5">
+            <div className="px-2 py-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <span className="inline-flex items-center gap-1.5">
+                <Pin className="w-3 h-3 text-amber-500" />
+                <span>Pinned Chats</span>
+              </span>
+              <span className="font-mono tabular-nums">{pinnedSessions.length}</span>
+            </div>
+            {pinnedSessions.map(renderSessionRow)}
+          </div>
+        )}
+
         <div className="space-y-0.5">
           <div className="px-2 py-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             <span className="inline-flex items-center gap-1.5">
-              <Pin className="w-3 h-3 text-amber-500" />
-              <span>Pinned Chats</span>
+              <MessageSquare className="w-3 h-3 text-cyan-500" />
+              <span>Recent Chats</span>
             </span>
-            <span className="font-mono tabular-nums">{pinnedSessions.length}</span>
+            <span className="font-mono tabular-nums">{recentSessions.length}</span>
           </div>
 
-          {pinnedSessions.length === 0 ? (
-            <div className="mx-1 px-3 py-2.5 rounded-xl border border-dashed border-slate-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
+          {recentSessions.length === 0 ? (
+            <div className="mx-1 px-3 py-2.5 rounded-xl border border-dashed border-slate-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[11px] text-slate-500 dark:text-slate-400">
               <p className="leading-relaxed">
-                No pinned chats yet. Pin any chat to keep quick access here.
+                Start a conversation and its sidebar title will be generated automatically.
               </p>
-              <button
-                type="button"
-                onClick={() => onSelectTab('chat-history')}
-                className="text-[11px] font-medium theme-accent-text hover:underline cursor-pointer"
-              >
-                Pin from All Conversations →
-              </button>
             </div>
           ) : (
-            pinnedSessions.map(renderSessionRow)
+            recentSessions.map(renderSessionRow)
           )}
         </div>
       </div>
 
-      {/* User Profile Footer with Credits Mini-Bar, Theme Switcher, Role Switcher, Sign Out */}
+      {/* User Profile Footer with Credits Mini-Bar, Theme Switcher, Role Switcher, Sign Out / Guest Login */}
       <div className="p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 space-y-2">
-        {/* Compact Monthly Quota Mini-Bar for Customers */}
-        {currentRole === 'user' && (
-          <button
-            type="button"
-            onClick={() => onSelectTab('user-billing')}
-            className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer space-y-1"
-            title="View Plan & Usage"
-          >
-            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-              <span>Monthly Credits</span>
-              <span className="font-mono tabular-nums">{usagePercent}% used</span>
+        {isGuest ? (
+          <div className="space-y-2">
+            <div className="px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-[11px] text-slate-600 dark:text-slate-300">
+              <div className="font-semibold text-slate-900 dark:text-white">Guest Preview</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                Chat & Voice unlocked · Sign in for Settings & tools
+              </div>
             </div>
-            <div className="w-full h-1 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  usagePercent > 85 ? 'bg-amber-500' : 'bg-[var(--theme-accent)]'
-                }`}
-                style={{ width: `${usagePercent}%` }}
+            <button
+              type="button"
+              onClick={() => onRequestAuth?.('Settings, History & Workspace Tools')}
+              className="w-full py-2 px-3 rounded-xl theme-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In / Sign Up</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Compact Monthly Quota Mini-Bar for Customers */}
+            {currentRole === 'user' && (
+              <button
+                type="button"
+                onClick={() => onSelectTab('user-billing')}
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer space-y-1"
+                title="View Plan & Usage"
+              >
+                <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                  <span>Monthly Credits</span>
+                  <span className="font-mono tabular-nums">{usagePercent}% used</span>
+                </div>
+                <div className="w-full h-1 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      usagePercent > 85 ? 'bg-amber-500' : 'bg-[var(--theme-accent)]'
+                    }`}
+                    style={{ width: `${usagePercent}%` }}
+                  />
+                </div>
+              </button>
+            )}
+
+            {/* Eligibility-Gated Quick Standard <-> Developer Switch (for dev-eligible users & admins) */}
+            {isDeveloperEligible && onToggleDeveloperMode && (
+              <div className="flex items-center p-0.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-[11px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (developerMode) onToggleDeveloperMode();
+                  }}
+                  className={`flex-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                    !developerMode
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!developerMode) onToggleDeveloperMode();
+                  }}
+                  className={`flex-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                    developerMode
+                      ? 'bg-cyan-600 text-white shadow-xs font-semibold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Developer
+                </button>
+              </div>
+            )}
+
+            {/* Compact Theme & Live Screen Bar directly inside Sidebar */}
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60">
+              <button
+                type="button"
+                onClick={() => onSelectTab('user-settings')}
+                className="flex items-center gap-1.5 min-w-0 text-[11px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                title="Open Appearance Settings"
+              >
+                <Palette className="w-3.5 h-3.5 theme-accent-text shrink-0" />
+                <span className="truncate font-medium">{activeThemeMeta.name}</span>
+              </button>
+
+              <ThemeControlPopover
+                compact
+                align="left"
+                placement="top"
+                triggerLabel="Switch"
+                onOpenSettings={() => onSelectTab('user-settings')}
               />
             </div>
-          </button>
-        )}
 
-        {/* Eligibility-Gated Quick Standard <-> Developer Switch (only shown to dev-eligible users) */}
-        {currentRole === 'user' && isDeveloperEligible && onToggleDeveloperMode && (
-          <div className="flex items-center p-0.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-[11px] font-medium">
-            <button
-              type="button"
-              onClick={() => {
-                if (developerMode) onToggleDeveloperMode();
-              }}
-              className={`flex-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                !developerMode
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              Standard
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!developerMode) onToggleDeveloperMode();
-              }}
-              className={`flex-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                developerMode
-                  ? 'bg-cyan-600 text-white shadow-xs font-semibold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              Developer
-            </button>
-          </div>
-        )}
-
-        {/* Compact Theme & Live Screen Bar directly inside Sidebar */}
-        <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60">
-          <button
-            type="button"
-            onClick={() => onSelectTab('user-settings')}
-            className="flex items-center gap-1.5 min-w-0 text-[11px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-            title="Open Appearance Settings"
-          >
-            <Palette className="w-3.5 h-3.5 theme-accent-text shrink-0" />
-            <span className="truncate font-medium">{activeThemeMeta.name}</span>
-          </button>
-
-          <ThemeControlPopover
-            compact
-            align="left"
-            placement="top"
-            triggerLabel="Switch"
-            onOpenSettings={() => onSelectTab('user-settings')}
-          />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div
-            onClick={() => onSelectTab('user-settings')}
-            className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
-          >
-            <div className="w-7 h-7 rounded-full bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 flex items-center justify-center text-xs font-semibold shrink-0">
-              {authUser?.avatar || authUser?.name?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-[var(--theme-accent)] transition-colors">
-                {authUser?.name || 'User'}
+            <div className="flex items-center justify-between">
+              <div
+                onClick={() => onSelectTab('user-settings')}
+                className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+              >
+                <div className="w-7 h-7 rounded-full bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 flex items-center justify-center text-xs font-semibold shrink-0">
+                  {authUser?.avatar || authUser?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-[var(--theme-accent)] transition-colors">
+                    {authUser?.name || 'User'}
+                  </div>
+                  <div className="text-[10px] theme-accent-text font-medium">
+                    {currentRole === 'admin' ? 'Admin' : (authUser?.plan || 'Pro')}
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] theme-accent-text font-medium">
-                {currentRole === 'admin' ? 'Admin' : (authUser?.plan || 'Pro')}
+
+              <div className="flex items-center gap-0.5">
+                {(currentRole === 'admin' || authUser?.isAdminEligible) && (
+                  <button
+                    type="button"
+                    onClick={onToggleRole}
+                    title={currentRole === 'admin' ? 'Switch to User View' : 'Switch to Admin Studio'}
+                    aria-label="Switch workspace role"
+                    className="p-1.5 text-slate-400 hover:text-cyan-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-[10px]"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {onSignOut && (
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    title="Sign Out"
+                    aria-label="Sign out of account"
+                    className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-0.5">
-            {(currentRole === 'admin' || authUser?.isAdminEligible) && (
-              <button
-                type="button"
-                onClick={onToggleRole}
-                title={currentRole === 'admin' ? 'Switch to User View' : 'Switch to Admin Studio'}
-                aria-label="Switch workspace role"
-                className="p-1.5 text-slate-400 hover:text-cyan-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-[10px]"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {onSignOut && (
-              <button
-                type="button"
-                onClick={onSignOut}
-                title="Sign Out"
-                aria-label="Sign out of account"
-                className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </aside>
     </>

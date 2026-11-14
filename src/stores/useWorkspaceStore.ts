@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { toast } from './useToastStore';
 
-export type WorkspaceTab = 'preview' | 'terminal' | 'browser' | 'code' | 'graph';
+export type WorkspaceTab = 'sandbox' | 'preview' | 'terminal' | 'browser' | 'code' | 'graph';
 export type ViewportDevice = 'desktop' | 'tablet' | 'mobile';
 
 export interface TerminalLine {
@@ -79,6 +79,7 @@ interface WorkspaceState {
   viewportDevice: ViewportDevice;
   previewDarkMode: boolean;
   previewRefreshKey: number;
+  sandboxAutoRunNonce: number;
 
   // Terminal
   terminalLines: TerminalLine[];
@@ -107,11 +108,12 @@ interface WorkspaceState {
   setActiveDockTab: (tab: WorkspaceTab) => void;
 
   // Preview & Code Actions
-  loadCodeIntoWorkspace: (code: string, lang?: string, openTab?: WorkspaceTab) => void;
+  loadCodeIntoWorkspace: (code: string, lang?: string, openTab?: WorkspaceTab, autoRun?: boolean) => void;
   updatePreviewCode: (code: string) => void;
   setViewportDevice: (device: ViewportDevice) => void;
   togglePreviewDarkMode: () => void;
   reloadPreview: () => void;
+  triggerSandboxRun: () => void;
 
   // Terminal Actions
   appendTerminalLine: (line: Omit<TerminalLine, 'id' | 'timestamp'>) => void;
@@ -137,6 +139,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   viewportDevice: 'desktop',
   previewDarkMode: true,
   previewRefreshKey: 1,
+  sandboxAutoRunNonce: 0,
 
   terminalLines: [
     {
@@ -182,7 +185,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setDockWidthPercent: (pct) => set({ dockWidthPercent: Math.max(32, Math.min(72, pct)) }),
   setActiveDockTab: (tab) => set({ activeDockTab: tab }),
 
-  loadCodeIntoWorkspace: (code, lang = 'html', openTab = 'preview') => {
+  loadCodeIntoWorkspace: (code, lang = 'html', openTab = 'preview', autoRun = false) => {
     const cleanLang = (lang || 'html').toLowerCase().trim();
     set((s) => ({
       previewCode: code,
@@ -191,6 +194,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeDockTab: openTab,
       isDockOpen: true,
       previewRefreshKey: s.previewRefreshKey + 1,
+      sandboxAutoRunNonce:
+        autoRun || openTab === 'sandbox' ? s.sandboxAutoRunNonce + 1 : s.sandboxAutoRunNonce,
     }));
     toast.info('Loaded in Workspace', `Opened ${cleanLang.toUpperCase()} snippet in ${openTab} tab.`);
   },
@@ -204,6 +209,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setViewportDevice: (device) => set({ viewportDevice: device }),
   togglePreviewDarkMode: () => set((s) => ({ previewDarkMode: !s.previewDarkMode })),
   reloadPreview: () => set((s) => ({ previewRefreshKey: s.previewRefreshKey + 1 })),
+  triggerSandboxRun: () => set((s) => ({ sandboxAutoRunNonce: s.sandboxAutoRunNonce + 1 })),
 
   appendTerminalLine: (line) =>
     set((s) => ({

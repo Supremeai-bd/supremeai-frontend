@@ -91,6 +91,20 @@ export const conversationService = {
     }
   },
 
+  async renameConversation(conversationId: string, title: string): Promise<boolean> {
+    if (env.isMockEnabled) {
+      return true;
+    }
+    try {
+      await apiClient.patch(`/api/v1/conversations/${encodeURIComponent(conversationId)}`, {
+        title,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   async deleteConversation(conversationId: string): Promise<boolean> {
     if (env.isMockEnabled) {
       return true;
