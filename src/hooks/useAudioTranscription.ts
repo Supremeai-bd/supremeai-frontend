@@ -238,9 +238,12 @@ export function useAudioTranscription(
       }, 500);
     } catch (err: unknown) {
       cleanupMedia();
+      const errName = err instanceof DOMException || err instanceof Error ? err.name : '';
       const message =
-        err instanceof Error && err.name === 'NotAllowedError'
+        errName === 'NotAllowedError'
           ? 'Microphone permission was denied. Please allow microphone access.'
+          : errName === 'NotFoundError' || errName === 'DevicesNotFoundError'
+          ? 'No microphone detected on this device. Connect a microphone or type your message.'
           : err instanceof Error
           ? err.message
           : 'Could not access microphone.';

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createAvatarTextureSet, type AvatarTextureSet } from './avatarTextures';
+import type { CustomFaceTraits } from '../../../utils/hologramAvatar';
 
 export interface AvatarPoseInput {
   elapsed: number;
@@ -344,6 +345,20 @@ function buildEyeAssembly(
   };
 }
 
+export interface AvatarRigOptions {
+  isFemale?: boolean;
+  maxAnisotropy?: number;
+  customFaceImg?: HTMLImageElement | null;
+  customTraits?: CustomFaceTraits;
+}
+
+function sanitizeColorHex(hex: string | undefined, fallback: number): number {
+  if (!hex) return fallback;
+  const cleaned = hex.trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(cleaned)) return fallback;
+  return parseInt(cleaned.slice(1), 16);
+}
+
 /**
  * Creates a complete, expressive, animated 3D humanoid avatar bust with:
  * - Sculpted head, cheekbones, nose, ears, hair silhouette, anatomical torso & collar
@@ -351,19 +366,35 @@ function buildEyeAssembly(
  * - Natural blinking upper & lower 3D eyelids + eyelashes
  * - Articulated 3D eyebrows reacting to speech stress, listening, & thinking
  * - Pivoted 3D jaw + Cupid's-bow upper lip + lower lip + inner teeth/tongue + morph targets
- * - Ambient holographic collar trim & orbital halo accents
+ * - Optional 3D glasses and face-matched custom portrait skin projection
  */
 export function createArticulatedAvatarRig(
-  isFemale: boolean,
-  maxAnisotropy = 4
+  isFemaleOrOptions: boolean | AvatarRigOptions,
+  maxAnisotropyArg = 4
 ): ArticulatedAvatarRig {
+  const options: AvatarRigOptions =
+    typeof isFemaleOrOptions === 'boolean'
+      ? { isFemale: isFemaleOrOptions, maxAnisotropy: maxAnisotropyArg }
+      : isFemaleOrOptions;
+
+  const customTraits = options.customTraits;
+  const customFaceImg = options.customFaceImg ?? null;
+  const isFemale =
+    options.isFemale ?? (customTraits?.genderCue === 'female');
+  const maxAnisotropy = options.maxAnisotropy ?? maxAnisotropyArg;
+
   const disposables = {
     geometries: [] as THREE.BufferGeometry[],
     materials: [] as THREE.Material[],
     textures: [] as THREE.Texture[],
   };
 
-  const textures: AvatarTextureSet = createAvatarTextureSet(isFemale, maxAnisotropy);
+  const textures: AvatarTextureSet = createAvatarTextureSet(
+    isFemale,
+    maxAnisotropy,
+    customFaceImg,
+    customTraits
+  );
   disposables.textures.push(
     textures.skin,
     textures.eye,
@@ -409,13 +440,13 @@ export function createArticulatedAvatarRig(
   });
 
   const browMat = new THREE.MeshStandardMaterial({
-    color: isFemale ? 0x1e293b : 0x172033,
+    color: sanitizeColorHex(customTraits?.hairHex, isFemale ? 0x1e293b : 0x172033),
     roughness: 0.58,
     metalness: 0.08,
   });
 
   const upperLipMat = new THREE.MeshPhysicalMaterial({
-    color: isFemale ? 0xc85d6c : 0xb36c6c,
+    color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xc85d6c : 0xb36c6c),
     roughness: 0.32,
     metalness: 0.02,
     clearcoat: 0.38,
@@ -423,7 +454,7 @@ export function createArticulatedAvatarRig(
   });
 
   const lowerLipMat = new THREE.MeshPhysicalMaterial({
-    color: isFemale ? 0xd46a79 : 0xbd7676,
+    color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xd46a79 : 0xbd7676),
     roughness: 0.28,
     metalness: 0.02,
     clearcoat: 0.45,
@@ -695,7 +726,11 @@ export function createArticulatedAvatarRig(
   const hairGroup = new THREE.Group();
   headGroup.add(hairGroup);
 
-  if (isFemale) {
+  const useLongHair = customTraits?.hairStyle
+    ? customTraits.hairStyle === 'long'
+    : isFemale;
+
+  if (useLongHair) {
     // Sleek crown cap covering top & back of skull cleanly
     const hairCapGeo = new THREE.SphereGeometry(1, 56, 40, 0, Math.PI * 2, 0, Math.PI * 0.64);
     hairCapGeo.scale(0.478, 0.585, 0.535);
@@ -772,6 +807,52 @@ export function createArticulatedAvatarRig(
       const sbMesh = new THREE.Mesh(sbGeo, hairMat);
       sbMesh.scale.set(0.45, 1, 1.3);
       hairGroup.add(sbMesh);
+    });
+  }
+
+  // 9. Optional 3D Eyewear if detected on custom uploaded portrait
+  if (customTraits?.hasGlasses) {
+    const glassesMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0f172a,
+      roughness: 0.22,
+      metalness: 0.72,
+      clearcoat: 0.6,
+    });
+    disposables.materials.push(glassesMat);
+
+    const glassesGroup = new THREE.Group();
+    glassesGroup.position.set(0, 0.077, 0.486);
+    headGroup.add(glassesGroup);
+
+    const rimGeo = new THREE.TorusGeometry(0.086, 0.0085, 12, 36);
+    rimGeo.scale(1.12, 0.88, 1);
+    disposables.geometries.push(rimGeo);
+
+    const leftRim = new THREE.Mesh(rimGeo, glassesMat);
+    leftRim.position.set(-0.156, 0, -0.014);
+    leftRim.rotation.y = -0.14;
+    glassesGroup.add(leftRim);
+
+    const rightRim = new THREE.Mesh(rimGeo, glassesMat);
+    rightRim.position.set(0.156, 0, -0.014);
+    rightRim.rotation.y = 0.14;
+    glassesGroup.add(rightRim);
+
+    const bridgeGeo = new THREE.CylinderGeometry(0.006, 0.006, 0.125, 10);
+    bridgeGeo.rotateZ(Math.PI / 2);
+    disposables.geometries.push(bridgeGeo);
+    const bridgeMesh = new THREE.Mesh(bridgeGeo, glassesMat);
+    bridgeMesh.position.set(0, 0.012, 0.004);
+    glassesGroup.add(bridgeMesh);
+
+    const armGeo = new THREE.CylinderGeometry(0.0055, 0.005, 0.44, 10);
+    armGeo.rotateX(Math.PI / 2);
+    disposables.geometries.push(armGeo);
+    [-1, 1].forEach((side) => {
+      const armMesh = new THREE.Mesh(armGeo, glassesMat);
+      armMesh.position.set(side * 0.268, 0.012, -0.23);
+      armMesh.rotation.y = side * -0.18;
+      glassesGroup.add(armMesh);
     });
   }
 

@@ -8,7 +8,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality, ThinkingLevel, Type } from '@google/genai';
 import { WebSocketServer, WebSocket } from 'ws';
 
 const execAsync = promisify(exec);
@@ -3175,6 +3175,105 @@ async function startServer() {
       const msg = err instanceof Error ? err.message : 'Audio transcription failed.';
       console.error('Error in /api/transcribe:', err);
       res.status(502).json({ error: msg });
+    }
+  });
+
+  // Intelligent Face Detection & Trait Extraction for Custom 3D Avatar Matching (gemini-4-hydrogen)
+  app.post('/api/avatar/analyze-face', async (req: Request, res: Response) => {
+    try {
+      const rawData = typeof req.body?.imageData === 'string' ? req.body.imageData : '';
+      const rawMimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType : 'image/jpeg';
+      if (!rawData) {
+        res.status(400).json({ error: 'imageData is required.' });
+        return;
+      }
+
+      const activeApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+      if (!activeApiKey || activeApiKey === 'MY_GEMINI_API_KEY') {
+        res.json({ fallback: true, faceFound: false });
+        return;
+      }
+
+      const base64Image = rawData.includes(',') ? rawData.split(',')[1] : rawData;
+      const cleanMime = rawMimeType.split(';')[0].trim() || 'image/jpeg';
+
+      const ai = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: cleanMime,
+                data: base64Image,
+              },
+            },
+            {
+              text:
+                'Locate the primary human face in this image (even if full-body or wide shot). Return normalized 0..1 bounding box coordinates covering ONLY the head/face from top of forehead/hairline to bottom of chin and ear-to-ear (exclude torso, legs, and background). Also extract natural skin hex, hair hex, eye iris hex, lip hex, gender silhouette cue (female or male), hair length style (short, medium, or long), and whether eyeglasses are worn.',
+            },
+          ],
+        },
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              faceFound: { type: Type.BOOLEAN },
+              faceBox: {
+                type: Type.OBJECT,
+                properties: {
+                  x: { type: Type.NUMBER },
+                  y: { type: Type.NUMBER },
+                  width: { type: Type.NUMBER },
+                  height: { type: Type.NUMBER },
+                },
+              },
+              skinHex: { type: Type.STRING },
+              hairHex: { type: Type.STRING },
+              eyeHex: { type: Type.STRING },
+              lipHex: { type: Type.STRING },
+              genderCue: { type: Type.STRING },
+              hairStyle: { type: Type.STRING },
+              hasGlasses: { type: Type.BOOLEAN },
+            },
+          },
+        },
+      });
+
+      const rawText = (response.text || '{}').trim();
+      let parsed: Record<string, any> = {};
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        parsed = {};
+      }
+
+      res.json({
+        fallback: false,
+        faceFound: Boolean(parsed.faceFound),
+        faceBox: parsed.faceBox || null,
+        skinHex: typeof parsed.skinHex === 'string' ? parsed.skinHex : undefined,
+        hairHex: typeof parsed.hairHex === 'string' ? parsed.hairHex : undefined,
+        eyeHex: typeof parsed.eyeHex === 'string' ? parsed.eyeHex : undefined,
+        lipHex: typeof parsed.lipHex === 'string' ? parsed.lipHex : undefined,
+        genderCue: parsed.genderCue === 'female' ? 'female' : 'male',
+        hairStyle:
+          parsed.hairStyle === 'long' || parsed.hairStyle === 'medium' ? parsed.hairStyle : 'short',
+        hasGlasses: Boolean(parsed.hasGlasses),
+      });
+    } catch (err: unknown) {
+      console.warn('Face analysis fallback triggered:', err instanceof Error ? err.message : err);
+      res.json({ fallback: true, faceFound: false });
     }
   });
 

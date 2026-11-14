@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { CustomFaceTraits } from '../../../utils/hologramAvatar';
 
 export interface AvatarTextureSet {
   skin: THREE.CanvasTexture;
@@ -22,36 +23,48 @@ function makeCanvas(width: number, height: number): {
   return { canvas, ctx };
 }
 
+function sanitizeHex(hex: string | undefined, fallback: string): string {
+  if (!hex) return fallback;
+  const cleaned = hex.trim();
+  return /^#[0-9a-fA-F]{6}$/.test(cleaned) ? cleaned : fallback;
+}
+
 /**
  * Generates an equirectangular UV skin texture aligned for SphereGeometry
  * after `rotateY(-Math.PI / 2)` so u=0.5, v=0.5 faces +Z (front of face).
  */
 export function createSkinTexture(
   isFemale: boolean,
-  anisotropy = 4
+  anisotropy = 4,
+  customSkinHex?: string
 ): THREE.CanvasTexture {
   const w = 1024;
   const h = 512;
   const { canvas, ctx } = makeCanvas(w, h);
 
-  // Base warm-natural translucent skin tone with subtle cool rim depth
-  const baseGrad = ctx.createLinearGradient(0, 0, 0, h);
-  if (isFemale) {
-    baseGrad.addColorStop(0, '#f3d4c4');
-    baseGrad.addColorStop(0.5, '#fae0d2');
-    baseGrad.addColorStop(1, '#e7bfb0');
+  const skinBase = sanitizeHex(customSkinHex, isFemale ? '#f3d4c4' : '#e8bfa7');
+  if (customSkinHex) {
+    ctx.fillStyle = skinBase;
+    ctx.fillRect(0, 0, w, h);
   } else {
-    baseGrad.addColorStop(0, '#e5bfa8');
-    baseGrad.addColorStop(0.5, '#efc9b2');
-    baseGrad.addColorStop(1, '#d4a68e');
+    const baseGrad = ctx.createLinearGradient(0, 0, 0, h);
+    if (isFemale) {
+      baseGrad.addColorStop(0, '#f3d4c4');
+      baseGrad.addColorStop(0.5, '#fae0d2');
+      baseGrad.addColorStop(1, '#e7bfb0');
+    } else {
+      baseGrad.addColorStop(0, '#e5bfa8');
+      baseGrad.addColorStop(0.5, '#efc9b2');
+      baseGrad.addColorStop(1, '#d4a68e');
+    }
+    ctx.fillStyle = baseGrad;
+    ctx.fillRect(0, 0, w, h);
   }
-  ctx.fillStyle = baseGrad;
-  ctx.fillRect(0, 0, w, h);
 
   // Gentle facial center luminance glow (u ~ 0.5, v ~ 0.48)
   const faceGlow = ctx.createRadialGradient(w * 0.5, h * 0.48, 12, w * 0.5, h * 0.48, w * 0.24);
-  faceGlow.addColorStop(0, 'rgba(255, 245, 238, 0.34)');
-  faceGlow.addColorStop(0.6, 'rgba(255, 236, 224, 0.14)');
+  faceGlow.addColorStop(0, 'rgba(255, 245, 238, 0.28)');
+  faceGlow.addColorStop(0.6, 'rgba(255, 236, 224, 0.12)');
   faceGlow.addColorStop(1, 'rgba(220, 185, 175, 0)');
   ctx.fillStyle = faceGlow;
   ctx.fillRect(0, 0, w, h);
@@ -59,8 +72,8 @@ export function createSkinTexture(
   // Rosy cheek blush gradients aligned symmetrically around center front
   const drawCheekBlush = (cx: number, cy: number) => {
     const blush = ctx.createRadialGradient(cx, cy, 4, cx, cy, 56);
-    blush.addColorStop(0, isFemale ? 'rgba(236, 118, 128, 0.24)' : 'rgba(216, 118, 112, 0.15)');
-    blush.addColorStop(0.6, 'rgba(232, 125, 130, 0.08)');
+    blush.addColorStop(0, isFemale ? 'rgba(236, 118, 128, 0.22)' : 'rgba(216, 118, 112, 0.13)');
+    blush.addColorStop(0.6, 'rgba(232, 125, 130, 0.07)');
     blush.addColorStop(1, 'rgba(232, 125, 130, 0)');
     ctx.fillStyle = blush;
     ctx.beginPath();
@@ -73,8 +86,8 @@ export function createSkinTexture(
   // Soft orbital eye socket shading so eyes sit naturally framed
   const drawSocketShade = (cx: number, cy: number) => {
     const shade = ctx.createRadialGradient(cx, cy, 6, cx, cy, 34);
-    shade.addColorStop(0, 'rgba(130, 92, 92, 0.26)');
-    shade.addColorStop(0.65, 'rgba(155, 112, 108, 0.12)');
+    shade.addColorStop(0, 'rgba(130, 92, 92, 0.24)');
+    shade.addColorStop(0.65, 'rgba(155, 112, 108, 0.1)');
     shade.addColorStop(1, 'rgba(155, 112, 108, 0)');
     ctx.fillStyle = shade;
     ctx.beginPath();
@@ -86,28 +99,28 @@ export function createSkinTexture(
 
   // Subtle nasal bridge highlight
   const noseGrad = ctx.createLinearGradient(w * 0.5, h * 0.44, w * 0.5, h * 0.56);
-  noseGrad.addColorStop(0, 'rgba(255, 250, 245, 0.18)');
-  noseGrad.addColorStop(0.8, 'rgba(255, 248, 240, 0.28)');
+  noseGrad.addColorStop(0, 'rgba(255, 250, 245, 0.16)');
+  noseGrad.addColorStop(0.8, 'rgba(255, 248, 240, 0.24)');
   noseGrad.addColorStop(1, 'rgba(255, 248, 240, 0)');
   ctx.fillStyle = noseGrad;
   ctx.beginPath();
   ctx.ellipse(w * 0.5, h * 0.505, 10, 28, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Subtle lip-zone natural warmth (lips themselves have dedicated 3D geometry, this blends border)
+  // Subtle lip-zone natural warmth
   const lipBorder = ctx.createRadialGradient(w * 0.5, h * 0.615, 4, w * 0.5, h * 0.615, 38);
-  lipBorder.addColorStop(0, 'rgba(195, 92, 98, 0.22)');
+  lipBorder.addColorStop(0, 'rgba(195, 92, 98, 0.2)');
   lipBorder.addColorStop(1, 'rgba(195, 92, 98, 0)');
   ctx.fillStyle = lipBorder;
   ctx.beginPath();
   ctx.ellipse(w * 0.5, h * 0.615, 38, 18, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ultra-fine organic skin micro-variation (deterministic pseudo-noise)
+  // Ultra-fine organic skin micro-variation
   ctx.fillStyle = 'rgba(160, 120, 105, 0.035)';
   for (let i = 0; i < 1600; i++) {
-    const px = ((i * 733) % 997) / 997 * w;
-    const py = ((i * 419 + 17) % 509) / 509 * h;
+    const px = (((i * 733) % 997) / 997) * w;
+    const py = (((i * 419 + 17) % 509) / 509) * h;
     ctx.fillRect(px, py, 1.5, 1.5);
   }
 
@@ -116,6 +129,74 @@ export function createSkinTexture(
   tex.anisotropy = anisotropy;
   tex.needsUpdate = true;
   return tex;
+}
+
+/**
+ * Composites a tightly cropped human face photo smoothly onto the front UV face
+ * region of the 3D head texture while feathering edges into matched skin tone so
+ * zero background scenery leaks onto the head.
+ */
+export function createCustomFaceSkinTexture(
+  faceImg: HTMLImageElement,
+  traits: CustomFaceTraits | undefined,
+  anisotropy = 4
+): THREE.CanvasTexture {
+  const isFemale = traits?.genderCue === 'female';
+  const baseTex = createSkinTexture(isFemale, anisotropy, traits?.skinHex);
+  const canvas = baseTex.image as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return baseTex;
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Prepare an elliptical feathered overlay from the face-only portrait
+  const patchW = Math.round(w * 0.24);
+  const patchH = Math.round(h * 0.44);
+  const { canvas: patchCanvas, ctx: pCtx } = makeCanvas(patchW, patchH);
+
+  // Draw inner 78% of face crop centered vertically to align eyebrows/nose/chin onto 3D skull
+  const iw = faceImg.naturalWidth || faceImg.width || 512;
+  const ih = faceImg.naturalHeight || faceImg.height || 512;
+  const cropMarginX = iw * 0.12;
+  const cropMarginY = ih * 0.1;
+  pCtx.drawImage(
+    faceImg,
+    cropMarginX,
+    cropMarginY,
+    Math.max(32, iw - cropMarginX * 2),
+    Math.max(32, ih - cropMarginY * 2),
+    0,
+    0,
+    patchW,
+    patchH
+  );
+
+  // Smooth elliptical alpha mask so temples/cheeks/chin feather invisibly into skin tone
+  pCtx.globalCompositeOperation = 'destination-in';
+  const maskGrad = pCtx.createRadialGradient(
+    patchW * 0.5,
+    patchH * 0.48,
+    patchW * 0.18,
+    patchW * 0.5,
+    patchH * 0.48,
+    patchW * 0.54
+  );
+  maskGrad.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
+  maskGrad.addColorStop(0.68, 'rgba(255, 255, 255, 0.72)');
+  maskGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  pCtx.fillStyle = maskGrad;
+  pCtx.fillRect(0, 0, patchW, patchH);
+  pCtx.globalCompositeOperation = 'source-over';
+
+  // Composite feathered face onto front UV window centered at (u=0.5, v=0.49)
+  ctx.save();
+  ctx.globalAlpha = 0.86;
+  ctx.drawImage(patchCanvas, Math.round(w * 0.5 - patchW * 0.5), Math.round(h * 0.5 - patchH * 0.48));
+  ctx.restore();
+
+  baseTex.needsUpdate = true;
+  return baseTex;
 }
 
 /**
@@ -142,8 +223,6 @@ export function createEyeTexture(
 
   const cx = w * 0.5;
   const cy = h * 0.5;
-  // Because equirectangular SphereGeometry stretches horizontally near equator (2:1 aspect),
-  // draw iris slightly narrower in X (rx/ry ~ 0.62) so it projects as a crisp circle onto the sphere.
   const rx = 44;
   const ry = 70;
 
@@ -151,7 +230,6 @@ export function createEyeTexture(
   ctx.translate(cx, cy);
   ctx.scale(rx / ry, 1);
 
-  // Dark outer limbal ring
   const limbusGrad = ctx.createRadialGradient(0, 0, ry * 0.35, 0, 0, ry * 1.04);
   limbusGrad.addColorStop(0, irisInnerHex);
   limbusGrad.addColorStop(0.68, irisPrimaryHex);
@@ -162,7 +240,6 @@ export function createEyeTexture(
   ctx.arc(0, 0, ry * 1.04, 0, Math.PI * 2);
   ctx.fill();
 
-  // 72 Radial Iris Fibers for lifelike depth
   for (let i = 0; i < 72; i++) {
     const angle = (i / 72) * Math.PI * 2;
     const len = ry * (0.8 + ((i * 7) % 5) * 0.035);
@@ -174,7 +251,6 @@ export function createEyeTexture(
     ctx.stroke();
   }
 
-  // Luminous iris collarette ring around pupil
   ctx.strokeStyle = irisInnerHex;
   ctx.lineWidth = 3.2;
   ctx.globalAlpha = 0.72;
@@ -183,7 +259,6 @@ export function createEyeTexture(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Deep pupil
   const pupilGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, ry * 0.36);
   pupilGrad.addColorStop(0, '#020409');
   pupilGrad.addColorStop(0.85, '#070b14');
@@ -193,7 +268,6 @@ export function createEyeTexture(
   ctx.arc(0, 0, ry * 0.36, 0, Math.PI * 2);
   ctx.fill();
 
-  // Subtle baked corneal micro-catchlights (augmented in 3D by real physical clearcoat cornea)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
   ctx.beginPath();
   ctx.arc(-ry * 0.24, -ry * 0.24, ry * 0.11, 0, Math.PI * 2);
@@ -281,18 +355,22 @@ export function createParticleSpriteTexture(): THREE.CanvasTexture {
 
 export function createAvatarTextureSet(
   isFemale: boolean,
-  anisotropy = 4
+  anisotropy = 4,
+  customFaceImg?: HTMLImageElement | null,
+  customTraits?: CustomFaceTraits
 ): AvatarTextureSet {
+  const hairBase = sanitizeHex(customTraits?.hairHex, isFemale ? '#1a233a' : '#1b2234');
+  const eyePrimary = sanitizeHex(customTraits?.eyeHex, isFemale ? '#0ea5e9' : '#2563eb');
+  const eyeInner = customTraits?.eyeHex ? '#94a3b8' : isFemale ? '#67e8f9' : '#93c5fd';
+
   return {
-    skin: createSkinTexture(isFemale, anisotropy),
-    eye: createEyeTexture(
-      isFemale ? '#0ea5e9' : '#2563eb',
-      isFemale ? '#67e8f9' : '#93c5fd',
-      anisotropy
-    ),
+    skin: customFaceImg
+      ? createCustomFaceSkinTexture(customFaceImg, customTraits, anisotropy)
+      : createSkinTexture(isFemale, anisotropy, customTraits?.skinHex),
+    eye: createEyeTexture(eyePrimary, eyeInner, anisotropy),
     hair: createHairTexture(
-      isFemale ? '#1a233a' : '#1b2234',
-      isFemale ? '#2d3f63' : '#2a3754',
+      hairBase,
+      customTraits?.hairHex ? '#334155' : isFemale ? '#2d3f63' : '#2a3754',
       anisotropy
     ),
     mouthInterior: createMouthInteriorTexture(),

@@ -106,6 +106,8 @@ export function useLiveVoiceSession({
 }: UseLiveVoiceSessionOptions = {}) {
   const [status, setStatus] = useState<LiveSessionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [micNotice, setMicNotice] = useState<string | null>(null);
+  const [hasMicrophone, setHasMicrophone] = useState<boolean>(true);
   const [voiceName, setVoiceNameState] = useState<LiveVoiceName>(() => loadVoicePreference());
   const [isMuted, setIsMuted] = useState(false);
 
@@ -267,6 +269,7 @@ export function useLiveVoiceSession({
       levelsRef.current = { input: 0, output: 0 };
       if (!preserveError) {
         setStatus('idle');
+        setMicNotice(null);
       }
     },
     [flushPendingTurn, stopAllPlayback]
@@ -323,13 +326,10 @@ export function useLiveVoiceSession({
       }
 
       setError(null);
+      setMicNotice(null);
       setStatus('connecting');
 
       try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Microphone capture is not supported in this browser environment.');
-        }
-
         const AudioCtx =
           window.AudioContext ||
           (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -337,67 +337,107 @@ export function useLiveVoiceSession({
           throw new Error('Web Audio API is unavailable in this browser.');
         }
 
-        // Capture 16kHz input and create 24kHz playback context per Live API spec
-        const inputCtx = new AudioCtx({ sampleRate: 16000 });
+        // Create 24kHz playback context per Live API spec
         const outputCtx = new AudioCtx({ sampleRate: 24000 });
-        await inputCtx.resume();
         await outputCtx.resume();
-
-        inputCtxRef.current = inputCtx;
         outputCtxRef.current = outputCtx;
         nextStartTimeRef.current = outputCtx.currentTime;
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
+        // Probe microphone non-fatally: if no hardware mic exists ("Requested device not found"),
+        // keep the Live Voice Avatar session connected in audio-playback + text-input mode!
+        let stream: MediaStream | null = null;
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            });
+          } catch (micErr: unknown) {
+            const errName = micErr instanceof DOMException ? micErr.name : '';
+            if (errName === 'OverconstrainedError') {
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              } catch (fallbackErr: unknown) {
+                stream = null;
+                const fbName = fallbackErr instanceof DOMException ? fallbackErr.name : '';
+                setMicNotice(
+                  fbName === 'NotAllowedError'
+                    ? 'Microphone access blocked — type below for avatar voice replies.'
+                    : 'No microphone detected — type below to converse with voice playback.'
+                );
+              }
+            } else {
+              stream = null;
+              setMicNotice(
+                errName === 'NotAllowedError'
+                  ? 'Microphone access blocked — type below for avatar voice replies.'
+                  : 'No microphone detected — type below to converse with voice playback.'
+              );
+            }
+          }
+        } else {
+          setMicNotice('Microphone unavailable in this browser — type below for avatar voice replies.');
+        }
 
         if (teardownGuardRef.current) {
-          for (const t of stream.getTracks()) t.stop();
+          if (stream) for (const t of stream.getTracks()) t.stop();
           return;
         }
 
-        streamRef.current = stream;
+        const micAvailable = Boolean(stream);
+        setHasMicrophone(micAvailable);
+        if (!micAvailable) {
+          isMutedRef.current = true;
+          setIsMuted(true);
+        } else {
+          isMutedRef.current = false;
+          setIsMuted(false);
+        }
 
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}/api/live`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
-        const source = inputCtx.createMediaStreamSource(stream);
-        const processor = inputCtx.createScriptProcessor(2048, 1, 1);
-        const silentGain = inputCtx.createGain();
-        silentGain.gain.value = 0;
+        if (stream) {
+          streamRef.current = stream;
+          const inputCtx = new AudioCtx({ sampleRate: 16000 });
+          await inputCtx.resume();
+          inputCtxRef.current = inputCtx;
 
-        source.connect(processor);
-        processor.connect(silentGain);
-        silentGain.connect(inputCtx.destination);
+          const source = inputCtx.createMediaStreamSource(stream);
+          const processor = inputCtx.createScriptProcessor(2048, 1, 1);
+          const silentGain = inputCtx.createGain();
+          silentGain.gain.value = 0;
 
-        sourceNodeRef.current = source;
-        processorRef.current = processor;
-        muteGainRef.current = silentGain;
+          source.connect(processor);
+          processor.connect(silentGain);
+          silentGain.connect(inputCtx.destination);
 
-        processor.onaudioprocess = (event) => {
-          const activeWs = wsRef.current;
-          if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
+          sourceNodeRef.current = source;
+          processorRef.current = processor;
+          muteGainRef.current = silentGain;
 
-          if (isMutedRef.current) {
-            levelsRef.current.input = 0;
-            return;
-          }
+          processor.onaudioprocess = (event) => {
+            const activeWs = wsRef.current;
+            if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
 
-          const rawInput = event.inputBuffer.getChannelData(0);
-          levelsRef.current.input = computeRms(rawInput);
+            if (isMutedRef.current) {
+              levelsRef.current.input = 0;
+              return;
+            }
 
-          const pcm16k = resampleFloat32(rawInput, inputCtx.sampleRate, 16000);
-          const base64Audio = float32ToBase64Pcm16(pcm16k);
-          activeWs.send(JSON.stringify({ type: 'audio', data: base64Audio }));
-        };
+            const rawInput = event.inputBuffer.getChannelData(0);
+            levelsRef.current.input = computeRms(rawInput);
+
+            const pcm16k = resampleFloat32(rawInput, inputCtx.sampleRate, 16000);
+            const base64Audio = float32ToBase64Pcm16(pcm16k);
+            activeWs.send(JSON.stringify({ type: 'audio', data: base64Audio }));
+          };
+        }
 
         ws.onopen = () => {
           ws.send(
@@ -459,9 +499,7 @@ export function useLiveVoiceSession({
         };
       } catch (err: unknown) {
         const message =
-          err instanceof DOMException && err.name === 'NotAllowedError'
-            ? 'Microphone permission was denied. Please allow microphone access to start a voice conversation.'
-            : err instanceof Error
+          err instanceof Error
             ? err.message
             : 'Unable to start voice conversation.';
         setError(message);
@@ -469,7 +507,7 @@ export function useLiveVoiceSession({
         cleanupMediaAndSocket(true);
       }
     },
-    [cleanupMediaAndSocket, flushPendingTurn, playAudioChunk, stopAllPlayback]
+    [cleanupMediaAndSocket, flushPendingTurn, playAudioChunk, setVoiceName, stopAllPlayback]
   );
 
   const disconnect = useCallback(() => {
@@ -478,6 +516,10 @@ export function useLiveVoiceSession({
   }, [cleanupMediaAndSocket]);
 
   const toggleMute = useCallback(() => {
+    if (!hasMicrophone) {
+      setMicNotice('No microphone detected on this device. Type below or attach a microphone.');
+      return;
+    }
     setIsMuted((prev) => {
       const next = !prev;
       isMutedRef.current = next;
@@ -494,7 +536,7 @@ export function useLiveVoiceSession({
       }
       return next;
     });
-  }, []);
+  }, [hasMicrophone]);
 
   const sendTextPrompt = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -538,6 +580,8 @@ export function useLiveVoiceSession({
   return {
     status,
     error,
+    micNotice,
+    hasMicrophone,
     voiceName,
     setVoiceName,
     isMuted,

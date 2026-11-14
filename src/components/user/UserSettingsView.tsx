@@ -56,7 +56,7 @@ import {
   loadAvatarPreference,
   saveAvatarPreference,
   resolveAvatarSource,
-  normalizeUploadedAvatarFile,
+  processCustomFaceUpload,
   loadVoicePreference,
   saveVoicePreference,
   VOICE_AVATAR_SYNC_EVENT,
@@ -272,16 +272,22 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     setIsProcessingAvatar(true);
     setAvatarError(null);
     try {
-      const normalizedDataUrl = await normalizeUploadedAvatarFile(file);
+      const { dataUrl, traits, faceDetected } = await processCustomFaceUpload(file);
       const next: AvatarPreference = {
         preset: 'custom',
-        customImageDataUrl: normalizedDataUrl,
+        customImageDataUrl: dataUrl,
         customImageName: file.name,
+        customTraits: traits,
       };
       setAvatarPref(next);
       saveAvatarPreference(next);
       triggerPreviewPulse();
-      toast.success('Hologram Created', 'Your custom portrait has been converted into a 3D hologram.');
+      toast.success(
+        faceDetected ? 'Face Matched to 3D Avatar' : '3D Face Avatar Created',
+        faceDetected
+          ? 'Detected your face, extracted skin & hair tones, and mapped it onto your 3D avatar.'
+          : 'Your portrait has been mapped onto the 3D avatar.'
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to process image.';
       setAvatarError(msg);
@@ -1547,6 +1553,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                   avatarSrc={activeAvatarSource.src}
                   isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
                   avatarPreset={avatarPref.preset}
+                  customTraits={avatarPref.customTraits}
                   isDark={resolvedScheme === 'dark'}
                 />
               </div>
@@ -1663,10 +1670,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="min-w-0">
                         <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                          Custom Hologram
+                          Face-Matched 3D
                         </div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                          {avatarPref.customImageName || 'Convert your own photo'}
+                          {avatarPref.customImageName || 'Auto-detects face only'}
                         </div>
                       </div>
                     </div>

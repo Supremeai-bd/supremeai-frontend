@@ -3,10 +3,22 @@ import type { LiveVoiceName } from '../hooks/useLiveVoiceSession';
 
 export type AvatarPresetId = 'female' | 'male' | 'custom';
 
+export interface CustomFaceTraits {
+  skinHex?: string;
+  hairHex?: string;
+  eyeHex?: string;
+  lipHex?: string;
+  genderCue?: 'female' | 'male';
+  hairStyle?: 'short' | 'medium' | 'long';
+  hasGlasses?: boolean;
+  faceFound?: boolean;
+}
+
 export interface AvatarPreference {
   preset: AvatarPresetId;
   customImageDataUrl: string | null;
   customImageName?: string;
+  customTraits?: CustomFaceTraits;
 }
 
 export interface AvatarPresetMeta {
@@ -19,14 +31,14 @@ export interface AvatarPresetMeta {
 export const AVATAR_PRESETS: AvatarPresetMeta[] = [
   {
     id: 'female',
-    label: 'Aria (3D Female)',
-    subtitle: 'Articulated 3D avatar with eye gaze, blinking & lip sync',
+    label: 'Aria (Female)',
+    subtitle: '3D avatar with eye gaze, blinking & lip sync',
     imageSrc: '/assets/aistudio/image_b5b290a6.png',
   },
   {
     id: 'male',
-    label: 'Orion (3D Male)',
-    subtitle: 'Articulated 3D avatar with eye gaze, blinking & lip sync',
+    label: 'Orion (Male)',
+    subtitle: '3D avatar with eye gaze, blinking & lip sync',
     imageSrc: maleHologramImg,
   },
 ];
@@ -78,6 +90,7 @@ export function loadAvatarPreference(): AvatarPreference {
       preset,
       customImageDataUrl,
       customImageName: typeof parsed.customImageName === 'string' ? parsed.customImageName : undefined,
+      customTraits: parsed.customTraits,
     };
   } catch {
     return { preset: 'female', customImageDataUrl: null };
@@ -96,19 +109,20 @@ export function saveAvatarPreference(pref: AvatarPreference): void {
 export function resolveAvatarSource(pref: AvatarPreference): {
   src: string;
   isPrestyledHologram: boolean;
+  traits?: CustomFaceTraits;
 } {
   if (pref.preset === 'custom' && pref.customImageDataUrl) {
-    return { src: pref.customImageDataUrl, isPrestyledHologram: false };
+    return {
+      src: pref.customImageDataUrl,
+      isPrestyledHologram: false,
+      traits: pref.customTraits,
+    };
   }
   const preset = AVATAR_PRESETS.find((p) => p.id === pref.preset) || AVATAR_PRESETS[0];
   return { src: preset.imageSrc, isPrestyledHologram: true };
 }
 
-/**
- * Normalizes any user-uploaded portrait image to a fast, localStorage-friendly
- * 640px max-dimension JPEG data URL before hologram conversion.
- */
-export function normalizeUploadedAvatarFile(file: File): Promise<string> {
+function readImageFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('Please select a PNG, JPG, or WebP image file.'));
@@ -118,33 +132,247 @@ export function normalizeUploadedAvatarFile(file: File): Promise<string> {
       reject(new Error('Image must be smaller than 12 MB.'));
       return;
     }
-
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Failed to read image file.'));
     reader.onload = () => {
-      const dataUrl = String(reader.result || '');
       const img = new Image();
       img.onerror = () => reject(new Error('Invalid or unsupported image format.'));
-      img.onload = () => {
-        const maxSide = 640;
-        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        const targetW = Math.max(64, Math.round(img.width * scale));
-        const targetH = Math.max(64, Math.round(img.height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(dataUrl);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, targetW, targetH);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
-      };
-      img.src = dataUrl;
+      img.onload = () => resolve(img);
+      img.src = String(reader.result || '');
     };
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Fallback skin-tone centroid finder across the upper 62% of the image so full-body
+ * shots without FaceDetector / API key still isolate the head rather than torso/legs.
+ */
+function estimateFaceBoxHeuristic(canvas: HTMLCanvasElement): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  if (!ctx || w < 16 || h < 16) {
+    return { x: 0.25, y: 0.08, width: 0.5, height: 0.5 };
+  }
+  const data = ctx.getImageData(0, 0, w, Math.floor(h * 0.62)).data;
+  const maxY = Math.floor(h * 0.62);
+  let sumX = 0;
+  let sumY = 0;
+  let count = 0;
+  let minX = w;
+  let maxSkinX = 0;
+  let minSkinY = maxY;
+  let maxSkinY = 0;
+
+  for (let y = 0; y < maxY; y += 2) {
+    for (let x = Math.floor(w * 0.15); x < Math.floor(w * 0.85); x += 2) {
+      const idx = (y * w + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      // Standard YCbCr-inspired human skin hue check
+      const isSkin =
+        r > 70 &&
+        g > 45 &&
+        b > 30 &&
+        r > g &&
+        r > b &&
+        Math.abs(r - g) > 12 &&
+        r - b > 18;
+      if (isSkin) {
+        sumX += x;
+        sumY += y;
+        count++;
+        if (x < minX) minX = x;
+        if (x > maxSkinX) maxSkinX = x;
+        if (y < minSkinY) minSkinY = y;
+        if (y > maxSkinY) maxSkinY = y;
+      }
+    }
+  }
+
+  if (count > 25) {
+    const cx = sumX / count / w;
+    const cy = sumY / count / h;
+    const span = Math.max(
+      0.24,
+      Math.min(0.55, Math.max((maxSkinX - minX) / w, (maxSkinY - minSkinY) / h) * 1.15)
+    );
+    return {
+      x: Math.max(0, Math.min(1 - span, cx - span * 0.5)),
+      y: Math.max(0, Math.min(1 - span, cy - span * 0.48)),
+      width: span,
+      height: span,
+    };
+  }
+
+  // Portrait default: upper-center crop (head zone)
+  const size = w < h ? 0.52 : 0.45;
+  return {
+    x: (1 - size) * 0.5,
+    y: 0.08,
+    width: size,
+    height: size,
+  };
+}
+
+/**
+ * Intelligently detects ONLY the human face in any uploaded image (headshot, full-body,
+ * wide landscape, or group shot), crops tightly around the face, and extracts skin/hair/eye/lip
+ * traits so the 3D Avatar rig matches the user's actual face with zero background/body clutter.
+ */
+export async function processCustomFaceUpload(file: File): Promise<{
+  dataUrl: string;
+  traits: CustomFaceTraits;
+  faceDetected: boolean;
+}> {
+  const img = await readImageFromFile(file);
+
+  // Prepare an analysis JPEG at <= 800px so Gemini/FaceDetector analyze fast
+  const maxSide = 800;
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const aw = Math.max(64, Math.round(img.naturalWidth * scale));
+  const ah = Math.max(64, Math.round(img.naturalHeight * scale));
+  const analysisCanvas = document.createElement('canvas');
+  analysisCanvas.width = aw;
+  analysisCanvas.height = ah;
+  const aCtx = analysisCanvas.getContext('2d');
+  if (!aCtx) {
+    throw new Error('2D canvas unavailable.');
+  }
+  aCtx.drawImage(img, 0, 0, aw, ah);
+  const analysisDataUrl = analysisCanvas.toDataURL('image/jpeg', 0.9);
+
+  let detectedBox: { x: number; y: number; width: number; height: number } | null = null;
+  let traits: CustomFaceTraits = {
+    genderCue: 'male',
+    hairStyle: 'short',
+    hasGlasses: false,
+    faceFound: false,
+  };
+
+  // 1. Server-side Gemini Multimodal Face Detection + Skin/Hair/Eye Trait Extraction
+  try {
+    const res = await fetch('/api/avatar/analyze-face', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageData: analysisDataUrl,
+        mimeType: 'image/jpeg',
+      }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.faceFound && json.faceBox && Number(json.faceBox.width) > 0.03) {
+        detectedBox = {
+          x: Number(json.faceBox.x) || 0,
+          y: Number(json.faceBox.y) || 0,
+          width: Number(json.faceBox.width) || 0.3,
+          height: Number(json.faceBox.height) || 0.3,
+        };
+      }
+      traits = {
+        skinHex: typeof json.skinHex === 'string' ? json.skinHex : undefined,
+        hairHex: typeof json.hairHex === 'string' ? json.hairHex : undefined,
+        eyeHex: typeof json.eyeHex === 'string' ? json.eyeHex : undefined,
+        lipHex: typeof json.lipHex === 'string' ? json.lipHex : undefined,
+        genderCue: json.genderCue === 'female' ? 'female' : 'male',
+        hairStyle:
+          json.hairStyle === 'long' || json.hairStyle === 'medium' ? json.hairStyle : 'short',
+        hasGlasses: Boolean(json.hasGlasses),
+        faceFound: Boolean(json.faceFound),
+      };
+    }
+  } catch {
+    // Fall back to browser FaceDetector / skin heuristic
+  }
+
+  // 2. Native Chrome/Edge FaceDetector fallback if Gemini didn't return a box
+  if (!detectedBox && typeof (window as unknown as { FaceDetector?: any }).FaceDetector === 'function') {
+    try {
+      const Detector = (window as unknown as { FaceDetector: any }).FaceDetector;
+      const detector = new Detector({ fastMode: false, maxDetectedFaces: 1 });
+      const faces = await detector.detect(analysisCanvas);
+      if (Array.isArray(faces) && faces.length > 0 && faces[0]?.boundingBox) {
+        const b = faces[0].boundingBox;
+        detectedBox = {
+          x: b.x / aw,
+          y: b.y / ah,
+          width: b.width / aw,
+          height: b.height / ah,
+        };
+        traits.faceFound = true;
+      }
+    } catch {
+      // Proceed to heuristic fallback
+    }
+  }
+
+  // 3. Skin-centroid upper portrait heuristic fallback
+  const usedHeuristic = !detectedBox;
+  if (!detectedBox) {
+    detectedBox = estimateFaceBoxHeuristic(analysisCanvas);
+  }
+
+  // Convert normalized face box -> tight padded square crop focused ONLY on the face
+  const boxCx = (detectedBox.x + detectedBox.width * 0.5) * img.naturalWidth;
+  const boxCy = (detectedBox.y + detectedBox.height * 0.5) * img.naturalHeight;
+  const faceMaxDim = Math.max(
+    detectedBox.width * img.naturalWidth,
+    detectedBox.height * img.naturalHeight
+  );
+  // Generous enough for forehead & chin, tight enough to exclude chest/arms/scenery
+  const cropSide = Math.max(96, Math.min(Math.min(img.naturalWidth, img.naturalHeight), faceMaxDim * 1.28));
+  const sx = Math.max(0, Math.min(img.naturalWidth - cropSide, boxCx - cropSide * 0.5));
+  const sy = Math.max(0, Math.min(img.naturalHeight - cropSide, boxCy - cropSide * 0.5));
+
+  const outSize = 512;
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = outSize;
+  cropCanvas.height = outSize;
+  const cCtx = cropCanvas.getContext('2d');
+  if (!cCtx) {
+    return { dataUrl: analysisDataUrl, traits, faceDetected: !usedHeuristic };
+  }
+  cCtx.drawImage(img, sx, sy, cropSide, cropSide, 0, 0, outSize, outSize);
+
+  // Sample natural skin tone from central cheek area if Gemini didn't supply skinHex
+  if (!traits.skinHex) {
+    const sample = cCtx.getImageData(Math.round(outSize * 0.38), Math.round(outSize * 0.54), 12, 12).data;
+    let sr = 0;
+    let sg = 0;
+    let sb = 0;
+    const pixels = sample.length / 4;
+    for (let i = 0; i < sample.length; i += 4) {
+      sr += sample[i];
+      sg += sample[i + 1];
+      sb += sample[i + 2];
+    }
+    if (pixels > 0) {
+      const toHex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+      traits.skinHex = `#${toHex(sr / pixels)}${toHex(sg / pixels)}${toHex(sb / pixels)}`;
+    }
+  }
+
+  return {
+    dataUrl: cropCanvas.toDataURL('image/jpeg', 0.92),
+    traits,
+    faceDetected: Boolean(traits.faceFound || !usedHeuristic),
+  };
+}
+
+/**
+ * Legacy helper kept for backward compatibility: returns tightly cropped face data URL.
+ */
+export async function normalizeUploadedAvatarFile(file: File): Promise<string> {
+  const result = await processCustomFaceUpload(file);
+  return result.dataUrl;
 }
 
 function clamp01(v: number): number {

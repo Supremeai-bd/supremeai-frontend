@@ -4,7 +4,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { LiveSessionStatus, LiveVoiceName } from '../../hooks/useLiveVoiceSession';
 import type { AvatarExpression } from '../../hooks/useAvatarExpression';
-import { buildHologramTextures, type AvatarPresetId } from '../../utils/hologramAvatar';
+import {
+  buildHologramTextures,
+  type AvatarPresetId,
+  type CustomFaceTraits,
+} from '../../utils/hologramAvatar';
 import { createParticleSpriteTexture } from './avatar3d/avatarTextures';
 import {
   createArticulatedAvatarRig,
@@ -19,6 +23,7 @@ interface LiveVoiceAvatarCanvasProps {
   avatarSrc: string;
   isPrestyledHologram: boolean;
   avatarPreset?: AvatarPresetId;
+  customTraits?: CustomFaceTraits;
   expression?: AvatarExpression;
   isStreaming?: boolean;
   isDark?: boolean;
@@ -215,6 +220,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   avatarSrc,
   isPrestyledHologram,
   avatarPreset = 'female',
+  customTraits,
   expression = 'neutral',
   isStreaming = false,
   isDark = true,
@@ -224,6 +230,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   const statusRef = useRef<LiveSessionStatus>(status);
   const voiceRef = useRef<LiveVoiceName>(voiceName);
   const presetRef = useRef<AvatarPresetId>(avatarPreset);
+  const customTraitsRef = useRef<CustomFaceTraits | undefined>(customTraits);
   const expressionRef = useRef<AvatarExpression>(expression);
   const isStreamingRef = useRef<boolean>(isStreaming);
   const isDarkRef = useRef<boolean>(isDark);
@@ -232,6 +239,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   statusRef.current = status;
   voiceRef.current = voiceName;
   presetRef.current = avatarPreset;
+  customTraitsRef.current = customTraits;
   expressionRef.current = expression;
   isStreamingRef.current = isStreaming;
   isDarkRef.current = isDark;
@@ -388,16 +396,25 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     const customBustGeo = new THREE.PlaneGeometry(1.78, 1.78, 96, 96);
     const customBustMesh = new THREE.Mesh(customBustGeo, hologramMat);
     customBustMesh.position.set(0, 0.04, 0);
-    customBustMesh.visible = presetRef.current === 'custom';
+    customBustMesh.visible = false;
     hologramGroup.add(customBustMesh);
 
-    // Build initial articulated 3D avatar rig for preset ('female' | 'male')
+    // Always mount the articulated 3D avatar rig (custom faces project cleanly onto its 3D head)
     const maxAnisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-    let activeRig: ArticulatedAvatarRig | null = null;
-    if (presetRef.current !== 'custom') {
-      activeRig = createArticulatedAvatarRig(presetRef.current !== 'male', maxAnisotropy);
-      rigAnchor.add(activeRig.root);
-    }
+    const initTraits = customTraitsRef.current;
+    const activeRig: ArticulatedAvatarRig | null = createArticulatedAvatarRig(
+      presetRef.current === 'custom'
+        ? {
+            isFemale: initTraits?.genderCue === 'female',
+            maxAnisotropy,
+            customTraits: initTraits,
+          }
+        : {
+            isFemale: presetRef.current !== 'male',
+            maxAnisotropy,
+          }
+    );
+    rigAnchor.add(activeRig.root);
 
     // Subtle Holographic Orbit Rings framing the 3D avatar
     const ringConfigs = [
@@ -875,68 +892,63 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     };
   }, [levelsRef]);
 
-  // Swap between articulated Female rig, Male rig, and Custom portrait mesh cleanly without recreating WebGLRenderer
+  // Swap cleanly between Female, Male, and Face-Matched Custom 3D rigs without recreating WebGLRenderer
   useEffect(() => {
     const refs = sceneRefs.current;
     if (!refs) return;
+    let cancelled = false;
 
-    if (avatarPreset === 'custom') {
+    const maxAnisotropy = Math.min(4, refs.renderer.capabilities.getMaxAnisotropy());
+    const mountRig = (nextRig: ArticulatedAvatarRig) => {
       if (refs.activeRig) {
         refs.rigAnchor.remove(refs.activeRig.root);
         refs.activeRig.dispose();
-        refs.activeRig = null;
       }
-      refs.customBustMesh.visible = true;
+      refs.customBustMesh.visible = false;
+      refs.rigAnchor.add(nextRig.root);
+      refs.activeRig = nextRig;
+    };
+
+    if (avatarPreset !== 'custom') {
+      mountRig(createArticulatedAvatarRig(avatarPreset !== 'male', maxAnisotropy));
+      refs.reactTrigger();
       return;
     }
 
-    refs.customBustMesh.visible = false;
-    if (refs.activeRig) {
-      refs.rigAnchor.remove(refs.activeRig.root);
-      refs.activeRig.dispose();
-    }
-    const maxAnisotropy = Math.min(4, refs.renderer.capabilities.getMaxAnisotropy());
-    const nextRig = createArticulatedAvatarRig(avatarPreset !== 'male', maxAnisotropy);
-    refs.rigAnchor.add(nextRig.root);
-    refs.activeRig = nextRig;
-    refs.reactTrigger();
-  }, [avatarPreset]);
-
-  // Rebuild holographic RGBA + depth textures whenever custom portrait src changes
-  useEffect(() => {
-    if (avatarPreset !== 'custom') return;
-    let cancelled = false;
-    buildHologramTextures(avatarSrc, isPrestyledHologram)
-      .then(({ colorCanvas, depthCanvas }) => {
-        if (cancelled || !sceneRefs.current) return;
-        const mat = sceneRefs.current.hologramMat;
-
-        const nextColorTex = new THREE.CanvasTexture(colorCanvas);
-        nextColorTex.colorSpace = THREE.SRGBColorSpace;
-        nextColorTex.needsUpdate = true;
-
-        const nextDepthTex = new THREE.CanvasTexture(depthCanvas);
-        nextDepthTex.needsUpdate = true;
-
-        const prevColor = activeTexturesRef.current.color;
-        const prevDepth = activeTexturesRef.current.depth;
-
-        mat.uniforms.uColorMap.value = nextColorTex;
-        mat.uniforms.uDepthMap.value = nextDepthTex;
-        mat.uniforms.uDepthScale.value = isPrestyledHologram ? 0.36 : 0.32;
-
-        activeTexturesRef.current = { color: nextColorTex, depth: nextDepthTex };
-        prevColor?.dispose();
-        prevDepth?.dispose();
+    // First mount matched trait skeleton immediately while cropped face image decodes
+    mountRig(
+      createArticulatedAvatarRig({
+        isFemale: customTraits?.genderCue === 'female',
+        maxAnisotropy,
+        customTraits,
       })
-      .catch(() => {
-        // Fallback keeps previous active texture safely
-      });
+    );
+
+    if (avatarSrc) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        if (cancelled || !sceneRefs.current) return;
+        const facedRig = createArticulatedAvatarRig({
+          isFemale: customTraits?.genderCue === 'female',
+          maxAnisotropy: Math.min(4, sceneRefs.current.renderer.capabilities.getMaxAnisotropy()),
+          customFaceImg: img,
+          customTraits,
+        });
+        mountRig(facedRig);
+        sceneRefs.current.reactTrigger();
+      };
+      img.onerror = () => {
+        // Fallback keeps trait-matched 3D rig if image decode fails
+        void buildHologramTextures(avatarSrc, isPrestyledHologram).catch(() => {});
+      };
+      img.src = avatarSrc;
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [avatarSrc, isPrestyledHologram, avatarPreset]);
+  }, [avatarPreset, avatarSrc, customTraits, isPrestyledHologram]);
 
   return (
     <div
