@@ -100,7 +100,7 @@ const DEV_ONLY_TABS = new Set([
 const SUBVIEW_TITLES: Record<string, string> = {
   'chat-history': 'All Conversations',
   'user-projects': 'My Projects',
-  'user-api-keys': 'API Keys & Hooks',
+  'user-api-keys': 'API Keys & Providers',
   'user-knowledge': 'Knowledge Base',
   'user-team': 'Team & Members',
   'user-billing': 'Plan & Usage',
@@ -113,7 +113,7 @@ const SUBVIEW_TITLES: Record<string, string> = {
   'schema-parity': 'Schema Parity Matrix',
   'llm-gateway': 'LLM Gateway & Pricing',
   'feature-flags': 'Feature Flags',
-  'provider-keys': 'Provider Keys',
+  'provider-keys': 'Provider API Keys & Infisical Vault',
   security: 'Security & Firewall',
   'system-audit': 'System Audit Log',
   customers: 'Customer Directory',
@@ -216,7 +216,10 @@ export default function App() {
     userPlugins,
     userSettings,
     addApiKey,
+    updateApiKey,
     revokeApiKey,
+    deleteApiKey,
+    probeApiKey,
     addWebhook,
     deleteWebhook,
     testWebhook,
@@ -1000,7 +1003,10 @@ export default function App() {
             <UserApiKeysView
               apiKeys={apiKeys}
               onAddApiKey={addApiKey}
+              onUpdateApiKey={updateApiKey}
               onRevokeApiKey={revokeApiKey}
+              onDeleteApiKey={deleteApiKey}
+              onProbeApiKey={probeApiKey}
               webhooks={webhooks}
               onAddWebhook={addWebhook}
               onDeleteWebhook={deleteWebhook}

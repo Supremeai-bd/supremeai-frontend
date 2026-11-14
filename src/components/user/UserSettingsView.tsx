@@ -149,7 +149,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   const [isPreviewPulsing, setIsPreviewPulsing] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
   const previewLevelsRef = useRef({ input: 0, output: 0 });
-  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pulseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const handleSync = () => {
@@ -159,7 +159,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     window.addEventListener(VOICE_AVATAR_SYNC_EVENT, handleSync);
     return () => {
       window.removeEventListener(VOICE_AVATAR_SYNC_EVENT, handleSync);
-      if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+      if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
     };
   }, []);
 
@@ -217,13 +217,27 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
   };
 
   const triggerPreviewPulse = () => {
-    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
     setIsPreviewPulsing(true);
-    previewLevelsRef.current.output = 0.72;
-    pulseTimerRef.current = setTimeout(() => {
-      previewLevelsRef.current.output = 0;
-      setIsPreviewPulsing(false);
-    }, 2200);
+    const start = performance.now();
+    const duration = 2600;
+    pulseTimerRef.current = setInterval(() => {
+      const elapsedSec = (performance.now() - start) / 1000;
+      if (elapsedSec * 1000 >= duration) {
+        if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
+        pulseTimerRef.current = null;
+        previewLevelsRef.current.output = 0;
+        setIsPreviewPulsing(false);
+        return;
+      }
+      // Natural varying speech amplitude curve so lips, jaw, teeth & brows animate realistically
+      const phrase =
+        0.48 +
+        0.28 * Math.sin(elapsedSec * 11.2) +
+        0.18 * Math.cos(elapsedSec * 19.5) +
+        0.1 * Math.sin(elapsedSec * 5.0);
+      previewLevelsRef.current.output = Math.max(0.18, Math.min(0.95, phrase));
+    }, 40);
   };
 
   const handleSelectPresetAvatar = (presetId: 'female' | 'male') => {
@@ -1508,10 +1522,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               <div className="px-4 py-3 border-b border-slate-200/70 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 flex items-center justify-between gap-2">
                 <div>
                   <h2 className="text-xs font-bold text-slate-900 dark:text-white">
-                    Live 3D Hologram Preview
+                    Live 3D Avatar Preview
                   </h2>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Drag to rotate · Transparent background
+                    Move cursor for eye gaze · Drag to rotate · Click to smile
                   </p>
                 </div>
                 <button
@@ -1520,7 +1534,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <Volume2 className="w-3 h-3 theme-accent-text" />
-                  <span>{isPreviewPulsing ? 'Speaking...' : 'Pulse Test'}</span>
+                  <span>{isPreviewPulsing ? 'Speaking...' : 'Test Voice & Lips'}</span>
                 </button>
               </div>
 
@@ -1532,6 +1546,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                   levelsRef={previewLevelsRef}
                   avatarSrc={activeAvatarSource.src}
                   isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
+                  avatarPreset={avatarPref.preset}
                   isDark={resolvedScheme === 'dark'}
                 />
               </div>

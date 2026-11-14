@@ -438,7 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Key className="w-4 h-4 text-purple-500" />
-              <span>Provider Health</span>
+              <span>Provider API Keys</span>
             </button>
 
             <button
@@ -674,7 +674,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                 >
                   <Key className="w-4 h-4 text-blue-500" />
-                  <span>API Keys & Hooks</span>
+                  <span>API Keys & Providers</span>
                 </button>
 
                 <button

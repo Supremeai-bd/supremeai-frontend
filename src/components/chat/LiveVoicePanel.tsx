@@ -60,6 +60,7 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTranscriptDrawer, setShowTranscriptDrawer] = useState(false);
   const [textNudge, setTextNudge] = useState('');
+  const [resetViewCounter, setResetViewCounter] = useState(0);
   const [avatarPref, setAvatarPref] = useState<AvatarPreference>(() => loadAvatarPreference());
   const syncToChatRef = useRef(syncToChat);
   syncToChatRef.current = syncToChat;
@@ -148,7 +149,7 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
   const activeAvatarLabel =
     avatarPref.preset === 'custom'
       ? 'Custom Hologram'
-      : AVATAR_PRESETS.find((p) => p.id === avatarPref.preset)?.label || 'Female Hologram';
+      : AVATAR_PRESETS.find((p) => p.id === avatarPref.preset)?.label || 'Aria (3D Female)';
 
   const handleSendNudge = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,6 +238,16 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
 
           <button
             type="button"
+            onClick={() => setResetViewCounter((c) => c + 1)}
+            title="Reset 3D camera angle"
+            aria-label="Reset 3D camera view"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsFullscreen((v) => !v)}
             aria-label={isFullscreen ? 'Restore split view' : 'Expand 3D avatar to fullscreen'}
             title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Fullscreen 3D Avatar'}
@@ -285,7 +296,9 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
           levelsRef={levelsRef}
           avatarSrc={activeAvatarSource.src}
           isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
+          avatarPreset={avatarPref.preset}
           isDark={isDark}
+          resetViewCounter={resetViewCounter}
         />
 
         {/* Minimal Bottom Live Caption Strip (No backdrop-filter over WebGL) */}

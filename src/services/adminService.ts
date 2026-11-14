@@ -282,10 +282,58 @@ export const adminService = {
     }
   },
 
+  async addProviderKey(payload: {
+    provider: string;
+    displayName: string;
+    rawKey: string;
+    rateLimitTpm?: string;
+    priority?: number;
+    infisicalPath?: string;
+    infisicalEnv?: 'prod' | 'staging' | 'dev';
+    region?: string;
+  }): Promise<{ success: boolean; provider: ProviderKeyItem; providers: ProviderKeyItem[] }> {
+    return apiClient.post('/api/admin/providers', payload);
+  },
+
+  async updateProviderKey(
+    id: string,
+    updates: {
+      provider?: string;
+      displayName?: string;
+      rawKey?: string;
+      rateLimitTpm?: string;
+      priority?: number;
+      infisicalPath?: string;
+      infisicalEnv?: 'prod' | 'staging' | 'dev';
+      status?: ProviderKeyItem['status'];
+      region?: string;
+    }
+  ): Promise<{ success: boolean; provider: ProviderKeyItem; providers: ProviderKeyItem[] }> {
+    return apiClient.patch(`/api/admin/providers/${encodeURIComponent(id)}`, updates);
+  },
+
+  async deleteProviderKey(id: string): Promise<{ success: boolean; providers: ProviderKeyItem[] }> {
+    return apiClient.delete(`/api/admin/providers/${encodeURIComponent(id)}`);
+  },
+
   async probeProvider(
     providerId: string
-  ): Promise<{ success: boolean; message: string; providers: ProviderKeyItem[] }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    providers: ProviderKeyItem[];
+    vaultKeys?: import('../types').InfisicalVaultKeyLatency[];
+  }> {
     return apiClient.post('/api/admin/providers/probe', { providerId });
+  },
+
+  async probeAllProviders(): Promise<{
+    success: boolean;
+    message: string;
+    providers: ProviderKeyItem[];
+    vaultKeys: import('../types').InfisicalVaultKeyLatency[];
+  }> {
+    return apiClient.post('/api/admin/providers/probe-all', {});
   },
 
   async updateProviderPriority(
@@ -297,6 +345,27 @@ export const adminService = {
       direction,
     });
     return res.providers || [];
+  },
+
+  async fetchInfisicalVaultKeys(): Promise<{
+    vaultEngine: string;
+    mode: string;
+    totalKeys: number;
+    healthyCount: number;
+    avgVaultLatencyMs: number;
+    lastSyncedAt: string;
+    keys: import('../types').InfisicalVaultKeyLatency[];
+  }> {
+    return apiClient.get('/api/admin/infisical/vault-keys');
+  },
+
+  async syncInfisicalVault(): Promise<{
+    success: boolean;
+    syncedAt: string;
+    keys: import('../types').InfisicalVaultKeyLatency[];
+    message: string;
+  }> {
+    return apiClient.post('/api/admin/infisical/sync', {});
   },
 
   async fetchSwarmWorkers(): Promise<SwarmWorker[]> {

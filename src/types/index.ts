@@ -175,16 +175,40 @@ export interface McpTowerService {
 
 // --- Customer Workspace Expansion Types ---
 
+export type AiProviderId =
+  | 'supremeai'
+  | 'google_ai_studio'
+  | 'vertex_ai'
+  | 'openai'
+  | 'anthropic'
+  | 'groq'
+  | 'deepseek'
+  | 'mistral';
+
 export interface ApiKeyItem {
   id: string;
   name: string;
+  provider?: AiProviderId | string;
   keyPrefix: string;
   secretMasked: string;
   createdAt: string;
   lastUsed: string;
   rateLimitRpm: number;
   status: 'active' | 'revoked';
+  healthStatus?: 'healthy' | 'degraded' | 'unhealthy' | 'untested';
+  lastChecked?: string;
   permissions: ('chat:write' | 'models:read' | 'knowledge:read' | 'agents:invoke')[];
+}
+
+export interface GatewayProviderLatency {
+  provider: string;
+  displayName: string;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  successRate: number;
+  sampleCount: number;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  updatedAt: string;
 }
 
 export interface WebhookItem {
@@ -320,14 +344,37 @@ export interface FeatureFlagItem {
 
 export interface ProviderKeyItem {
   id: string;
-  provider: 'google_ai_studio' | 'vertex_ai' | 'groq' | 'anthropic';
+  provider: AiProviderId | string;
   displayName: string;
   maskedKey: string;
-  status: 'healthy' | 'degraded' | 'untested';
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'untested';
   latencyMs: number;
+  avgLatencyMs?: number;
+  p95LatencyMs?: number;
   priority: number;
   lastChecked: string;
   rateLimitTpm: string;
+  infisicalPath?: string;
+  infisicalEnv?: 'prod' | 'staging' | 'dev';
+  vaultVersion?: number;
+  region?: string;
+}
+
+export interface InfisicalVaultKeyLatency {
+  id: string;
+  secretName: string;
+  infisicalPath: string;
+  environment: 'prod' | 'staging' | 'dev';
+  provider: string;
+  providerDisplayName: string;
+  maskedKey: string;
+  version: number;
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'untested';
+  latencyMs: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  lastChecked: string;
+  lastSyncedAt: string;
 }
 
 export interface PromptTemplateItem {

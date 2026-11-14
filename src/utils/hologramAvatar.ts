@@ -19,14 +19,14 @@ export interface AvatarPresetMeta {
 export const AVATAR_PRESETS: AvatarPresetMeta[] = [
   {
     id: 'female',
-    label: 'Female Hologram',
-    subtitle: 'Luminous cyan-violet female portrait',
+    label: 'Aria (3D Female)',
+    subtitle: 'Articulated 3D avatar with eye gaze, blinking & lip sync',
     imageSrc: '/assets/aistudio/image_b5b290a6.png',
   },
   {
     id: 'male',
-    label: 'Male Hologram',
-    subtitle: 'Luminous cyan-violet male portrait',
+    label: 'Orion (3D Male)',
+    subtitle: 'Articulated 3D avatar with eye gaze, blinking & lip sync',
     imageSrc: maleHologramImg,
   },
 ];

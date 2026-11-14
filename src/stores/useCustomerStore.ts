@@ -49,8 +49,16 @@ interface CustomerState {
 
   // API Key Actions
   fetchApiKeys: () => Promise<void>;
-  addApiKey: (newKey: Omit<ApiKeyItem, 'id' | 'createdAt' | 'lastUsed'>) => Promise<void> | void;
+  addApiKey: (
+    newKey: Omit<ApiKeyItem, 'id' | 'createdAt' | 'lastUsed'> & { rawSecret?: string }
+  ) => Promise<void> | void;
+  updateApiKey: (
+    id: string,
+    updates: Partial<ApiKeyItem> & { rawSecret?: string }
+  ) => Promise<void> | void;
   revokeApiKey: (id: string) => Promise<void> | void;
+  deleteApiKey: (id: string) => Promise<void> | void;
+  probeApiKey: (id: string) => Promise<void>;
 
   // Webhook Actions
   fetchWebhooks: () => Promise<void>;
@@ -133,10 +141,34 @@ export const useCustomerStore = create<CustomerState>((set) => {
           localStorage.setItem(API_KEYS_KEY, JSON.stringify(updated));
           return { apiKeys: updated };
         });
-        toast.success('API Key Generated', `Created key with prefix ${keyItem.keyPrefix}`);
+        toast.success('API Key Added', `Configured key ${keyItem.name} (${keyItem.keyPrefix})`);
       } catch (err) {
         console.error('Error generating API key:', err);
       }
+    },
+
+    updateApiKey: async (id, updates) => {
+      const serverUpdated = await apiKeyService.updateApiKey(id, updates);
+      set((state) => {
+        const updated = state.apiKeys.map((k) => {
+          if (k.id !== id) return k;
+          if (serverUpdated) return serverUpdated;
+          const next = { ...k, ...updates };
+          if (updates.rawSecret && updates.rawSecret.trim()) {
+            const clean = updates.rawSecret.trim();
+            next.keyPrefix = clean.slice(0, Math.min(14, clean.length));
+            next.secretMasked =
+              clean.length > 10 ? `${clean.slice(0, 10)}••••••••••••••••${clean.slice(-4)}` : '••••••••••••';
+            next.healthStatus = 'healthy';
+            next.lastChecked = 'Rotated just now';
+          }
+          delete (next as { rawSecret?: string }).rawSecret;
+          return next;
+        });
+        localStorage.setItem(API_KEYS_KEY, JSON.stringify(updated));
+        return { apiKeys: updated };
+      });
+      toast.success('API Key Updated', 'Credential configuration saved.');
     },
 
     revokeApiKey: async (id: string) => {
@@ -152,6 +184,47 @@ export const useCustomerStore = create<CustomerState>((set) => {
         await apiKeyService.revokeApiKey(id);
       } catch (err) {
         console.error('Error revoking API key on server:', err);
+      }
+    },
+
+    deleteApiKey: async (id: string) => {
+      set((state) => {
+        const updated = state.apiKeys.filter((k) => k.id !== id);
+        localStorage.setItem(API_KEYS_KEY, JSON.stringify(updated));
+        return { apiKeys: updated };
+      });
+      toast.info('API Key Removed', 'Credential permanently deleted.');
+      try {
+        await apiKeyService.deleteApiKey(id);
+      } catch (err) {
+        console.error('Error deleting API key on server:', err);
+      }
+    },
+
+    probeApiKey: async (id: string) => {
+      try {
+        const res = await apiKeyService.probeApiKey(id);
+        set((state) => {
+          const updated = state.apiKeys.map((k) => {
+            if (k.id !== id) return k;
+            if (res.key) return res.key;
+            return {
+              ...k,
+              healthStatus: res.success ? ('healthy' as const) : ('degraded' as const),
+              lastChecked: `Just now (${res.latencyMs}ms)`,
+              lastUsed: 'Just now',
+            };
+          });
+          localStorage.setItem(API_KEYS_KEY, JSON.stringify(updated));
+          return { apiKeys: updated };
+        });
+        if (res.success) {
+          toast.success('Provider Probe Healthy', `${res.message} (${res.latencyMs}ms)`);
+        } else {
+          toast.warning('Provider Probe Degraded', `${res.message} (${res.latencyMs}ms)`);
+        }
+      } catch (err) {
+        toast.error('Probe Failed', err instanceof Error ? err.message : 'Unable to reach provider gateway.');
       }
     },
 
