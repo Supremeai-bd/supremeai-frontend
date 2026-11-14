@@ -2105,6 +2105,7 @@ async function startServer() {
   // Create HTTP server & mount /api/live WebSocket bridge for Gemini Live API (gemini-3.8-live)
   const server = http.createServer(app);
   const liveWss = new WebSocketServer({ noServer: true });
+  const broadcasterWss = new WebSocketServer({ noServer: true });
   const VALID_LIVE_VOICES = new Set(['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr']);
 
   server.on('upgrade', (request, socket, head) => {
@@ -2114,12 +2115,57 @@ async function startServer() {
         liveWss.handleUpgrade(request, socket, head, (ws) => {
           liveWss.emit('connection', ws, request);
         });
+      } else if (
+        reqUrl.pathname === '/ws' ||
+        reqUrl.pathname === '/ws/live' ||
+        reqUrl.pathname === '/api/ws'
+      ) {
+        broadcasterWss.handleUpgrade(request, socket, head, (ws) => {
+          broadcasterWss.emit('connection', ws, request);
+        });
       } else {
         socket.destroy();
       }
     } catch {
       socket.destroy();
     }
+  });
+
+  const broadcasterClients = new Set<WebSocket>();
+
+  broadcasterWss.on('connection', (clientWs: WebSocket) => {
+    broadcasterClients.add(clientWs);
+    clientWs.send(
+      JSON.stringify({
+        type: 'connection_ack',
+        status: 'connected',
+        mode: 'frontend_dev_broadcaster',
+      })
+    );
+
+    clientWs.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.type === 'ping' || msg.command === 'ping') {
+          clientWs.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        } else if (msg.type === 'customer_updated' || msg.type === 'mcp_service_updated') {
+          const payload = JSON.stringify(msg);
+          broadcasterClients.forEach((otherWs) => {
+            if (otherWs !== clientWs && otherWs.readyState === WebSocket.OPEN) {
+              otherWs.send(payload);
+            }
+          });
+        }
+      } catch {}
+    });
+
+    clientWs.on('close', () => {
+      broadcasterClients.delete(clientWs);
+    });
+
+    clientWs.on('error', () => {
+      broadcasterClients.delete(clientWs);
+    });
   });
 
   liveWss.on('connection', (clientWs: WebSocket, req: http.IncomingMessage) => {
