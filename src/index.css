@@ -918,3 +918,125 @@ mark.search-highlight {
   vertical-align: middle;
 }
 
+/* ========================================================
+   3D AVATAR EXPRESSION & SPEECH KEYFRAME ANIMATIONS
+   ======================================================== */
+
+@keyframes avatar-eye-blink {
+  0%, 44%, 49%, 91%, 96%, 100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  46.5%, 93.5% {
+    transform: scaleY(0.1);
+    opacity: 0.75;
+  }
+}
+
+@keyframes avatar-mouth-pulse {
+  0%, 100% {
+    transform: scaleX(calc(0.95 + var(--avatar-audio-level, 0.35) * 0.12))
+               scaleY(calc(0.65 + var(--avatar-audio-level, 0.35) * 0.3));
+    box-shadow: 0 0 4px currentColor;
+  }
+  25% {
+    transform: scaleX(calc(1.04 + var(--avatar-audio-level, 0.35) * 0.16))
+               scaleY(calc(1.15 + var(--avatar-audio-level, 0.35) * 0.65));
+    box-shadow: 0 0 10px currentColor;
+  }
+  50% {
+    transform: scaleX(calc(0.88 + var(--avatar-audio-level, 0.35) * 0.08))
+               scaleY(calc(0.75 + var(--avatar-audio-level, 0.35) * 0.35));
+    box-shadow: 0 0 6px currentColor;
+  }
+  75% {
+    transform: scaleX(calc(1.06 + var(--avatar-audio-level, 0.35) * 0.18))
+               scaleY(calc(1.3 + var(--avatar-audio-level, 0.35) * 0.72));
+    box-shadow: 0 0 12px currentColor;
+  }
+}
+
+@keyframes avatar-happy-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes avatar-thinking-sway {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-3.5deg);
+  }
+}
+
+.avatar-eye-sim {
+  transform-origin: center center;
+  animation: avatar-eye-blink 4.2s ease-in-out infinite;
+}
+
+.avatar-speech-active .avatar-eye-sim {
+  animation-duration: 3.1s;
+}
+
+.avatar-mouth-sim {
+  transform-origin: center center;
+  transition: transform 150ms ease, border-radius 150ms ease, background-color 220ms ease;
+}
+
+.avatar-speech-active .avatar-mouth-sim {
+  animation: avatar-mouth-pulse 340ms ease-in-out infinite;
+}
+
+/* Expression states mapped by useAvatarExpression */
+.avatar-expression-happy .avatar-expression-badge {
+  border-color: rgba(16, 185, 129, 0.48);
+  color: #34d399;
+  box-shadow: 0 0 14px -3px rgba(16, 185, 129, 0.35);
+}
+
+.avatar-expression-happy .avatar-face-shell {
+  animation: avatar-happy-float 2.4s ease-in-out infinite;
+}
+
+.avatar-expression-happy .avatar-mouth-sim {
+  border-radius: 2px 2px 9999px 9999px;
+}
+
+.avatar-expression-thinking .avatar-expression-badge {
+  border-color: rgba(251, 191, 36, 0.48);
+  color: #fbbf24;
+  box-shadow: 0 0 14px -3px rgba(251, 191, 36, 0.3);
+}
+
+.avatar-expression-thinking .avatar-face-shell {
+  animation: avatar-thinking-sway 2.8s ease-in-out infinite;
+}
+
+.avatar-expression-thinking .avatar-mouth-sim {
+  width: 0.5rem;
+  border-radius: 9999px;
+}
+
+.avatar-expression-neutral .avatar-expression-badge {
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+[data-live-motion='paused'] .avatar-eye-sim,
+[data-live-motion='paused'] .avatar-mouth-sim,
+[data-live-motion='paused'] .avatar-face-shell {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-eye-sim,
+  .avatar-mouth-sim,
+  .avatar-face-shell {
+    animation: none !important;
+  }
+}

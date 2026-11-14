@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { LiveSessionStatus, LiveVoiceName } from '../../hooks/useLiveVoiceSession';
+import type { AvatarExpression } from '../../hooks/useAvatarExpression';
 import { buildHologramTextures, type AvatarPresetId } from '../../utils/hologramAvatar';
 import { createParticleSpriteTexture } from './avatar3d/avatarTextures';
 import {
@@ -18,6 +19,8 @@ interface LiveVoiceAvatarCanvasProps {
   avatarSrc: string;
   isPrestyledHologram: boolean;
   avatarPreset?: AvatarPresetId;
+  expression?: AvatarExpression;
+  isStreaming?: boolean;
   isDark?: boolean;
   resetViewCounter?: number;
 }
@@ -212,6 +215,8 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   avatarSrc,
   isPrestyledHologram,
   avatarPreset = 'female',
+  expression = 'neutral',
+  isStreaming = false,
   isDark = true,
   resetViewCounter = 0,
 }) => {
@@ -219,12 +224,16 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   const statusRef = useRef<LiveSessionStatus>(status);
   const voiceRef = useRef<LiveVoiceName>(voiceName);
   const presetRef = useRef<AvatarPresetId>(avatarPreset);
+  const expressionRef = useRef<AvatarExpression>(expression);
+  const isStreamingRef = useRef<boolean>(isStreaming);
   const isDarkRef = useRef<boolean>(isDark);
   const [contextLost, setContextLost] = useState(false);
 
   statusRef.current = status;
   voiceRef.current = voiceName;
   presetRef.current = avatarPreset;
+  expressionRef.current = expression;
+  isStreamingRef.current = isStreaming;
   isDarkRef.current = isDark;
 
   const sceneRefs = useRef<{
@@ -617,12 +626,15 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       currentAccent.lerp(targetAccent, Math.min(1, dt * 5));
       rimLight.color.copy(currentAccent);
 
+      const curExpression = expressionRef.current;
+      const streamingActive = isStreamingRef.current;
       const rawOutput = levelsRef.current.output || 0;
       const rawInput = levelsRef.current.input || 0;
-      smoothOutput = THREE.MathUtils.damp(smoothOutput, rawOutput, 18, dt);
+      const effectiveOutput = streamingActive ? Math.max(rawOutput, 0.42) : rawOutput;
+      smoothOutput = THREE.MathUtils.damp(smoothOutput, effectiveOutput, 18, dt);
       smoothInput = THREE.MathUtils.damp(smoothInput, rawInput, 14, dt);
 
-      const speakEnergy = curStatus === 'speaking' ? Math.max(0.16, smoothOutput) : smoothOutput;
+      const speakEnergy = curStatus === 'speaking' || streamingActive ? Math.max(0.22, smoothOutput) : smoothOutput;
       const listenEnergy = curStatus === 'listening' ? Math.max(0.18, smoothInput) : smoothInput;
       const isSpeaking = speakEnergy > 0.06;
 
@@ -665,9 +677,9 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       }
       let targetLookX = pointerNdc.active ? pointerNdc.x * 0.82 : saccadeOffsetX;
       let targetLookY = pointerNdc.active ? pointerNdc.y * 0.72 : saccadeOffsetY;
-      if (curStatus === 'connecting') {
+      if (curStatus === 'connecting' || curExpression === 'thinking') {
         targetLookX += 0.24;
-        targetLookY += 0.18;
+        targetLookY += 0.2;
       } else if (curStatus === 'listening' && !pointerNdc.active) {
         targetLookX *= 0.45;
         targetLookY *= 0.45;
@@ -695,8 +707,10 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       smoothOh = THREE.MathUtils.damp(smoothOh, targetOh, 16, dt);
 
       // --- 4. Smile & Eyebrow Expression ---
+      const exprSmileBoost = curExpression === 'happy' ? 0.42 : curExpression === 'thinking' ? -0.06 : 0;
       const targetSmile = THREE.MathUtils.clamp(
         0.15 +
+          exprSmileBoost +
           (curStatus === 'listening' ? 0.18 : 0) +
           (isSpeaking ? 0.14 * (1 - smoothOh) : 0) +
           clickReact * 0.65 -
@@ -709,9 +723,15 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       const targetBrow =
         (isSpeaking ? Math.max(0, Math.sin(elapsed * 4.2)) * speakEnergy * 0.65 : 0) +
         (curStatus === 'listening' ? 0.22 + listenEnergy * 0.25 : 0) +
+        (curExpression === 'happy' ? 0.24 : 0) +
         clickReact * 0.45;
       smoothBrow = THREE.MathUtils.damp(smoothBrow, targetBrow, 9, dt);
-      const browAsym = curStatus === 'listening' ? Math.sin(elapsed * 1.1) * 0.45 : Math.sin(elapsed * 0.6) * 0.15;
+      const browAsym =
+        curExpression === 'thinking'
+          ? 0.52 + Math.sin(elapsed * 1.4) * 0.18
+          : curStatus === 'listening'
+          ? Math.sin(elapsed * 1.1) * 0.45
+          : Math.sin(elapsed * 0.6) * 0.15;
 
       // --- 5. Head, Neck & Breathing Motion ---
       const breath = Math.sin(elapsed * 1.65);
@@ -727,6 +747,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
           : Math.sin(elapsed * 0.7) * 0.015) +
         clickReact * 0.11 * Math.sin(elapsed * 8.0);
       const targetRoll =
+        (curExpression === 'thinking' ? 0.085 : 0) +
         (curStatus === 'listening' ? 0.065 : Math.sin(elapsed * 0.48) * 0.028) +
         (isSpeaking ? Math.sin(elapsed * 2.4) * 0.04 : 0);
 

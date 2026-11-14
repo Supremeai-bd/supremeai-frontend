@@ -22,6 +22,8 @@ import {
 } from '../../hooks/useLiveVoiceSession';
 import { LiveVoiceAvatarCanvas } from './LiveVoiceAvatarCanvas';
 import { useThemeStore } from '../../stores/useThemeStore';
+import { useChatStore } from '../../stores/useChatStore';
+import { useAvatarExpression } from '../../hooks/useAvatarExpression';
 import {
   AVATAR_PRESETS,
   AvatarPreference,
@@ -61,10 +63,13 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
   const [showTranscriptDrawer, setShowTranscriptDrawer] = useState(false);
   const [textNudge, setTextNudge] = useState('');
   const [resetViewCounter, setResetViewCounter] = useState(0);
+  const [liveAudioLevel, setLiveAudioLevel] = useState(0);
   const [avatarPref, setAvatarPref] = useState<AvatarPreference>(() => loadAvatarPreference());
   const syncToChatRef = useRef(syncToChat);
   syncToChatRef.current = syncToChat;
 
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const streamingContent = useChatStore((s) => s.streamingContent);
   const resolvedScheme = useThemeStore((s) => s.resolvedScheme);
   const isDark = resolvedScheme === 'dark';
 
@@ -105,6 +110,23 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
 
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const hasAutoStartedRef = useRef(false);
+
+  const { expression, expressionClass } = useAvatarExpression({
+    streamingContent,
+    isStreaming,
+    voiceText: liveModelText,
+    isConnecting: status === 'connecting',
+  });
+
+  // Sample audio output level smoothly when panel is open so CSS keyframes scale with voice energy
+  useEffect(() => {
+    if (!isOpen) return;
+    const id = setInterval(() => {
+      const nextLevel = Math.min(1, Math.max(0, levelsRef.current.output || 0));
+      setLiveAudioLevel((prev) => (Math.abs(prev - nextLevel) > 0.04 ? nextLevel : prev));
+    }, 90);
+    return () => clearInterval(id);
+  }, [isOpen, levelsRef]);
 
   // Auto-start session when panel opens; disconnect when panel closes
   useEffect(() => {
@@ -176,21 +198,39 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
     : null;
   const captionText = liveModelText || liveUserText || latestTurn?.text || '';
 
+  const isSpeechActive = isStreaming || status === 'speaking' || liveAudioLevel > 0.06;
+  const effectiveAudioLevel = isStreaming
+    ? Math.max(liveAudioLevel, 0.55)
+    : status === 'speaking'
+    ? Math.max(liveAudioLevel, 0.4)
+    : liveAudioLevel;
+
   return (
     <aside
       data-testid="live-voice-panel"
       aria-label="3D Real-time Voice Companion"
-      className={
+      style={{ '--avatar-audio-level': effectiveAudioLevel.toFixed(2) } as React.CSSProperties}
+      className={`${expressionClass} ${isSpeechActive ? 'avatar-speech-active' : ''} ${
         isFullscreen
           ? 'fixed inset-0 z-50 w-screen h-screen bg-slate-100/88 dark:bg-slate-950/86 flex flex-col overflow-hidden'
           : 'fixed inset-0 z-40 md:static md:z-auto w-full md:w-[340px] lg:w-[370px] xl:w-[400px] shrink-0 h-full border-l border-slate-200/70 dark:border-slate-800/80 bg-slate-100/92 dark:bg-slate-950/90 md:bg-transparent dark:md:bg-transparent flex flex-col overflow-hidden'
-      }
+      }`}
     >
       {/* Top Bar (Outside 3D Canvas Viewport) */}
       <div className="px-3.5 py-2.5 border-b border-slate-200/80 dark:border-slate-800/90 bg-white/92 dark:bg-slate-900/92 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg theme-btn-primary flex items-center justify-center shrink-0">
-            <AudioLines className="w-3.5 h-3.5" />
+          {/* Expressive CSS Keyframe Mini-Avatar (blinking eyes + audio/streaming pulsing mouth + sentiment class) */}
+          <div
+            data-testid="avatar-expression-indicator"
+            data-expression={expression}
+            title={`Expression: ${expression}`}
+            className="avatar-expression-badge avatar-face-shell w-8 h-8 rounded-xl border bg-slate-950/90 flex flex-col items-center justify-center gap-1 shrink-0 transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="avatar-eye-sim w-1.5 h-1.5 rounded-full bg-current" />
+              <span className="avatar-eye-sim w-1.5 h-1.5 rounded-full bg-current" />
+            </div>
+            <span className="avatar-mouth-sim w-3 h-1 rounded-full bg-current" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -199,7 +239,10 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
               </h2>
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-[10px] font-medium text-slate-700 dark:text-slate-200">
                 <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dotColor}`} />
-                <span>{statusMeta.label}</span>
+                <span>{isStreaming && status !== 'speaking' ? 'Responding' : statusMeta.label}</span>
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800/90 text-[10px] font-medium capitalize text-slate-600 dark:text-slate-300">
+                {expression}
               </span>
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
@@ -297,6 +340,8 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
           avatarSrc={activeAvatarSource.src}
           isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
           avatarPreset={avatarPref.preset}
+          expression={expression}
+          isStreaming={isStreaming}
           isDark={isDark}
           resetViewCounter={resetViewCounter}
         />
