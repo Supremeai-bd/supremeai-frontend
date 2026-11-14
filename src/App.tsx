@@ -898,6 +898,7 @@ export default function App() {
                 }
                 roleName={activeRole.name}
                 onCommitTurn={appendVoiceTurn}
+                onSendChatPrompt={(text) => void handleSendMessageWrapper(text)}
                 onOpenVoiceSettings={() => {
                   setSettingsSubTab('voice-avatar');
                   setSettingsSubTabKey((k) => k + 1);

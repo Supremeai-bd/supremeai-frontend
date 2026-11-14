@@ -74,7 +74,7 @@ interface ChatRequestBody {
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '15mb' }));
 
   // Health and metadata endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
@@ -3098,6 +3098,83 @@ async function startServer() {
         error: `Could not load ${parsed.toString()}: ${msg}`,
         url: parsed.toString(),
       });
+    }
+  });
+
+  // Server-side Audio Transcription endpoint powered by gemini-3.5-transcribe
+  app.post('/api/transcribe', async (req: Request, res: Response) => {
+    try {
+      if (isIpBlocked(req)) {
+        res.status(403).json({ error: 'Request rejected by platform WAF IP blacklist.' });
+        return;
+      }
+
+      if (platformConfig.maintenanceMode) {
+        res.status(503).json({
+          error: platformConfig.maintenanceMessage || 'Platform is currently in maintenance mode.',
+        });
+        return;
+      }
+
+      const activeApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+      if (!activeApiKey || activeApiKey === 'MY_GEMINI_API_KEY') {
+        res.status(400).json({
+          error: 'API key is not configured. Please check your key in the Settings > Secrets panel.',
+        });
+        return;
+      }
+
+      const rawData = typeof req.body?.audioData === 'string' ? req.body.audioData : '';
+      const rawMimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType : 'audio/webm';
+      const promptHint =
+        typeof req.body?.prompt === 'string' && req.body.prompt.trim()
+          ? req.body.prompt.trim()
+          : 'Transcribe this audio accurately into clean, punctuated text. Return only the transcribed text.';
+
+      if (!rawData) {
+        res.status(400).json({ error: 'Audio payload is required for transcription.' });
+        return;
+      }
+
+      const base64Audio = rawData.includes(',') ? rawData.split(',')[1] : rawData;
+      // Strip codec suffixes such as "audio/webm;codecs=opus" -> "audio/webm"
+      const cleanMimeType = rawMimeType.split(';')[0].trim() || 'audio/webm';
+
+      const ai = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const startMs = Date.now();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-transcribe',
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: cleanMimeType,
+                data: base64Audio,
+              },
+            },
+            { text: promptHint },
+          ],
+        },
+      });
+
+      const transcript = (response.text || '').trim();
+      res.json({
+        transcript,
+        model: 'gemini-3.5-transcribe',
+        latencyMs: Date.now() - startMs,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Audio transcription failed.';
+      console.error('Error in /api/transcribe:', err);
+      res.status(502).json({ error: msg });
     }
   });
 

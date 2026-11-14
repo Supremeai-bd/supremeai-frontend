@@ -15,6 +15,8 @@ import {
   Minimize2,
   MessageSquareText,
   SlidersHorizontal,
+  Square,
+  Loader2,
 } from 'lucide-react';
 import {
   useLiveVoiceSession,
@@ -24,6 +26,7 @@ import { LiveVoiceAvatarCanvas } from './LiveVoiceAvatarCanvas';
 import { useThemeStore } from '../../stores/useThemeStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { useAvatarExpression } from '../../hooks/useAvatarExpression';
+import { useAudioTranscription } from '../../hooks/useAudioTranscription';
 import {
   AVATAR_PRESETS,
   AvatarPreference,
@@ -38,6 +41,7 @@ interface LiveVoicePanelProps {
   systemInstruction?: string;
   roleName?: string;
   onCommitTurn?: (userText: string, assistantText: string, voiceName?: string) => void;
+  onSendChatPrompt?: (text: string) => void;
   onOpenVoiceSettings?: () => void;
 }
 
@@ -56,6 +60,7 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
   systemInstruction,
   roleName = 'Assistant',
   onCommitTurn,
+  onSendChatPrompt,
   onOpenVoiceSettings,
 }) => {
   const [syncToChat, setSyncToChat] = useState(true);
@@ -118,6 +123,34 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
     isConnecting: status === 'connecting',
   });
 
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  const {
+    isRecording: isTranscribingRec,
+    isTranscribing,
+    recordingSeconds,
+    error: transcribeError,
+    lastTranscript,
+    toggleRecording: toggleTranscribeRecording,
+    clearError: clearTranscribeError,
+  } = useAudioTranscription({
+    onAudioLevel: (lvl) => {
+      levelsRef.current.input = lvl;
+    },
+    onTranscript: (text) => {
+      const s = statusRef.current;
+      const liveReady = s === 'listening' || s === 'speaking' || s === 'muted';
+      if (liveReady) {
+        sendTextPrompt(text);
+      } else if (onSendChatPrompt) {
+        onSendChatPrompt(text);
+      } else {
+        setTextNudge((prev) => (prev ? `${prev} ${text}` : text));
+      }
+    },
+  });
+
   // Sample audio output level smoothly when panel is open so CSS keyframes scale with voice energy
   useEffect(() => {
     if (!isOpen) return;
@@ -175,9 +208,15 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
 
   const handleSendNudge = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!textNudge.trim() || !isSessionActive) return;
-    sendTextPrompt(textNudge);
-    setTextNudge('');
+    const cleaned = textNudge.trim();
+    if (!cleaned) return;
+    if (isSessionActive) {
+      sendTextPrompt(cleaned);
+      setTextNudge('');
+    } else if (onSendChatPrompt) {
+      onSendChatPrompt(cleaned);
+      setTextNudge('');
+    }
   };
 
   const handleClose = () => {
@@ -191,12 +230,22 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
     ? `SupremeAI (${voiceName})`
     : liveUserText
     ? 'You'
+    : isTranscribing
+    ? 'gemini-3.5-transcribe'
+    : lastTranscript && !latestTurn
+    ? 'Transcribed'
     : latestTurn
     ? latestTurn.role === 'user'
       ? 'You'
       : `SupremeAI (${voiceName})`
     : null;
-  const captionText = liveModelText || liveUserText || latestTurn?.text || '';
+  const captionText =
+    liveModelText ||
+    liveUserText ||
+    (isTranscribing ? 'Transcribing microphone audio...' : '') ||
+    latestTurn?.text ||
+    lastTranscript ||
+    '';
 
   const isSpeechActive = isStreaming || status === 'speaking' || liveAudioLevel > 0.06;
   const effectiveAudioLevel = isStreaming
@@ -204,6 +253,9 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
     : status === 'speaking'
     ? Math.max(liveAudioLevel, 0.4)
     : liveAudioLevel;
+
+  const canSendText = isSessionActive || Boolean(onSendChatPrompt);
+  const avatarVisualStatus: LiveSessionStatus = isTranscribingRec ? 'listening' : status;
 
   return (
     <aside
@@ -316,25 +368,36 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
       </div>
 
       {/* Error Banner */}
-      {error && (
+      {(error || transcribeError) && (
         <div className="px-3.5 py-2 bg-rose-950/90 border-b border-rose-500/40 text-rose-200 text-xs flex items-center gap-2 shrink-0">
           <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-          <p className="flex-1 min-w-0 truncate">{error}</p>
-          <button
-            type="button"
-            onClick={() => connect()}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/35 text-[11px] font-semibold cursor-pointer shrink-0"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>Retry</span>
-          </button>
+          <p className="flex-1 min-w-0 truncate">{transcribeError || error}</p>
+          {transcribeError ? (
+            <button
+              type="button"
+              onClick={clearTranscribeError}
+              className="p-1 rounded hover:bg-rose-500/25 cursor-pointer shrink-0"
+              aria-label="Dismiss transcription error"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => connect()}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/35 text-[11px] font-semibold cursor-pointer shrink-0"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Retry</span>
+            </button>
+          )}
         </div>
       )}
 
       {/* Unobstructed Transparent 3D Hologram Viewport */}
       <div className="flex-1 min-h-[260px] relative bg-transparent overflow-hidden">
         <LiveVoiceAvatarCanvas
-          status={status}
+          status={avatarVisualStatus}
           voiceName={voiceName}
           levelsRef={levelsRef}
           avatarSrc={activeAvatarSource.src}
@@ -452,25 +515,61 @@ export const LiveVoicePanel: React.FC<LiveVoicePanelProps> = ({
           )}
         </div>
 
-        {/* Mid-Call Text Context Input */}
+        {/* Mid-Call Text & Transcribe Audio Input (gemini-3.5-transcribe) */}
         <form onSubmit={handleSendNudge} className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => void toggleTranscribeRecording()}
+            disabled={isTranscribing}
+            aria-label={isTranscribingRec ? 'Stop recording and transcribe audio' : 'Record speech to transcribe with gemini-3.5-transcribe'}
+            title={
+              isTranscribing
+                ? 'Transcribing audio with gemini-3.5-transcribe...'
+                : isTranscribingRec
+                ? 'Stop & transcribe audio'
+                : 'Transcribe microphone audio (gemini-3.5-transcribe)'
+            }
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+              isTranscribingRec
+                ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)]'
+            }`}
+          >
+            {isTranscribing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
+            ) : isTranscribingRec ? (
+              <>
+                <Square className="w-3 h-3 fill-current" />
+                <span className="font-mono text-[11px]">
+                  0:{String(recordingSeconds).padStart(2, '0')}
+                </span>
+              </>
+            ) : (
+              <Mic className="w-3.5 h-3.5 theme-accent-text" />
+            )}
+          </button>
+
           <input
             type="text"
             value={textNudge}
             onChange={(e) => setTextNudge(e.target.value)}
-            disabled={!isSessionActive}
+            disabled={!canSendText}
             placeholder={
-              isSessionActive
-                ? 'Type context to guide the 3D avatar...'
-                : 'Start voice chat to send context...'
+              isTranscribingRec
+                ? 'Listening for transcription... click stop when done'
+                : isTranscribing
+                ? 'Transcribing with gemini-3.5-transcribe...'
+                : isSessionActive
+                ? 'Type or dictate to guide 3D avatar...'
+                : 'Dictate audio or type to ask avatar...'
             }
-            className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/90 dark:border-slate-700/80 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none disabled:opacity-50"
+            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/90 dark:border-slate-700/80 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!isSessionActive || !textNudge.trim()}
-            aria-label="Send text prompt to voice session"
-            className="p-2 rounded-xl theme-btn-primary disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
+            disabled={!canSendText || !textNudge.trim()}
+            aria-label="Send text prompt to avatar"
+            className="p-2 rounded-xl theme-btn-primary disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer shrink-0"
           >
             <Send className="w-3.5 h-3.5" />
           </button>

@@ -14,12 +14,14 @@ import {
   Database,
   Lock,
   AudioLines,
+  Loader2,
 } from 'lucide-react';
 import { ModelDetail, ChatAttachment, PlanTier } from '../types';
 import { SUPREMEAI_MODELS } from '../data/models';
 import { usePlatformStore } from '../stores/usePlatformStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
+import { useAudioTranscription } from '../hooks/useAudioTranscription';
 
 interface ChatInputProps {
   onSendMessage: (text: string, attachment?: ChatAttachment) => void;
@@ -63,8 +65,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
+
+  const {
+    isRecording,
+    isTranscribing,
+    recordingSeconds,
+    error: transcribeError,
+    toggleRecording,
+    clearError: clearTranscribeError,
+  } = useAudioTranscription({
+    onTranscript: (transcript) => {
+      setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    },
+  });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,40 +145,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setShowAttachMenu(false);
   };
 
-  // Web Speech API Voice Dictation
+  // Microphone Audio Transcription via gemini-3.5-transcribe
   const toggleListening = () => {
-    const speechWindow = window as unknown as {
-      SpeechRecognition?: any;
-      webkitSpeechRecognition?: any;
-    };
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      return;
-    }
-
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    try {
-      const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-      };
-
-      recognition.start();
-    } catch {
-      setIsListening(false);
-    }
+    void toggleRecording();
   };
 
   const insertSnippet = (snippet: string) => {
@@ -206,6 +189,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               type="button"
               onClick={() => setAttachment(null)}
               className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-rose-500 transition-colors ml-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {transcribeError && (
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-600 dark:text-rose-300">
+            <span className="truncate">{transcribeError}</span>
+            <button
+              type="button"
+              onClick={clearTranscribeError}
+              className="p-0.5 rounded hover:bg-rose-500/20 cursor-pointer shrink-0"
+              aria-label="Dismiss audio transcription error"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -440,19 +437,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               )}
             </div>
 
-            {/* Voice Dictation (Microphone) */}
+            {/* Voice Transcription (Microphone -> gemini-3.5-transcribe) */}
             <button
               type="button"
               onClick={toggleListening}
-              aria-label="Voice input"
-              title="Voice dictation"
-              className={`p-1.5 rounded-full hover:bg-slate-200/80 dark:hover:bg-slate-700/80 transition-colors cursor-pointer ${
-                isListening
-                  ? 'text-rose-600 bg-rose-100 dark:bg-rose-950 animate-pulse'
+              disabled={isTranscribing}
+              aria-label={isRecording ? 'Stop recording and transcribe audio' : 'Record audio for transcription'}
+              title={
+                isTranscribing
+                  ? 'Transcribing with gemini-3.5-transcribe...'
+                  : isRecording
+                  ? 'Stop recording & transcribe'
+                  : 'Transcribe microphone audio (gemini-3.5-transcribe)'
+              }
+              className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-full hover:bg-slate-200/80 dark:hover:bg-slate-700/80 transition-colors cursor-pointer disabled:opacity-50 ${
+                isRecording
+                  ? 'text-white bg-rose-600 hover:bg-rose-700'
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
-              <Mic className="w-4 h-4" />
+              {isTranscribing ? (
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
+              ) : isRecording ? (
+                <>
+                  <Square className="w-3 h-3 fill-current" />
+                  <span className="font-mono text-[10px]">
+                    0:{String(recordingSeconds).padStart(2, '0')}
+                  </span>
+                </>
+              ) : (
+                <Mic className="w-4 h-4" />
+              )}
             </button>
 
             {/* Real-time 3D Voice Conversation (Gemini Live API) */}
