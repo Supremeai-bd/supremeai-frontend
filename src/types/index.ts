@@ -101,6 +101,7 @@ export interface PluginItem {
 }
 
 export type WorkspaceContentLayout = 'compact' | 'fluid' | 'maximized';
+export type AppLanguage = 'en' | 'bn';
 
 export interface UserAccountSettings {
   name: string;
@@ -113,6 +114,7 @@ export interface UserAccountSettings {
   autoCodeReview: boolean;
   streamResponses: boolean;
   defaultModel: string;
+  language?: AppLanguage;
   layoutMode?: 'sidebar-focus' | 'classic';
   contentLayout?: WorkspaceContentLayout;
   developerMode?: boolean;

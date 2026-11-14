@@ -15,6 +15,7 @@ import {
   Lock,
   AudioLines,
   Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { ModelDetail, ChatAttachment, PlanTier } from '../types';
 import { SUPREMEAI_MODELS } from '../data/models';
@@ -23,6 +24,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
 import { useAudioTranscription } from '../hooks/useAudioTranscription';
 import type { LiveSessionStatus } from '../hooks/useLiveVoiceSession';
+import { useI18n } from '../utils/i18n';
 
 interface ChatInputProps {
   onSendMessage: (text: string, attachment?: ChatAttachment) => void;
@@ -40,6 +42,8 @@ interface ChatInputProps {
   onOpenLiveVoice?: () => void;
   isLiveVoiceOpen?: boolean;
   voiceStatus?: LiveSessionStatus;
+  canReadAgain?: boolean;
+  onReadAgain?: () => void;
 }
 
 const TIER_RANK: Record<PlanTier, number> = {
@@ -64,11 +68,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onOpenLiveVoice,
   isLiveVoiceOpen = false,
   voiceStatus = 'idle',
+  canReadAgain = false,
+  onReadAgain,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
+  const { t } = useI18n();
 
   const {
     isRecording,
@@ -365,10 +372,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={
               attachment
-                ? 'Add instructions for attached file...'
+                ? t.attachmentPlaceholder
                 : isLiveVoiceOpen
-                ? 'Type or speak — AI replies in voice...'
-                : 'Ask SupremeAI or type instructions...'
+                ? t.voicePlaceholder
+                : t.askPlaceholder
             }
             className="order-1 @[640px]/input:order-2 basis-full @[640px]/input:basis-0 @[640px]/input:flex-1 min-w-0 max-h-40 bg-transparent resize-none border-none focus:outline-none text-xs @[520px]/input:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 px-2 py-1 leading-relaxed"
           />
@@ -452,6 +459,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </div>
 
             {/* Unified Voice & Microphone Mode Button */}
+            {onOpenLiveVoice && isLiveVoiceOpen && onReadAgain && (
+              <button
+                type="button"
+                onClick={onReadAgain}
+                disabled={!canReadAgain}
+                title={canReadAgain ? t.readAgainTooltip : t.noPreviousResponse}
+                aria-label={t.readAgain}
+                className={`sm:hidden inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  canReadAgain
+                    ? 'border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] cursor-pointer'
+                    : 'border-slate-200/60 dark:border-slate-800 text-slate-400 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <RotateCcw className="w-3 h-3 shrink-0" />
+                <span className="hidden @[440px]/input:inline">{t.readAgain}</span>
+              </button>
+            )}
             {onOpenLiveVoice ? (
               <button
                 type="button"
@@ -474,12 +498,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 ) : (
                   <Mic className="w-3.5 h-3.5 shrink-0" />
                 )}
-                <span className="hidden @[440px]/input:inline">
+                <span className="hidden @[440px]/input:inline whitespace-nowrap">
                   {isLiveVoiceOpen
                     ? voiceStatus === 'speaking'
-                      ? 'Speaking'
-                      : 'Voice On'
-                    : 'Voice'}
+                      ? t.voiceSpeakingBtn
+                      : t.voiceOnBtn
+                    : t.voiceBtn}
                 </span>
               </button>
             ) : (

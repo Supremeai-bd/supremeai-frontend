@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Copy, Check, Paperclip, Sparkles, User } from 'lucide-react';
+import { Copy, Check, Paperclip, Sparkles, User, Volume2 } from 'lucide-react';
 import { Marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ChatMessage, RolePersona, ModelDetail } from '../../types';
 import { ResearchReportViewer } from './ResearchReportViewer';
+import { useI18n } from '../../utils/i18n';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -11,6 +12,7 @@ interface ChatMessageItemProps {
   activeModel: ModelDetail;
   searchQuery?: string;
   developerMode?: boolean;
+  onSpeakText?: (text: string) => void;
 }
 
 // Escape HTML utility
@@ -87,7 +89,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   activeRole,
   activeModel,
   developerMode = false,
+  onSpeakText,
 }) => {
+  const { t } = useI18n();
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
 
@@ -149,24 +153,36 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             </span>
           </div>
 
-          {/* Copy Message Button */}
-          <button
-            onClick={handleCopyMessage}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer text-[11px] flex items-center gap-1"
-            title="Copy message text"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-mono">Copied</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                <span className="font-mono">Copy</span>
-              </>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isUser && onSpeakText && message.content.trim() && (
+              <button
+                type="button"
+                onClick={() => onSpeakText(message.content)}
+                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-cyan-500 cursor-pointer text-[11px] flex items-center gap-1 transition-colors"
+                title={t.readAloud}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span className="font-mono hidden sm:inline">{t.readAloud}</span>
+              </button>
             )}
-          </button>
+            <button
+              onClick={handleCopyMessage}
+              className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer text-[11px] flex items-center gap-1 transition-colors"
+              title="Copy message text"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400 font-mono">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span className="font-mono">Copy</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Multimodal Attachment Preview if present */}

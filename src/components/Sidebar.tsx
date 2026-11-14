@@ -40,6 +40,7 @@ import {
 import { ChatSession, RolePersona, UserRole, AuthUser } from '../types';
 import { useThemeStore, LIVE_THEMES } from '../stores/useThemeStore';
 import { ThemeControlPopover } from './theme/ThemeControlPopover';
+import { useI18n } from '../utils/i18n';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -116,6 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [editingTitle, setEditingTitle] = useState('');
   const liveTheme = useThemeStore((s) => s.liveTheme);
   const activeThemeMeta = LIVE_THEMES.find((t) => t.id === liveTheme) || LIVE_THEMES[0];
+  const { t } = useI18n();
 
   const pinnedSessions = sessions.filter((s) => s.isPinned);
   const recentSessions = [...sessions]
@@ -316,7 +318,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-full bg-slate-200/80 hover:bg-slate-300/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-900 dark:text-slate-100 text-xs font-medium transition-colors cursor-pointer shadow-xs"
         >
           <Plus className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-          <span>New chat</span>
+          <span>{t.newChat}</span>
         </button>
       </div>
 
@@ -686,7 +688,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <>
             <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Workspace
+              {t.workspaceSection}
             </div>
 
             <button
@@ -700,7 +702,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-3">
                 <History className="w-4 h-4 text-slate-500" />
-                <span>All Conversations</span>
+                <span>{t.allConversations}</span>
               </div>
               {isGuest ? (
                 <Lock className="w-3 h-3 text-slate-400" />
@@ -722,7 +724,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-3">
                 <CreditCard className="w-4 h-4 text-emerald-500" />
-                <span>Plan & Usage</span>
+                <span>{t.planUsage}</span>
               </div>
               {isGuest && <Lock className="w-3 h-3 text-slate-400" />}
             </button>
@@ -738,7 +740,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-3">
                 <Users className="w-4 h-4 text-indigo-500" />
-                <span>Team & Members</span>
+                <span>{t.teamMembers}</span>
               </div>
               {isGuest && <Lock className="w-3 h-3 text-slate-400" />}
             </button>
@@ -754,7 +756,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-3">
                 <Settings className="w-4 h-4 text-slate-500" />
-                <span>Settings</span>
+                <span>{t.settings}</span>
               </div>
               {isGuest && <Lock className="w-3 h-3 text-slate-400" />}
             </button>
@@ -771,7 +773,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <BookOpen className="w-4 h-4 text-purple-500" />
-                  <span>Knowledge Base</span>
+                  <span>{t.knowledgeBase}</span>
                 </div>
                 <span className="text-[10px] font-mono text-purple-500">RAG</span>
               </button>
@@ -780,7 +782,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {developerMode && (
               <>
                 <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Developer Tools
+                  {t.developerTools}
                 </div>
 
                 {enableKnowledgeGrounding && (
@@ -795,7 +797,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <BookOpen className="w-4 h-4 text-purple-500" />
-                      <span>Knowledge & RAG</span>
+                      <span>{t.knowledgeRag}</span>
                     </div>
                     <span className="text-[10px] font-mono text-purple-500">RAG</span>
                   </button>
@@ -812,7 +814,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     <FolderGit2 className="w-4 h-4 text-slate-500" />
-                    <span>My Projects</span>
+                    <span>{t.myProjects}</span>
                   </div>
                   <span className="text-[10px] font-mono tabular-nums text-slate-400">
                     {projectsCount}
@@ -829,7 +831,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                 >
                   <Key className="w-4 h-4 text-blue-500" />
-                  <span>API Keys & Providers</span>
+                  <span>{t.apiKeysProviders}</span>
                 </button>
 
                 <button
@@ -843,7 +845,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     <Puzzle className="w-4 h-4 text-slate-500" />
-                    <span>Plugins & Tools</span>
+                    <span>{t.pluginsTools}</span>
                   </div>
                   <span className="text-[10px] font-mono tabular-nums text-slate-400">
                     {activePluginsCount}
@@ -865,7 +867,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="px-2 py-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               <span className="inline-flex items-center gap-1.5">
                 <Pin className="w-3 h-3 text-amber-500" />
-                <span>Pinned Chats</span>
+                <span>{t.pinnedChats}</span>
               </span>
               <span className="font-mono tabular-nums">{pinnedSessions.length}</span>
             </div>
@@ -877,7 +879,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="px-2 py-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             <span className="inline-flex items-center gap-1.5">
               <MessageSquare className="w-3 h-3 text-cyan-500" />
-              <span>Recent Chats</span>
+              <span>{t.recentChats}</span>
             </span>
             <span className="font-mono tabular-nums">{recentSessions.length}</span>
           </div>
@@ -885,7 +887,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {recentSessions.length === 0 ? (
             <div className="mx-1 px-3 py-2.5 rounded-xl border border-dashed border-slate-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[11px] text-slate-500 dark:text-slate-400">
               <p className="leading-relaxed">
-                Start a conversation and its sidebar title will be generated automatically.
+                {t.emptySidebarHint}
               </p>
             </div>
           ) : (
@@ -899,9 +901,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isGuest ? (
           <div className="space-y-2">
             <div className="px-2 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-[11px] text-slate-600 dark:text-slate-300">
-              <div className="font-semibold text-slate-900 dark:text-white">Guest Preview</div>
+              <div className="font-semibold text-slate-900 dark:text-white">{t.guestPreview}</div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                Chat & Voice unlocked · Sign in for Settings & tools
+                {t.guestHint}
               </div>
             </div>
             <button
@@ -910,7 +912,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-full py-2 px-3 rounded-xl theme-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In / Sign Up</span>
+              <span>{t.signInSignUp}</span>
             </button>
           </div>
         ) : (
@@ -921,11 +923,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={() => onSelectTab('user-billing')}
                 className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer space-y-1"
-                title="View Plan & Usage"
+                title={t.planUsage}
               >
                 <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                  <span>Monthly Credits</span>
-                  <span className="font-mono tabular-nums">{usagePercent}% used</span>
+                  <span>{t.monthlyCredits}</span>
+                  <span className="font-mono tabular-nums">{usagePercent}% {t.usedSuffix}</span>
                 </div>
                 <div className="w-full h-1 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                   <div
@@ -952,7 +954,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  Standard
+                  {t.standardMode}
                 </button>
                 <button
                   type="button"
@@ -965,7 +967,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  Developer
+                  {t.developerMode}
                 </button>
               </div>
             )}
@@ -986,7 +988,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 compact
                 align="left"
                 placement="top"
-                triggerLabel="Switch"
+                triggerLabel={t.switchTheme}
                 onOpenSettings={() => onSelectTab('user-settings')}
               />
             </div>

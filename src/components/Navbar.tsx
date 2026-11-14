@@ -3,6 +3,7 @@ import { PanelLeft, PanelRight, ShieldCheck, LogOut, LogIn, ChevronDown, Laptop,
 import { ModelDetail, UserRole, AuthUser } from '../types';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCustomerStore } from '../stores/useCustomerStore';
+import { useI18n } from '../utils/i18n';
 
 interface NavbarProps {
   activeTab: string;
@@ -47,6 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { isDockOpen, toggleDock, setDockOpen } = useWorkspaceStore();
   const storeDeveloperMode = useCustomerStore((s) => s.userSettings.developerMode);
+  const { t } = useI18n();
   const developerMode =
     developerModeProp !== undefined
       ? developerModeProp
@@ -188,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Chat
+              {t.navChat}
             </button>
             <button
               type="button"
@@ -199,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              History
+              {t.navHistory}
             </button>
             <button
               type="button"
@@ -210,7 +212,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Plan & Usage
+              {t.navPlanUsage}
             </button>
             <button
               type="button"
@@ -221,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Team
+              {t.navTeam}
             </button>
             {developerMode && (
               <>
@@ -234,7 +236,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  Projects
+                  {t.navProjects}
                 </button>
                 <button
                   type="button"
@@ -245,7 +247,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  Plugins
+                  {t.navPlugins}
                 </button>
               </>
             )}
@@ -258,7 +260,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Settings
+              {t.navSettings}
             </button>
           </>
         )}
@@ -344,7 +346,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full theme-btn-primary text-xs font-semibold cursor-pointer whitespace-nowrap shrink-0"
           >
             <LogIn className="w-3.5 h-3.5" />
-            <span>Sign In / Sign Up</span>
+            <span>{t.signInSignUp}</span>
           </button>
         ) : (
         <div className="relative">

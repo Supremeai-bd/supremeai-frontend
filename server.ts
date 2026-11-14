@@ -73,6 +73,7 @@ interface ChatRequestBody {
   systemInstruction?: string;
   groundingContext?: string;
   stream?: boolean;
+  language?: 'en' | 'bn';
   userContext?: {
     email?: string;
     role?: 'admin' | 'user';
@@ -2623,10 +2624,15 @@ async function startServer() {
             parts: [{ text: String(m.content || '') }],
           }));
         const systemMsg = messages.find((m: any) => m.role === 'system')?.content;
+        const langDirective =
+          body.language === 'bn'
+            ? '\n\n[DEFAULT RESPONSE LANGUAGE]: Always reply in clear, natural Bengali (বাংলা) by default, keeping code/technical identifiers in English unless the user explicitly asks for another language.'
+            : '\n\n[DEFAULT RESPONSE LANGUAGE]: Reply in clear English by default unless the user writes in Bengali (বাংলা) or requests another language.';
+        const combinedSystem = `${systemMsg ? String(systemMsg) : 'You are SupremeAI Studio, a helpful and authoritative AI assistant.'}${langDirective}`;
         const streamRes = await clientAi.models.generateContentStream({
           model: upstreamModel,
           contents,
-          config: systemMsg ? { systemInstruction: String(systemMsg) } : undefined,
+          config: { systemInstruction: combinedSystem },
         });
         for await (const chunk of streamRes) {
           const textChunk = chunk.text || '';
@@ -2663,6 +2669,7 @@ async function startServer() {
         systemInstruction,
         groundingContext,
         stream = true,
+        language,
         userContext,
       } = req.body;
 
@@ -2744,6 +2751,14 @@ async function startServer() {
         'You are SupremeAI, the premier intelligent AI engineering partner created by Supremeai-bd. You provide sharp, concise, authoritative code solutions, architectural insight, and deep reasoning with clean formatting.';
 
       let activeSystemInstruction = (systemInstruction || '').trim() || defaultSystemInstruction;
+
+      if (language === 'bn') {
+        activeSystemInstruction +=
+          '\n\n[DEFAULT RESPONSE LANGUAGE]: Respond naturally and fluently in Bengali (বাংলা) by default, keeping code/technical identifiers in English unless the user explicitly asks for another language.';
+      } else {
+        activeSystemInstruction +=
+          '\n\n[DEFAULT RESPONSE LANGUAGE]: Respond in clear English by default unless the user writes in Bengali (বাংলা) or explicitly requests another language.';
+      }
 
       // Inject Knowledge Base RAG grounding context if provided & enabled by runtime flags
       if (effectiveGrounding && effectiveGrounding.trim()) {
@@ -3495,6 +3510,93 @@ async function startServer() {
     }
   });
 
+  // Multilingual Neural Text-to-Speech endpoint (supports seamless Bengali/বাংলা + English speech)
+  app.post('/api/tts', async (req: Request, res: Response) => {
+    try {
+      if (isIpBlocked(req)) {
+        res.status(403).json({ error: 'Request rejected by platform WAF IP blacklist.' });
+        return;
+      }
+
+      const rawText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+      const voiceRaw = typeof req.body?.voiceName === 'string' ? req.body.voiceName.trim() : 'Zephyr';
+      const language = req.body?.language === 'bn' ? 'bn' : 'en';
+      const VALID_VOICES = new Set(['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr']);
+      const voiceName = VALID_VOICES.has(voiceRaw) ? voiceRaw : 'Zephyr';
+
+      if (!rawText) {
+        res.status(400).json({ error: 'Text is required for speech synthesis.' });
+        return;
+      }
+
+      const activeApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+      if (!activeApiKey || activeApiKey === 'MY_GEMINI_API_KEY') {
+        res.status(503).json({ error: 'GEMINI_API_KEY is not configured for neural TTS.' });
+        return;
+      }
+
+      const clientAi = new GoogleGenAI({
+        apiKey: activeApiKey,
+        httpOptions: {
+          apiVersion: 'v1beta',
+          headers: { 'User-Agent': 'aistudio-build' },
+        },
+      });
+
+      const truncatedText = rawText.slice(0, 1800);
+      const hasBengali = /[\u0980-\u09FF]/.test(truncatedText);
+      const hasLatin = /[A-Za-z]/.test(truncatedText);
+      const styleGuide =
+        hasBengali && hasLatin
+          ? 'Bilingual speaker fluent in both Bengali (বাংলা) and English; read every Bengali and English word aloud clearly without skipping either language.'
+          : hasBengali || language === 'bn'
+          ? 'Natural, warm Bengali (বাংলা) and English conversational narrator; speak every word clearly.'
+          : 'Clear, natural, expressive conversational voice.';
+
+      const ttsResponse = await clientAi.models.generateContent({
+        model: 'gemini-3.8-flash-lite-tts',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: truncatedText,
+                speechMetadata: {
+                  style: styleGuide,
+                },
+              } as any,
+            ],
+          },
+        ],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName },
+            },
+          },
+        },
+      });
+
+      const inlineData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      const base64Audio = inlineData?.data;
+      if (!base64Audio) {
+        res.status(502).json({ error: 'TTS model returned empty audio.' });
+        return;
+      }
+
+      res.json({
+        audioBase64: base64Audio,
+        mimeType: inlineData?.mimeType || 'audio/wav',
+        voiceName,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'TTS generation failed.';
+      console.error('Error in /api/tts:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Express Vite Dev Server or Production Static Serving
   if (isProduction) {
     app.use(express.static(path.resolve(__dirname, 'dist')));
@@ -3620,12 +3722,21 @@ async function startServer() {
       }
     };
 
-    const startLiveSession = (voiceRaw?: string, systemInstructionRaw?: string) => {
+    const startLiveSession = (
+      voiceRaw?: string,
+      systemInstructionRaw?: string,
+      languageRaw?: string
+    ) => {
       if (sessionPromise) return;
 
       const voiceName = voiceRaw && VALID_LIVE_VOICES.has(voiceRaw) ? voiceRaw : 'Zephyr';
+      const preferredLang = languageRaw === 'bn' ? 'bn' : 'en';
+      const langDirective =
+        preferredLang === 'bn'
+          ? 'Default spoken language: Bengali (বাংলা). Speak warmly and clearly in natural Bengali unless the user speaks or asks in another language. When reading or mixing Bengali (বাংলা) and English terms, pronounce EVERY Bengali word and EVERY English word audibly—never skip, silence, or drop the Bengali portion.'
+          : 'Default spoken language: English, unless the user speaks in Bengali (বাংলা) or requests another language. When speaking or reading mixed English and Bengali (বাংলা), pronounce BOTH English and Bengali portions clearly and audibly—never skip or drop Bengali words.';
       const baseInstruction =
-        'You are SupremeAI Live, a real-time conversational voice engineering partner in SupremeAI Studio. Respond naturally, concisely, and clearly in spoken dialogue without markdown formatting symbols.';
+        `You are SupremeAI Live, a real-time conversational voice engineering partner in SupremeAI Studio. Respond naturally, concisely, and clearly in spoken dialogue without markdown formatting symbols.\n\n${langDirective}`;
       const effectiveSystemInstruction = systemInstructionRaw?.trim()
         ? `${baseInstruction}\n\nActive Persona Context:\n${systemInstructionRaw.trim()}`
         : baseInstruction;
@@ -3737,12 +3848,12 @@ async function startServer() {
       }
 
       if (parsed?.type === 'init') {
-        startLiveSession(parsed.voiceName, parsed.systemInstruction);
+        startLiveSession(parsed.voiceName, parsed.systemInstruction, parsed.language);
         return;
       }
 
       if (!sessionPromise) {
-        startLiveSession(parsed?.voiceName, parsed?.systemInstruction);
+        startLiveSession(parsed?.voiceName, parsed?.systemInstruction, parsed?.language);
       }
 
       if (parsed?.type === 'audio' && typeof parsed.data === 'string' && parsed.data.length > 0) {

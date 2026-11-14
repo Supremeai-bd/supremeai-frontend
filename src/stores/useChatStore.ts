@@ -455,6 +455,8 @@ export const useChatStore = create<ChatState>((set, get) => {
         customerSettings.customInstructions?.trim() ||
         activeRole.systemInstruction;
 
+      const preferredLanguage = customerSettings.language || 'en';
+
       await chatService.streamChat({
         model: activeModel.id,
         messages: updatedMessages,
@@ -462,6 +464,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         systemInstruction: effectiveSystemInstruction,
         groundingContext,
         deepResearch,
+        language: preferredLanguage,
         userContext: {
           email: authState.authUser?.email || customerSettings.email,
           role: authState.currentRole,

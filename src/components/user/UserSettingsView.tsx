@@ -35,9 +35,11 @@ import {
   Loader2,
   ShieldCheck,
   AlertCircle,
+  Globe,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
+import { AppLanguage, UserAccountSettings, UserRole, WorkspaceContentLayout } from '../../types';
+import { APP_LANGUAGE_OPTIONS, TranslationKeys, useI18n } from '../../utils/i18n';
 import { SUPREMEAI_MODELS } from '../../data/models';
 import {
   useThemeStore,
@@ -55,8 +57,10 @@ import { LiveVoiceAvatarCanvas } from '../chat/LiveVoiceAvatarCanvas';
 import {
   AVATAR_PRESETS,
   AvatarPreference,
+  AvatarRenderQuality,
   loadAvatarPreference,
   saveAvatarPreference,
+  saveRenderQualityPreference,
   resolveAvatarSource,
   processCustomFaceUpload,
   loadVoicePreference,
@@ -88,13 +92,13 @@ interface UserSettingsViewProps {
 
 const SETTINGS_TABS: Array<{
   id: SettingsSubTab;
-  label: string;
+  labelKey: TranslationKeys;
   icon: React.ReactNode;
 }> = [
-  { id: 'general', label: 'General', icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
-  { id: 'appearance', label: 'Appearance', icon: <Palette className="w-3.5 h-3.5" /> },
-  { id: 'voice-avatar', label: 'Voice & Avatar', icon: <AudioLines className="w-3.5 h-3.5" /> },
-  { id: 'account', label: 'Account & Security', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
+  { id: 'general', labelKey: 'tabGeneral', icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
+  { id: 'appearance', labelKey: 'tabAppearance', icon: <Palette className="w-3.5 h-3.5" /> },
+  { id: 'voice-avatar', labelKey: 'tabVoiceAvatar', icon: <AudioLines className="w-3.5 h-3.5" /> },
+  { id: 'account', labelKey: 'tabAccount', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
 ];
 
 export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
@@ -134,6 +138,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     settings.showWorkspaceTips !== false
   );
   const [defaultModel, setDefaultModel] = useState(settings.defaultModel);
+  const [language, setLanguage] = useState<AppLanguage>(settings.language || 'en');
   const [customInstructions, setCustomInstructions] = useState(settings.customInstructions || '');
   const [layoutMode, setLayoutMode] = useState<'sidebar-focus' | 'classic'>(
     settings.layoutMode || 'sidebar-focus'
@@ -142,6 +147,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     settings.contentLayout || 'fluid'
   );
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const { t } = useI18n();
 
   // Voice & 3D Hologram Avatar state (synced live with LiveVoicePanel)
   const [avatarPref, setAvatarPref] = useState<AvatarPreference>(() => loadAvatarPreference());
@@ -224,6 +230,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       enableKnowledgeGrounding,
       showWorkspaceTips,
       defaultModel,
+      language,
       layoutMode,
       contentLayout,
       customInstructions,
@@ -231,6 +238,11 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     setChatCustomInstruction(customInstructions);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleSelectLanguage = (nextLang: AppLanguage) => {
+    setLanguage(nextLang);
+    onUpdateSettings({ language: nextLang });
   };
 
   const triggerPreviewPulse = () => {
@@ -291,6 +303,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     try {
       const { dataUrl, traits } = await processCustomFaceUpload(file);
       const next: AvatarPreference = {
+        ...avatarPref,
         preset: 'custom',
         customImageDataUrl: dataUrl,
         customImageName: file.name,
@@ -317,6 +330,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
 
   const handleClearCustomAvatar = () => {
     const next: AvatarPreference = {
+      ...avatarPref,
       preset: avatarPref.preset === 'male' ? 'male' : 'female',
       customImageDataUrl: null,
       customImageName: undefined,
@@ -325,6 +339,12 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
     setAvatarError(null);
     saveAvatarPreference(next);
     toast.info('Custom Photo Removed', 'Switched back to preset 3D hologram avatar.');
+  };
+
+  const handleSelectRenderQuality = (quality: AvatarRenderQuality) => {
+    setAvatarPref((prev) => ({ ...prev, renderQuality: quality }));
+    saveRenderQualityPreference(quality);
+    triggerPreviewPulse();
   };
 
   const handleSelectVoice = (voice: LiveVoiceName) => {
@@ -345,12 +365,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
       <div className="border-b border-slate-200/80 dark:border-slate-800 pb-4 space-y-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Account & Workspace Settings
+            {t.settingsTitle}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {devModeActive
-              ? 'Manage your profile, appearance, 3D voice avatar, and developer preferences.'
-              : 'Manage your profile, appearance, 3D voice avatar, and security settings.'}
+            {devModeActive ? t.settingsSubtitleDev : t.settingsSubtitleUser}
           </p>
         </div>
 
@@ -374,7 +392,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 <span className={active ? 'theme-accent-text' : 'text-slate-400'}>
                   {tab.icon}
                 </span>
-                <span>{tab.label}</span>
+                <span>{t[tab.labelKey]}</span>
               </button>
             );
           })}
@@ -572,6 +590,46 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-400"
                 />
+              </div>
+            </div>
+
+            {/* Preferred Language (UI + Default AI Chat & Voice Response Language) */}
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/70 space-y-2.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 theme-accent-text" />
+                  <span>{t.languageCardTitle}</span>
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {t.languageCardSubtitle}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {APP_LANGUAGE_OPTIONS.map((opt) => {
+                  const active = language === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      data-testid={`lang-option-${opt.id}`}
+                      onClick={() => handleSelectLanguage(opt.id)}
+                      className={`flex items-start justify-between gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        active
+                          ? 'theme-accent-active text-slate-900 dark:text-white shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold">{opt.nativeLabel}</span>
+                          <span className="text-[10px] font-mono text-slate-400">{opt.label}</span>
+                        </div>
+                        <p className="text-[11px] opacity-80 mt-0.5">{opt.description}</p>
+                      </div>
+                      {active && <Check className="w-3.5 h-3.5 theme-accent-text shrink-0 mt-0.5" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -868,10 +926,10 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
               {savedSuccess ? (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" />
-                  Settings saved successfully!
+                  {t.settingsSavedToast}
                 </span>
               ) : (
-                <span className="text-xs text-slate-400">Preferences saved locally and applied live.</span>
+                <span className="text-xs text-slate-400">{t.preferencesLocalHint}</span>
               )}
 
               <button
@@ -879,7 +937,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full theme-btn-primary text-xs font-medium cursor-pointer whitespace-nowrap shrink-0"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Save Preferences</span>
+                <span>{t.savePreferences}</span>
               </button>
             </div>
           </form>
@@ -1579,6 +1637,7 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                     isPrestyledHologram={activeAvatarSource.isPrestyledHologram}
                     avatarPreset={avatarPref.preset}
                     customTraits={avatarPref.customTraits}
+                    renderingQuality={avatarPref.renderQuality || 'ultra'}
                     isDark={resolvedScheme === 'dark'}
                   />
                 </motion.div>
@@ -1800,18 +1859,65 @@ export const UserSettingsView: React.FC<UserSettingsViewProps> = ({
                     <span>{avatarError}</span>
                   </div>
                 )}
+
+                {/* Avatar Rendering Quality Dropdown (Performance vs Ultra) */}
+                <div className="pt-3 border-t border-slate-200/70 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <label
+                      htmlFor="avatar-render-quality-select"
+                      className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5"
+                    >
+                      <Gauge className="w-3.5 h-3.5 theme-accent-text shrink-0" />
+                      <span>{t.renderingQuality}</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {t.renderingQualityHint}
+                    </p>
+                  </div>
+                  <select
+                    id="avatar-render-quality-select"
+                    data-testid="avatar-render-quality-select"
+                    value={avatarPref.renderQuality || 'ultra'}
+                    onChange={(e) =>
+                      handleSelectRenderQuality(e.target.value as AvatarRenderQuality)
+                    }
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer shrink-0 sm:min-w-[240px]"
+                  >
+                    <option value="performance">{t.renderQualityPerformance}</option>
+                    <option value="ultra">{t.renderQualityUltra}</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Voice Persona Settings */}
+              {/* Voice Persona & Default Speech Language Settings */}
               <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 theme-accent-text" />
-                    <span>Voice Persona</span>
-                  </h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Select the neural voice profile used during live 3D hologram conversations.
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 theme-accent-text" />
+                      <span>Voice Persona & Bilingual Speech</span>
+                    </h2>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Select the neural voice profile and default spoken language (Bangla & English are both pronounced cleanly).
+                    </p>
+                  </div>
+
+                  <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70">
+                    {APP_LANGUAGE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => handleSelectLanguage(opt.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                          language === opt.id
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {opt.nativeLabel}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">

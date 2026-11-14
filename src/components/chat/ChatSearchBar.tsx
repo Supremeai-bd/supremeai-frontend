@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
+import { useI18n } from '../../utils/i18n';
 
 interface ChatSearchBarProps {
   searchQuery: string;
@@ -22,6 +23,7 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({
   onClear,
   inputRef,
 }) => {
+  const { t } = useI18n();
   return (
     <div className="sticky top-0 z-10 w-full px-4 py-2.5 bg-white/80 dark:bg-[#131314]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-all">
       <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center gap-2">
@@ -33,7 +35,7 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search messages, code blocks, or reasoning output..."
+            placeholder={t.chatSearchPlaceholder}
             className="w-full pl-9 pr-9 py-1.5 text-xs rounded-xl bg-slate-100/90 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-sans"
           />
           {searchQuery && (
@@ -60,14 +62,14 @@ export const ChatSearchBar: React.FC<ChatSearchBarProps> = ({
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                {filter === 'all' ? 'All' : filter === 'user' ? 'You' : 'AI'}
+                {filter === 'all' ? t.filterAll : filter === 'user' ? t.filterYou : t.filterAi}
               </button>
             ))}
           </div>
 
           {searchQuery.trim() && (
             <span className="text-[11px] text-slate-400 shrink-0">
-              {totalMatches}/{totalMessages} found
+              {totalMatches}/{totalMessages} {t.foundSuffix}
             </span>
           )}
         </div>

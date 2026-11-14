@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { ChatSession } from '../../types';
+import { useI18n } from '../../utils/i18n';
 
 interface ChatHistoryViewProps {
   sessions: ChatSession[];
@@ -59,6 +60,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useI18n();
 
   const activeQuery = (appliedQuery || searchInput).trim().toLowerCase();
 
@@ -135,10 +137,10 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              All Conversations
+              {t.allConversations}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Search across titles, prompts, and assistant responses ({sessions.length} total)
+              {t.historySubtitle} ({sessions.length})
             </p>
           </div>
 
@@ -151,7 +153,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl theme-btn-primary text-xs font-semibold cursor-pointer whitespace-nowrap shrink-0 self-start sm:self-auto"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>New Chat</span>
+            <span>{t.newChat}</span>
           </button>
         </div>
 
@@ -169,7 +171,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
                   setSearchInput(e.target.value);
                   if (!e.target.value.trim()) setAppliedQuery('');
                 }}
-                placeholder="Search conversation titles, code snippets, or messages..."
+                placeholder={t.historySearchPlaceholder}
                 className="w-full pl-10 pr-9 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[var(--theme-accent)] focus:ring-2 focus:ring-[var(--theme-accent-soft)] transition-all"
               />
               {(searchInput || appliedQuery) && (
@@ -189,7 +191,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl theme-btn-primary text-xs font-semibold cursor-pointer whitespace-nowrap shrink-0"
             >
               <Search className="w-3.5 h-3.5" />
-              <span>Search</span>
+              <span>{t.searchBtn}</span>
             </button>
           </form>
 
@@ -197,11 +199,11 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
             <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100/90 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
               {(
                 [
-                  { id: 'all', label: `All (${sessions.length})` },
-                  { id: 'pinned', label: `Pinned (${sessions.filter((s) => s.isPinned).length})` },
+                  { id: 'all', label: `${t.filterAll} (${sessions.length})` },
+                  { id: 'pinned', label: `${t.filterPinned} (${sessions.filter((s) => s.isPinned).length})` },
                   {
                     id: 'with-messages',
-                    label: `With Messages (${sessions.filter((s) => (s.messages?.length || 0) > 0).length})`,
+                    label: `${t.filterWithMessages} (${sessions.filter((s) => (s.messages?.length || 0) > 0).length})`,
                   },
                 ] as const
               ).map((tab) => (
@@ -249,7 +251,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
                   onClick={handleClearSearch}
                   className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Clear Search
+                  {t.clearSearch}
                 </button>
               )}
               <button
@@ -260,7 +262,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
                 }}
                 className="px-3.5 py-2 rounded-xl theme-btn-primary text-xs font-semibold cursor-pointer"
               >
-                Start New Chat
+                {t.startNewChat}
               </button>
             </div>
           </div>
@@ -411,7 +413,7 @@ export const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({
                       }}
                       className="ml-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)] transition-colors cursor-pointer whitespace-nowrap"
                     >
-                      <span>Open</span>
+                      <span>{t.openBtn}</span>
                       <ArrowUpRight className="w-3 h-3" />
                     </button>
                   </div>

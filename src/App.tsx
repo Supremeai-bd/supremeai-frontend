@@ -85,6 +85,7 @@ import { useMcpTelemetry } from './hooks/useMcpTelemetry';
 import { useOsThemeSync } from './hooks/useOsThemeSync';
 import { LiveScreenBackdrop } from './components/theme/LiveScreenBackdrop';
 import { UserProject, ChatAttachment } from './types';
+import { useI18n } from './utils/i18n';
 
 const ADMIN_ONLY_TABS = new Set([
   'admin-overview',
@@ -274,6 +275,7 @@ export default function App() {
 
   const healthAlertCount = useControlCenterStore((s) => s.healthSnapshot?.alerts?.length ?? 0);
 
+  const { lang: appLanguage, t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 900 : true
   );
@@ -285,6 +287,7 @@ export default function App() {
     activeRole.systemInstruction;
   const liveVoice = useLiveVoiceSession({
     systemInstruction: liveVoiceSystemInstruction,
+    language: appLanguage,
     onTurnCommitted: appendVoiceTurn,
   });
 
@@ -295,7 +298,7 @@ export default function App() {
       liveVoice.disconnect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLiveVoiceOpen]);
+  }, [isLiveVoiceOpen, appLanguage]);
   const [authModal, setAuthModal] = useState<{ open: boolean; reason?: string }>({ open: false });
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general');
   const [settingsSubTabKey, setSettingsSubTabKey] = useState<number>(0);
@@ -346,8 +349,9 @@ export default function App() {
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.workspaceLayout = contentLayout;
+      document.documentElement.lang = appLanguage;
     }
-  }, [contentLayout]);
+  }, [contentLayout, appLanguage]);
 
   // Sync saved custom instructions into chat store on mount
   useEffect(() => {
@@ -539,6 +543,21 @@ export default function App() {
         liveVoice.speakFallbackText(lastMsg.content);
       }
     }
+  };
+
+  const lastAssistantResponseText = (() => {
+    const msgs = currentSession?.messages || [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant' && msgs[i].content.trim()) {
+        return msgs[i].content;
+      }
+    }
+    return liveVoice.lastSpokenText || '';
+  })();
+
+  const handleReadAgainVoice = () => {
+    if (!lastAssistantResponseText) return;
+    void liveVoice.speakFallbackText(lastAssistantResponseText);
   };
 
   const handleExecuteDangerAction = async () => {
@@ -774,7 +793,7 @@ export default function App() {
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold theme-btn-primary cursor-pointer shadow-xs"
                       >
                         <LogIn className="w-3.5 h-3.5" />
-                        <span>Sign In / Sign Up</span>
+                        <span>{t.signInSignUp}</span>
                       </button>
                     )}
 
@@ -799,7 +818,7 @@ export default function App() {
                           }`}
                         >
                           <Pin className="w-3 h-3" />
-                          <span className="hidden md:inline">{currentSession?.isPinned ? 'Pinned' : 'Pin'}</span>
+                          <span className="hidden md:inline">{currentSession?.isPinned ? t.pinned : t.pin}</span>
                         </button>
 
                         {developerMode && (
@@ -814,7 +833,7 @@ export default function App() {
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer shadow-xs"
                           >
                             <GitFork className="w-3 h-3" />
-                            <span className="hidden md:inline">Branch</span>
+                            <span className="hidden md:inline">{t.branch}</span>
                           </button>
                         )}
 
@@ -839,7 +858,7 @@ export default function App() {
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer shadow-xs"
                         >
                           <Share2 className="w-3 h-3" />
-                          <span className="hidden md:inline">Share</span>
+                          <span className="hidden md:inline">{t.share}</span>
                         </button>
 
                         <div className="relative">
@@ -849,7 +868,7 @@ export default function App() {
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-xs"
                           >
                             <Download className="w-3 h-3" />
-                            <span className="hidden md:inline">Export</span>
+                            <span className="hidden md:inline">{t.exportBtn}</span>
                           </button>
 
                           {showExportMenu && (
@@ -903,7 +922,7 @@ export default function App() {
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-500 transition-colors cursor-pointer shadow-xs"
                         >
                           <Trash2 className="w-3 h-3" />
-                          <span className="hidden md:inline">Clear</span>
+                          <span className="hidden md:inline">{t.clear}</span>
                         </button>
                       </>
                     )}
@@ -920,14 +939,14 @@ export default function App() {
                         }`}
                       >
                         <PanelRight className="w-3.5 h-3.5" />
-                        <span>{isDockOpen ? 'Close Dock' : 'Workspace'}</span>
+                        <span>{isDockOpen ? t.closeDock : t.workspaceDock}</span>
                       </button>
                     )}
                   </div>
                 </div>
 
                 {isChatEmpty ? (
-                  <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-4 py-6 flex flex-col">
+                  <div className="relative z-10 flex-1 min-h-0 overflow-y-auto chat-scroll-clean px-4 py-6 flex flex-col">
                     <div className="my-auto w-full flex flex-col items-center">
                       <ChatEmptyState
                         activeRole={activeRole}
@@ -970,6 +989,8 @@ export default function App() {
                           onOpenLiveVoice={() => setIsLiveVoiceOpen((v) => !v)}
                           isLiveVoiceOpen={isLiveVoiceOpen}
                           voiceStatus={liveVoice.status}
+                          canReadAgain={Boolean(lastAssistantResponseText)}
+                          onReadAgain={handleReadAgainVoice}
                         />
                       </div>
                       <WorkspaceTipBar
@@ -1004,6 +1025,7 @@ export default function App() {
                       error={inferenceError}
                       userName={authUser?.name || (isGuest ? 'Guest' : undefined)}
                       developerMode={developerMode}
+                      onSpeakText={(txt) => liveVoice.speakFallbackText(txt)}
                     />
 
                     <ChatInput
@@ -1040,6 +1062,8 @@ export default function App() {
                       onOpenLiveVoice={() => setIsLiveVoiceOpen((v) => !v)}
                       isLiveVoiceOpen={isLiveVoiceOpen}
                       voiceStatus={liveVoice.status}
+                      canReadAgain={Boolean(lastAssistantResponseText)}
+                      onReadAgain={handleReadAgainVoice}
                     />
                   </div>
                 )}
@@ -1051,6 +1075,8 @@ export default function App() {
                 voiceName={liveVoice.voiceName}
                 liveModelText={liveVoice.liveModelText}
                 levelsRef={liveVoice.levelsRef}
+                canReadAgain={Boolean(lastAssistantResponseText)}
+                onReadAgain={handleReadAgainVoice}
               />
 
               {(developerMode || effectiveRole === 'admin') && (
@@ -1083,7 +1109,7 @@ export default function App() {
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-900/80 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-[var(--theme-accent)] transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Overview</span>
+                      <span>{t.overview}</span>
                     </button>
                   )}
 
@@ -1097,12 +1123,25 @@ export default function App() {
                     ) : (
                       <ArrowLeft className="w-3.5 h-3.5 theme-accent-text" />
                     )}
-                    <span>{effectiveRole === 'admin' ? 'Chat Home' : 'Back to Chat'}</span>
+                    <span>{effectiveRole === 'admin' ? t.chatHome : t.backToChat}</span>
                   </button>
 
                   <span aria-hidden="true" className="hidden sm:inline text-slate-300 dark:text-slate-700">/</span>
                   <span className="hidden sm:inline text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                    {SUBVIEW_TITLES[activeTab] || 'Workspace'}
+                    {(() => {
+                      const localizedMap: Record<string, string> = {
+                        'chat-history': t.subviewChatHistory,
+                        'user-projects': t.subviewProjects,
+                        'user-api-keys': t.subviewApiKeys,
+                        'user-knowledge': t.subviewKnowledge,
+                        'user-team': t.subviewTeam,
+                        'user-billing': t.subviewBilling,
+                        usage: t.subviewUsage,
+                        'user-plugins': t.subviewPlugins,
+                        'user-settings': t.subviewSettings,
+                      };
+                      return localizedMap[activeTab] || SUBVIEW_TITLES[activeTab] || 'Workspace';
+                    })()}
                   </span>
                 </div>
 
@@ -1115,7 +1154,7 @@ export default function App() {
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Close</span>
+                    <span className="hidden sm:inline">{t.close}</span>
                   </button>
                 </div>
               </div>

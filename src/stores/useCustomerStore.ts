@@ -479,8 +479,13 @@ export const useCustomerStore = create<CustomerState>((set) => {
       set((state) => {
         const updated = { ...state.userSettings, ...newSettings };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
-        if (typeof document !== 'undefined' && updated.contentLayout) {
-          document.documentElement.dataset.workspaceLayout = updated.contentLayout;
+        if (typeof document !== 'undefined') {
+          if (updated.contentLayout) {
+            document.documentElement.dataset.workspaceLayout = updated.contentLayout;
+          }
+          if (updated.language) {
+            document.documentElement.lang = updated.language;
+          }
         }
         return { userSettings: updated };
       });

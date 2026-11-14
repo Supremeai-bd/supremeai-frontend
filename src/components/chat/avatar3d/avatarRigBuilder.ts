@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createAvatarTextureSet, type AvatarTextureSet } from './avatarTextures';
-import type { CustomFaceTraits } from '../../../utils/hologramAvatar';
+import type { AvatarRenderQuality, CustomFaceTraits } from '../../../utils/hologramAvatar';
 
 export interface AvatarPoseInput {
   elapsed: number;
@@ -271,7 +271,7 @@ function buildSculptedHeadGeometry(isFemale: boolean): THREE.BufferGeometry {
 function buildEyeAssembly(
   side: -1 | 1,
   eyeMat: THREE.MeshStandardMaterial,
-  corneaMat: THREE.MeshPhysicalMaterial,
+  corneaMat: THREE.MeshStandardMaterial,
   eyelidMat: THREE.MeshStandardMaterial,
   lashMat: THREE.MeshStandardMaterial,
   disposables: { geometries: THREE.BufferGeometry[] }
@@ -352,6 +352,7 @@ export interface AvatarRigOptions {
   maxAnisotropy?: number;
   customFaceImg?: HTMLImageElement | null;
   customTraits?: CustomFaceTraits;
+  quality?: AvatarRenderQuality;
 }
 
 function sanitizeColorHex(hex: string | undefined, fallback: number): number {
@@ -383,7 +384,9 @@ export function createArticulatedAvatarRig(
   const customFaceImg = options.customFaceImg ?? null;
   const isFemale =
     options.isFemale ?? (customTraits?.genderCue === 'female');
-  const maxAnisotropy = options.maxAnisotropy ?? maxAnisotropyArg;
+  const quality: AvatarRenderQuality = options.quality ?? 'ultra';
+  const isUltra = quality === 'ultra';
+  const maxAnisotropy = isUltra ? (options.maxAnisotropy ?? maxAnisotropyArg) : 1;
 
   const disposables = {
     geometries: [] as THREE.BufferGeometry[],
@@ -395,7 +398,8 @@ export function createArticulatedAvatarRig(
     isFemale,
     maxAnisotropy,
     customFaceImg,
-    customTraits
+    customTraits,
+    quality
   );
   disposables.textures.push(
     textures.skin,
@@ -405,17 +409,23 @@ export function createArticulatedAvatarRig(
     textures.particle
   );
 
-  // --- Shared PBR Materials ---
-  const skinMat = new THREE.MeshPhysicalMaterial({
-    map: textures.skin,
-    roughness: 0.46,
-    metalness: 0.02,
-    clearcoat: 0.14,
-    clearcoatRoughness: 0.48,
-    sheen: 0.35,
-    sheenRoughness: 0.55,
-    sheenColor: new THREE.Color(isFemale ? 0xffe4e6 : 0xe0f2fe),
-  });
+  // --- Shared Materials (Ultra uses full MeshPhysicalMaterial clearcoat/sheen; Performance uses streamlined MeshStandardMaterial) ---
+  const skinMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        map: textures.skin,
+        roughness: 0.46,
+        metalness: 0.02,
+        clearcoat: 0.14,
+        clearcoatRoughness: 0.48,
+        sheen: 0.35,
+        sheenRoughness: 0.55,
+        sheenColor: new THREE.Color(isFemale ? 0xffe4e6 : 0xe0f2fe),
+      })
+    : new THREE.MeshStandardMaterial({
+        map: textures.skin,
+        roughness: 0.5,
+        metalness: 0.02,
+      });
 
   const eyeMat = new THREE.MeshStandardMaterial({
     map: textures.eye,
@@ -423,17 +433,26 @@ export function createArticulatedAvatarRig(
     metalness: 0.02,
   });
 
-  const corneaMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.24,
-    roughness: 0.03,
-    metalness: 0.0,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.03,
-    reflectivity: 1.0,
-    depthWrite: false,
-  });
+  const corneaMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.24,
+        roughness: 0.03,
+        metalness: 0.0,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.03,
+        reflectivity: 1.0,
+        depthWrite: false,
+      })
+    : new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.16,
+        roughness: 0.08,
+        metalness: 0.05,
+        depthWrite: false,
+      });
 
   const lashMat = new THREE.MeshStandardMaterial({
     color: 0x0f172a,
@@ -447,29 +466,47 @@ export function createArticulatedAvatarRig(
     metalness: 0.08,
   });
 
-  const upperLipMat = new THREE.MeshPhysicalMaterial({
-    color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xc85d6c : 0xb36c6c),
-    roughness: 0.32,
-    metalness: 0.02,
-    clearcoat: 0.38,
-    clearcoatRoughness: 0.26,
-  });
+  const upperLipMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xc85d6c : 0xb36c6c),
+        roughness: 0.32,
+        metalness: 0.02,
+        clearcoat: 0.38,
+        clearcoatRoughness: 0.26,
+      })
+    : new THREE.MeshStandardMaterial({
+        color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xc85d6c : 0xb36c6c),
+        roughness: 0.36,
+        metalness: 0.02,
+      });
 
-  const lowerLipMat = new THREE.MeshPhysicalMaterial({
-    color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xd46a79 : 0xbd7676),
-    roughness: 0.28,
-    metalness: 0.02,
-    clearcoat: 0.45,
-    clearcoatRoughness: 0.22,
-  });
+  const lowerLipMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xd46a79 : 0xbd7676),
+        roughness: 0.28,
+        metalness: 0.02,
+        clearcoat: 0.45,
+        clearcoatRoughness: 0.22,
+      })
+    : new THREE.MeshStandardMaterial({
+        color: sanitizeColorHex(customTraits?.lipHex, isFemale ? 0xd46a79 : 0xbd7676),
+        roughness: 0.32,
+        metalness: 0.02,
+      });
 
-  const teethMat = new THREE.MeshPhysicalMaterial({
-    color: 0xf8fafc,
-    roughness: 0.18,
-    metalness: 0.02,
-    clearcoat: 0.7,
-    clearcoatRoughness: 0.15,
-  });
+  const teethMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        color: 0xf8fafc,
+        roughness: 0.18,
+        metalness: 0.02,
+        clearcoat: 0.7,
+        clearcoatRoughness: 0.15,
+      })
+    : new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.22,
+        metalness: 0.02,
+      });
 
   const tongueMat = new THREE.MeshStandardMaterial({
     color: 0xb95360,
@@ -483,29 +520,41 @@ export function createArticulatedAvatarRig(
     metalness: 0.0,
   });
 
-  const hairMat = new THREE.MeshPhysicalMaterial({
-    map: textures.hair,
-    roughness: 0.34,
-    metalness: 0.12,
-    clearcoat: 0.42,
-    clearcoatRoughness: 0.28,
-    sheen: 0.65,
-    sheenColor: new THREE.Color(0x38bdf8),
-    sheenRoughness: 0.4,
-  });
+  const hairMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        map: textures.hair,
+        roughness: 0.34,
+        metalness: 0.12,
+        clearcoat: 0.42,
+        clearcoatRoughness: 0.28,
+        sheen: 0.65,
+        sheenColor: new THREE.Color(0x38bdf8),
+        sheenRoughness: 0.4,
+      })
+    : new THREE.MeshStandardMaterial({
+        map: textures.hair,
+        roughness: 0.4,
+        metalness: 0.12,
+      });
 
-  const suitMat = new THREE.MeshPhysicalMaterial({
-    color: isFemale ? 0x13203b : 0x111c33,
-    roughness: 0.34,
-    metalness: 0.28,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.28,
-  });
+  const suitMat = isUltra
+    ? new THREE.MeshPhysicalMaterial({
+        color: isFemale ? 0x13203b : 0x111c33,
+        roughness: 0.34,
+        metalness: 0.28,
+        clearcoat: 0.35,
+        clearcoatRoughness: 0.28,
+      })
+    : new THREE.MeshStandardMaterial({
+        color: isFemale ? 0x13203b : 0x111c33,
+        roughness: 0.38,
+        metalness: 0.28,
+      });
 
   const accentGlowMat = new THREE.MeshStandardMaterial({
     color: 0x38bdf8,
     emissive: new THREE.Color(0x22d3ee),
-    emissiveIntensity: 1.35,
+    emissiveIntensity: isUltra ? 1.35 : 0.95,
     roughness: 0.2,
     metalness: 0.2,
   });
@@ -549,8 +598,8 @@ export function createArticulatedAvatarRig(
   torsoGeo.scale(1.0, 1.0, 0.52);
   disposables.geometries.push(torsoGeo);
   const torsoMesh = new THREE.Mesh(torsoGeo, suitMat);
-  torsoMesh.castShadow = true;
-  torsoMesh.receiveShadow = true;
+  torsoMesh.castShadow = isUltra;
+  torsoMesh.receiveShadow = isUltra;
   torsoGroup.add(torsoMesh);
 
   // Sleek illuminated collar ring framing neck
@@ -582,8 +631,8 @@ export function createArticulatedAvatarRig(
   disposables.geometries.push(neckGeo);
   const neckMesh = new THREE.Mesh(neckGeo, skinMat);
   neckMesh.position.set(0, 0.16, -0.02);
-  neckMesh.castShadow = true;
-  neckMesh.receiveShadow = true;
+  neckMesh.castShadow = isUltra;
+  neckMesh.receiveShadow = isUltra;
   neckGroup.add(neckMesh);
 
   // 3. Head Pivot (at C1 skull base)
@@ -594,8 +643,8 @@ export function createArticulatedAvatarRig(
   const headGeo = buildSculptedHeadGeometry(isFemale);
   disposables.geometries.push(headGeo);
   const headMesh = new THREE.Mesh(headGeo, skinMat);
-  headMesh.castShadow = true;
-  headMesh.receiveShadow = true;
+  headMesh.castShadow = isUltra;
+  headMesh.receiveShadow = isUltra;
   headGroup.add(headMesh);
 
   // Dark inner mouth backing shell tucked neatly behind closed lips
@@ -740,7 +789,7 @@ export function createArticulatedAvatarRig(
     const hairCap = new THREE.Mesh(hairCapGeo, hairMat);
     hairCap.position.set(0, 0.065, -0.055);
     hairCap.rotation.x = -0.42;
-    hairCap.castShadow = true;
+    hairCap.castShadow = isUltra;
     hairGroup.add(hairCap);
 
     // Swept side-locks framing outer temples, cheeks & jawline cleanly
@@ -756,7 +805,7 @@ export function createArticulatedAvatarRig(
       disposables.geometries.push(lockGeo);
       const lockMesh = new THREE.Mesh(lockGeo, hairMat);
       lockMesh.scale.set(0.55, 1.0, 1.15);
-      lockMesh.castShadow = true;
+      lockMesh.castShadow = isUltra;
       hairGroup.add(lockMesh);
     });
 
@@ -780,7 +829,7 @@ export function createArticulatedAvatarRig(
     const crown = new THREE.Mesh(crownGeo, hairMat);
     crown.position.set(0, 0.075, -0.052);
     crown.rotation.x = -0.4;
-    crown.castShadow = true;
+    crown.castShadow = isUltra;
     hairGroup.add(crown);
 
     // Sculpted swept front hair wave above forehead
@@ -794,7 +843,7 @@ export function createArticulatedAvatarRig(
     const crestGeo = createTaperedTubeGeometry(crestPts, 26, 12, (t) => 0.072 * (0.35 + 0.65 * Math.sin(t * Math.PI)));
     disposables.geometries.push(crestGeo);
     const crestMesh = new THREE.Mesh(crestGeo, hairMat);
-    crestMesh.castShadow = true;
+    crestMesh.castShadow = isUltra;
     hairGroup.add(crestMesh);
 
     // Tapered temple sideburns

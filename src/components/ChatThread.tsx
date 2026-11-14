@@ -16,6 +16,7 @@ interface ChatThreadProps {
   error: string | null;
   userName?: string;
   developerMode?: boolean;
+  onSpeakText?: (text: string) => void;
 }
 
 export const ChatThread: React.FC<ChatThreadProps> = ({
@@ -28,6 +29,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   error,
   userName,
   developerMode = false,
+  onSpeakText,
 }) => {
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,7 +149,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
         ref={containerRef}
         onScroll={handleScroll}
         onClick={handleContainerClick}
-        className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4"
+        className="flex-1 min-h-0 overflow-y-auto chat-scroll-clean p-4 sm:p-6 space-y-4"
       >
         {isEmpty ? (
           <ChatEmptyState
@@ -166,6 +168,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
                 activeModel={activeModel}
                 searchQuery={searchQuery}
                 developerMode={developerMode}
+                onSpeakText={onSpeakText}
               />
             ))}
 

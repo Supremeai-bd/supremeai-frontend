@@ -2,11 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { LiveSessionStatus, LiveVoiceName } from '../../hooks/useLiveVoiceSession';
 import type { AvatarExpression } from '../../hooks/useAvatarExpression';
 import {
   buildHologramTextures,
   type AvatarPresetId,
+  type AvatarRenderQuality,
   type CustomFaceTraits,
 } from '../../utils/hologramAvatar';
 import { createParticleSpriteTexture } from './avatar3d/avatarTextures';
@@ -24,6 +29,7 @@ interface LiveVoiceAvatarCanvasProps {
   isPrestyledHologram: boolean;
   avatarPreset?: AvatarPresetId;
   customTraits?: CustomFaceTraits;
+  renderingQuality?: AvatarRenderQuality;
   expression?: AvatarExpression;
   expressionIntensity?: number;
   isStreaming?: boolean;
@@ -76,7 +82,7 @@ function createPlaceholderTexture(fillHex: string): THREE.CanvasTexture {
   return tex;
 }
 
-// Upgraded Custom Photo Hologram Shaders: supports real-time lip/jaw displacement, eye blink & gaze glints
+// Upgraded Custom Photo Hologram Shaders: supports Ultra high-detail vs Performance simplified shading
 const HOLOGRAM_VERTEX_SHADER = /* glsl */ `
   uniform sampler2D uDepthMap;
   uniform float uTime;
@@ -84,6 +90,7 @@ const HOLOGRAM_VERTEX_SHADER = /* glsl */ `
   uniform float uJawOpen;
   uniform float uVisemeOh;
   uniform float uDepthScale;
+  uniform float uQuality;
 
   varying vec2 vUv;
   varying float vDepth;
@@ -104,8 +111,10 @@ const HOLOGRAM_VERTEX_SHADER = /* glsl */ `
     pos.y -= (lowerLipMask * 0.055 + chinMask * 0.025) * uJawOpen;
     pos.z += lowerLipMask * 0.018 * uVisemeOh;
 
-    float voiceWave = sin(uv.y * 22.0 - uTime * 8.5) * 0.007 * uSpeakEnergy * depth;
-    pos.z += voiceWave;
+    if (uQuality > 0.5) {
+      float voiceWave = sin(uv.y * 22.0 - uTime * 8.5) * 0.007 * uSpeakEnergy * depth;
+      pos.z += voiceWave;
+    }
 
     vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
     vViewPos = -mvPos.xyz;
@@ -125,6 +134,7 @@ const HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
   uniform float uLookY;
   uniform vec3 uAccentColor;
   uniform float uIsDarkBg;
+  uniform float uQuality;
 
   varying vec2 vUv;
   varying float vDepth;
@@ -134,42 +144,47 @@ const HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
     vec4 tex = texture2D(uColorMap, vUv);
     if (tex.a < 0.015) discard;
 
-    float eps = 0.004;
-    float dL = texture2D(uDepthMap, vUv - vec2(eps, 0.0)).r;
-    float dR = texture2D(uDepthMap, vUv + vec2(eps, 0.0)).r;
-    float dD = texture2D(uDepthMap, vUv - vec2(0.0, eps)).r;
-    float dU = texture2D(uDepthMap, vUv + vec2(0.0, eps)).r;
-    vec3 surfNormal = normalize(vec3((dL - dR) * 2.8, (dD - dU) * 2.8, 0.65));
     vec3 viewDir = normalize(vViewPos);
-    float fresnel = pow(1.0 - clamp(abs(dot(surfNormal, viewDir)), 0.0, 1.0), 2.1);
+    vec3 surfNormal = vec3(0.0, 0.0, 1.0);
+    float fineScan = 1.0;
+    float sweepBand = 0.0;
+    float glintL = 0.0;
+    float glintR = 0.0;
 
-    float fineScan = 0.93 + 0.07 * sin(vUv.y * 320.0 - uTime * 3.2);
-    float sweepY = fract(uTime * 0.19);
-    float sweepBand = exp(-pow((vUv.y - sweepY) * 14.0, 2.0)) * (0.24 + uSpeakEnergy * 0.4);
-
-    // Eye regions for custom portrait blinking & living eye catchlight tracking
+    // Eye & mouth masks (always active so blinks & speech stay responsive in both modes)
     vec2 eyeL = vec2(0.425, 0.565);
     vec2 eyeR = vec2(0.575, 0.565);
     float eyeMaskL = exp(-((vUv.x - eyeL.x) * (vUv.x - eyeL.x) / 0.0014 + (vUv.y - eyeL.y) * (vUv.y - eyeL.y) / 0.0007));
     float eyeMaskR = exp(-((vUv.x - eyeR.x) * (vUv.x - eyeR.x) / 0.0014 + (vUv.y - eyeR.y) * (vUv.y - eyeR.y) / 0.0007));
     float eyesMask = clamp(eyeMaskL + eyeMaskR, 0.0, 1.0);
-
-    vec2 gazeShift = vec2(uLookX * 0.011, uLookY * 0.007);
-    float glintL = exp(-length((vUv - (eyeL + gazeShift)) * vec2(85.0, 110.0)));
-    float glintR = exp(-length((vUv - (eyeR + gazeShift)) * vec2(85.0, 110.0)));
-
-    // Mouth interior parting shadow during speech
     float mouthOpenMask = exp(-((vUv.x - 0.5) * (vUv.x - 0.5) / 0.0055 + (vUv.y - 0.36) * (vUv.y - 0.36) / 0.0018));
 
+    if (uQuality > 0.5) {
+      float eps = 0.004;
+      float dL = texture2D(uDepthMap, vUv - vec2(eps, 0.0)).r;
+      float dR = texture2D(uDepthMap, vUv + vec2(eps, 0.0)).r;
+      float dD = texture2D(uDepthMap, vUv - vec2(0.0, eps)).r;
+      float dU = texture2D(uDepthMap, vUv + vec2(0.0, eps)).r;
+      surfNormal = normalize(vec3((dL - dR) * 2.8, (dD - dU) * 2.8, 0.65));
+
+      fineScan = 0.93 + 0.07 * sin(vUv.y * 320.0 - uTime * 3.2);
+      float sweepY = fract(uTime * 0.19);
+      sweepBand = exp(-pow((vUv.y - sweepY) * 14.0, 2.0)) * (0.24 + uSpeakEnergy * 0.4);
+
+      vec2 gazeShift = vec2(uLookX * 0.011, uLookY * 0.007);
+      glintL = exp(-length((vUv - (eyeL + gazeShift)) * vec2(85.0, 110.0)));
+      glintR = exp(-length((vUv - (eyeR + gazeShift)) * vec2(85.0, 110.0)));
+    }
+
+    float fresnel = pow(1.0 - clamp(abs(dot(surfNormal, viewDir)), 0.0, 1.0), 2.1);
     vec3 violetTint = vec3(0.56, 0.38, 1.0);
     vec3 rimGlow = mix(uAccentColor, violetTint, fresnel * 0.45) * (fresnel * (0.62 + uSpeakEnergy * 0.6));
 
     vec3 color = tex.rgb * fineScan;
-    // Blink darkens eye slit smoothly like descending eyelids
     color = mix(color, color * 0.24 + vec3(0.05, 0.12, 0.22), eyesMask * uBlink * 0.85);
-    // Subtle living eye glint when eyes are open
-    color += vec3(0.65, 0.92, 1.0) * (glintL + glintR) * (1.0 - uBlink) * 0.42;
-    // Darken inner mouth gap & add subtle vocal pulse
+    if (uQuality > 0.5) {
+      color += vec3(0.65, 0.92, 1.0) * (glintL + glintR) * (1.0 - uBlink) * 0.42;
+    }
     color = mix(color, vec3(0.03, 0.07, 0.16), mouthOpenMask * uJawOpen * 0.72);
     color += rimGlow;
     color += uAccentColor * (sweepBand * 0.42 + uListenEnergy * 0.14);
@@ -201,9 +216,19 @@ const RING_FRAGMENT_SHADER = /* glsl */ `
   uniform vec3 uColorA;
   uniform vec3 uColorB;
   uniform float uEnergy;
+  uniform float uQuality;
   varying vec2 vUv;
 
   void main() {
+    float core = 1.0 - abs(vUv.y - 0.5) * 2.0;
+    core = clamp(core, 0.0, 1.0);
+
+    if (uQuality <= 0.5) {
+      float simpleAlpha = core * (0.28 + uEnergy * 0.25);
+      gl_FragColor = vec4(uColorA, simpleAlpha);
+      return;
+    }
+
     float angle = fract(vUv.x - uTime * uSpeed + uOffset);
     float arc1 = smoothstep(0.0, 0.12, angle) * smoothstep(0.68, 0.16, angle);
     float arc2 = smoothstep(0.52, 0.64, angle) * smoothstep(0.95, 0.68, angle) * 0.6;
@@ -211,8 +236,7 @@ const RING_FRAGMENT_SHADER = /* glsl */ `
     float intensity = baseTrail + arc1 * (0.75 + uEnergy * 0.8) + arc2 * (0.55 + uEnergy * 0.55);
 
     vec3 col = mix(uColorA, uColorB, 0.5 + 0.5 * sin(vUv.x * 6.28318 + uTime));
-    float core = 1.0 - abs(vUv.y - 0.5) * 2.0;
-    core = pow(clamp(core, 0.0, 1.0), 1.4);
+    core = pow(core, 1.4);
 
     float alpha = clamp(intensity * core * (0.62 + uEnergy * 0.35), 0.0, 1.0);
     gl_FragColor = vec4(col * (1.0 + intensity * 0.42), alpha);
@@ -227,6 +251,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   isPrestyledHologram,
   avatarPreset = 'female',
   customTraits,
+  renderingQuality = 'ultra',
   expression = 'neutral',
   expressionIntensity = 0.65,
   isStreaming = false,
@@ -238,6 +263,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   const voiceRef = useRef<LiveVoiceName>(voiceName);
   const presetRef = useRef<AvatarPresetId>(avatarPreset);
   const customTraitsRef = useRef<CustomFaceTraits | undefined>(customTraits);
+  const qualityRef = useRef<AvatarRenderQuality>(renderingQuality);
   const expressionRef = useRef<AvatarExpression>(expression);
   const expressionIntensityRef = useRef<number>(expressionIntensity);
   const isStreamingRef = useRef<boolean>(isStreaming);
@@ -248,16 +274,25 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
   voiceRef.current = voiceName;
   presetRef.current = avatarPreset;
   customTraitsRef.current = customTraits;
+  qualityRef.current = renderingQuality;
   expressionRef.current = expression;
   expressionIntensityRef.current = expressionIntensity;
   isStreamingRef.current = isStreaming;
   isDarkRef.current = isDark;
 
   const sceneRefs = useRef<{
+    container: HTMLDivElement;
+    isSoftwareGl: boolean;
     renderer: THREE.WebGLRenderer;
+    composer: EffectComposer | null;
+    bloomPass: UnrealBloomPass | null;
+    keyLight: THREE.DirectionalLight;
     rigAnchor: THREE.Group;
     customBustMesh: THREE.Mesh;
     hologramMat: THREE.ShaderMaterial;
+    ringMaterials: THREE.ShaderMaterial[];
+    particleGeo: THREE.BufferGeometry;
+    particleCount: number;
     activeRig: ArticulatedAvatarRig | null;
     controls: OrbitControls;
     camera: THREE.PerspectiveCamera;
@@ -284,6 +319,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     if (!container) return;
 
     const isSoftwareGl = detectSoftwareWebGL();
+    const initialUltra = qualityRef.current === 'ultra' && !isSoftwareGl;
     const width = Math.max(container.clientWidth, 120);
     const height = Math.max(container.clientHeight, 120);
 
@@ -300,18 +336,46 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       powerPreference: 'high-performance',
     });
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(initialUltra ? Math.min(window.devicePixelRatio || 1, 2) : 1);
     renderer.setSize(width, height, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.06;
-    renderer.shadowMap.enabled = !isSoftwareGl;
+    renderer.shadowMap.enabled = initialUltra;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.background = 'transparent';
     container.appendChild(renderer.domElement);
+
+    // Alpha-preserving EffectComposer pipeline for Ultra mode (skipped on Performance or Software WebGL)
+    let composerRenderTarget: THREE.WebGLRenderTarget | null = null;
+    let composer: EffectComposer | null = null;
+    let renderPass: RenderPass | null = null;
+    let bloomPass: UnrealBloomPass | null = null;
+    let outputPass: OutputPass | null = null;
+
+    if (!isSoftwareGl) {
+      const pr = renderer.getPixelRatio();
+      composerRenderTarget = new THREE.WebGLRenderTarget(
+        Math.max(1, Math.floor(width * pr)),
+        Math.max(1, Math.floor(height * pr)),
+        {
+          type: THREE.HalfFloatType,
+          format: THREE.RGBAFormat,
+        }
+      );
+      composer = new EffectComposer(renderer, composerRenderTarget);
+      composer.setPixelRatio(pr);
+      composer.setSize(width, height);
+      renderPass = new RenderPass(scene, camera, undefined, new THREE.Color(0x000000), 0);
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.36, 0.45, 0.84);
+      outputPass = new OutputPass();
+      composer.addPass(renderPass);
+      composer.addPass(bloomPass);
+      composer.addPass(outputPass);
+    }
 
     // RoomEnvironment PBR Studio Reflections (identical intensity across GPU & Software WebGL)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
@@ -329,7 +393,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     const keyLight = new THREE.DirectionalLight(0xfff7ed, 2.25);
     keyLight.position.set(1.85, 2.4, 3.1);
     if (!isSoftwareGl) {
-      keyLight.castShadow = true;
+      keyLight.castShadow = initialUltra;
       keyLight.shadow.mapSize.set(1024, 1024);
       keyLight.shadow.bias = -0.0005;
       keyLight.shadow.camera.near = 0.5;
@@ -357,7 +421,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.02, 0);
-    controls.enableDamping = !isSoftwareGl;
+    controls.enableDamping = initialUltra;
     controls.dampingFactor = 0.08;
     controls.enablePan = false;
     controls.minDistance = 1.9;
@@ -394,6 +458,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
         uDepthScale: { value: 0.34 },
         uAccentColor: { value: new THREE.Color(STATUS_ACCENT_COLORS.idle) },
         uIsDarkBg: { value: isDarkRef.current ? 1.0 : 0.0 },
+        uQuality: { value: qualityRef.current === 'ultra' ? 1.0 : 0.0 },
       },
       vertexShader: HOLOGRAM_VERTEX_SHADER,
       fragmentShader: HOLOGRAM_FRAGMENT_SHADER,
@@ -409,7 +474,8 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     hologramGroup.add(customBustMesh);
 
     // Always mount the articulated 3D avatar rig (custom faces project cleanly onto its 3D head)
-    const maxAnisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+    const maxAnisotropy =
+      qualityRef.current === 'ultra' ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
     const initTraits = customTraitsRef.current;
     const activeRig: ArticulatedAvatarRig | null = createArticulatedAvatarRig(
       presetRef.current === 'custom'
@@ -417,10 +483,12 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
             isFemale: initTraits?.genderCue === 'female',
             maxAnisotropy,
             customTraits: initTraits,
+            quality: qualityRef.current,
           }
         : {
             isFemale: presetRef.current !== 'male',
             maxAnisotropy,
+            quality: qualityRef.current,
           }
     );
     rigAnchor.add(activeRig.root);
@@ -444,6 +512,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
           uColorA: { value: new THREE.Color(0x22d3ee) },
           uColorB: { value: new THREE.Color(0x8b5cf6) },
           uEnergy: { value: 0 },
+          uQuality: { value: qualityRef.current === 'ultra' ? 1.0 : 0.0 },
         },
         vertexShader: RING_VERTEX_SHADER,
         fragmentShader: RING_FRAGMENT_SHADER,
@@ -494,6 +563,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     }
     const particleGeo = new THREE.BufferGeometry();
     particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+    particleGeo.setDrawRange(0, qualityRef.current === 'performance' ? 36 : particleCount);
     const particleSpriteTex = createParticleSpriteTexture();
     const particleMat = new THREE.PointsMaterial({
       map: particleSpriteTex,
@@ -517,10 +587,18 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     };
 
     sceneRefs.current = {
+      container,
+      isSoftwareGl,
       renderer,
+      composer,
+      bloomPass,
+      keyLight,
       rigAnchor,
       customBustMesh,
       hologramMat,
+      ringMaterials,
+      particleGeo,
+      particleCount,
       activeRig,
       controls,
       camera,
@@ -566,6 +644,12 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h, false);
+        if (composer) {
+          composer.setSize(w, h);
+        }
+        if (bloomPass) {
+          bloomPass.resolution.set(w, h);
+        }
       }
     });
     resizeObserver.observe(container);
@@ -878,8 +962,10 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       particleMat.opacity = 0.45 + ringEnergy * 0.38;
       particleCloud.rotation.y += dt * (0.16 + ringEnergy * 0.42);
 
+      const isUltraFrame = qualityRef.current === 'ultra';
+      const activeParticleLimit = isUltraFrame ? particleCount : 36;
       const posAttr = particleGeo.getAttribute('position') as THREE.BufferAttribute;
-      for (let i = 0; i < particleCount; i++) {
+      for (let i = 0; i < activeParticleLimit; i++) {
         const yOff = Math.sin(elapsed * 1.2 + pPhases[i]) * 0.035;
         const rPulse = pRadii[i] * (1 + ringEnergy * 0.09);
         const ang = pPhases[i] + elapsed * 0.12;
@@ -890,7 +976,11 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
       posAttr.needsUpdate = true;
 
       controls.update();
-      renderer.render(scene, camera);
+      if (composer && isUltraFrame && !isSoftwareGl) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
       afterDraw(tick);
     };
 
@@ -927,6 +1017,12 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
         }
       });
 
+      if (renderPass) renderPass.dispose();
+      if (bloomPass) bloomPass.dispose();
+      if (outputPass) outputPass.dispose();
+      if (composer) composer.dispose();
+      if (composerRenderTarget) composerRenderTarget.dispose();
+
       envTarget.dispose();
       activeTexturesRef.current.color?.dispose();
       activeTexturesRef.current.depth?.dispose();
@@ -938,13 +1034,45 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     };
   }, [levelsRef]);
 
+  // Apply Rendering Quality (Performance vs Ultra) live without recreating WebGLRenderer
+  useEffect(() => {
+    const refs = sceneRefs.current;
+    if (!refs) return;
+    const isUltra = renderingQuality === 'ultra';
+    const useHighRes = isUltra && !refs.isSoftwareGl;
+    const pr = useHighRes ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+
+    refs.renderer.setPixelRatio(pr);
+    const w = Math.max(refs.container.clientWidth, 80);
+    const h = Math.max(refs.container.clientHeight, 80);
+    refs.renderer.setSize(w, h, false);
+
+    if (refs.composer) {
+      refs.composer.setPixelRatio(pr);
+      refs.composer.setSize(w, h);
+    }
+    if (refs.bloomPass) {
+      refs.bloomPass.resolution.set(w, h);
+    }
+
+    refs.renderer.shadowMap.enabled = useHighRes;
+    refs.keyLight.castShadow = useHighRes;
+    refs.controls.enableDamping = useHighRes;
+    refs.particleGeo.setDrawRange(0, isUltra ? refs.particleCount : 36);
+    refs.hologramMat.uniforms.uQuality.value = isUltra ? 1.0 : 0.0;
+    for (let i = 0; i < refs.ringMaterials.length; i++) {
+      refs.ringMaterials[i].uniforms.uQuality.value = isUltra ? 1.0 : 0.0;
+    }
+  }, [renderingQuality]);
+
   // Swap cleanly between Female, Male, and Face-Matched Custom 3D rigs without recreating WebGLRenderer
   useEffect(() => {
     const refs = sceneRefs.current;
     if (!refs) return;
     let cancelled = false;
 
-    const maxAnisotropy = Math.min(4, refs.renderer.capabilities.getMaxAnisotropy());
+    const maxAnisotropy =
+      renderingQuality === 'ultra' ? Math.min(8, refs.renderer.capabilities.getMaxAnisotropy()) : 1;
     const mountRig = (nextRig: ArticulatedAvatarRig) => {
       if (refs.activeRig) {
         refs.rigAnchor.remove(refs.activeRig.root);
@@ -956,7 +1084,13 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     };
 
     if (avatarPreset !== 'custom') {
-      mountRig(createArticulatedAvatarRig(avatarPreset !== 'male', maxAnisotropy));
+      mountRig(
+        createArticulatedAvatarRig({
+          isFemale: avatarPreset !== 'male',
+          maxAnisotropy,
+          quality: renderingQuality,
+        })
+      );
       refs.reactTrigger();
       return;
     }
@@ -967,6 +1101,7 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
         isFemale: customTraits?.genderCue === 'female',
         maxAnisotropy,
         customTraits,
+        quality: renderingQuality,
       })
     );
 
@@ -977,9 +1112,13 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
         if (cancelled || !sceneRefs.current) return;
         const facedRig = createArticulatedAvatarRig({
           isFemale: customTraits?.genderCue === 'female',
-          maxAnisotropy: Math.min(4, sceneRefs.current.renderer.capabilities.getMaxAnisotropy()),
+          maxAnisotropy:
+            renderingQuality === 'ultra'
+              ? Math.min(8, sceneRefs.current.renderer.capabilities.getMaxAnisotropy())
+              : 1,
           customFaceImg: img,
           customTraits,
+          quality: renderingQuality,
         });
         mountRig(facedRig);
         sceneRefs.current.reactTrigger();
@@ -994,12 +1133,13 @@ export const LiveVoiceAvatarCanvas: React.FC<LiveVoiceAvatarCanvasProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [avatarPreset, avatarSrc, customTraits, isPrestyledHologram]);
+  }, [avatarPreset, avatarSrc, customTraits, isPrestyledHologram, renderingQuality]);
 
   return (
     <div
       ref={mountRef}
       data-testid="live-voice-3d-canvas"
+      data-quality={renderingQuality}
       title="Drag to orbit · Move cursor for eye tracking · Click to smile & nod"
       className="w-full h-full relative select-none touch-none cursor-grab active:cursor-grabbing bg-transparent"
     >

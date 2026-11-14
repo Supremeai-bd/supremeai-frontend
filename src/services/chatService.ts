@@ -9,6 +9,7 @@ export interface ChatStreamOptions {
   groundingContext?: string;
   deepResearch?: boolean;
   stream?: boolean;
+  language?: 'en' | 'bn';
   userContext?: {
     email?: string;
     role?: 'admin' | 'user';
@@ -30,6 +31,7 @@ export const chatService = {
       groundingContext,
       deepResearch = false,
       stream = true,
+      language = 'en',
       userContext,
       signal,
       onChunk,
@@ -108,6 +110,7 @@ export const chatService = {
           messages: formattedMessages,
           stream: true,
           deepResearch,
+          language,
           userContext,
         }),
       });
@@ -227,6 +230,7 @@ export const chatService = {
                 systemInstruction,
                 groundingContext,
                 stream: false,
+                language,
                 userContext,
               }),
             });

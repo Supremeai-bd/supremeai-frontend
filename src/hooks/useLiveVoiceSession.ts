@@ -36,6 +36,7 @@ export interface LiveTranscriptItem {
 
 interface UseLiveVoiceSessionOptions {
   systemInstruction?: string;
+  language?: 'en' | 'bn';
   onTurnCommitted?: (userText: string, assistantText: string, voice: LiveVoiceName) => void;
 }
 
@@ -100,8 +101,27 @@ function computeRms(samples: Float32Array): number {
   return Math.min(1, Math.sqrt(sum / samples.length) * 4.2);
 }
 
+function splitByScriptSegments(text: string): Array<{ text: string; lang: 'bn-BD' | 'en-US' }> {
+  const tokens = text.split(/([\u0980-\u09FF]+(?:[\s\u0964\u0965.,!?;:'"()-]+[\u0980-\u09FF]+)*)/g);
+  const segments: Array<{ text: string; lang: 'bn-BD' | 'en-US' }> = [];
+  for (const part of tokens) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const hasBengali = /[\u0980-\u09FF]/.test(trimmed);
+    const lang: 'bn-BD' | 'en-US' = hasBengali ? 'bn-BD' : 'en-US';
+    const prev = segments[segments.length - 1];
+    if (prev && prev.lang === lang) {
+      prev.text = `${prev.text} ${trimmed}`;
+    } else {
+      segments.push({ text: trimmed, lang });
+    }
+  }
+  return segments;
+}
+
 export function useLiveVoiceSession({
   systemInstruction,
+  language = 'en',
   onTurnCommitted,
 }: UseLiveVoiceSessionOptions = {}) {
   const [status, setStatus] = useState<LiveSessionStatus>('idle');
@@ -127,6 +147,7 @@ export function useLiveVoiceSession({
   const [transcripts, setTranscripts] = useState<LiveTranscriptItem[]>([]);
   const [liveUserText, setLiveUserText] = useState('');
   const [liveModelText, setLiveModelText] = useState('');
+  const [lastSpokenText, setLastSpokenText] = useState('');
 
   // Mutable refs for real-time audio callbacks (avoids stale closures & 60fps React renders)
   const wsRef = useRef<WebSocket | null>(null);
@@ -148,6 +169,9 @@ export function useLiveVoiceSession({
   const systemInstructionRef = useRef<string | undefined>(systemInstruction);
   systemInstructionRef.current = systemInstruction;
 
+  const languageRef = useRef<'en' | 'bn'>(language);
+  languageRef.current = language;
+
   const onTurnCommittedRef = useRef(onTurnCommitted);
   onTurnCommittedRef.current = onTurnCommitted;
 
@@ -156,6 +180,9 @@ export function useLiveVoiceSession({
   const queuedTextPromptsRef = useRef<string[]>([]);
   const isLiveReadyRef = useRef<boolean>(false);
   const ttsPulseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ttsAnalyserRafRef = useRef<number | null>(null);
+  const ttsGenerationRef = useRef<number>(0);
+  const ttsAbortRef = useRef<AbortController | null>(null);
   const levelsRef = useRef<{ input: number; output: number }>({ input: 0, output: 0 });
   const teardownGuardRef = useRef<boolean>(false);
 
@@ -187,6 +214,9 @@ export function useLiveVoiceSession({
     pendingModelTextRef.current = '';
     setLiveUserText('');
     setLiveModelText('');
+    if (mText) {
+      setLastSpokenText(mText);
+    }
     setTranscripts((prev) => [...prev, ...additions]);
 
     if (onTurnCommittedRef.current) {
@@ -195,6 +225,17 @@ export function useLiveVoiceSession({
   }, []);
 
   const stopAllPlayback = useCallback(() => {
+    ttsGenerationRef.current += 1;
+    if (ttsAbortRef.current) {
+      try {
+        ttsAbortRef.current.abort();
+      } catch {}
+      ttsAbortRef.current = null;
+    }
+    if (ttsAnalyserRafRef.current !== null) {
+      cancelAnimationFrame(ttsAnalyserRafRef.current);
+      ttsAnalyserRafRef.current = null;
+    }
     if (ttsPulseTimerRef.current) {
       clearInterval(ttsPulseTimerRef.current);
       ttsPulseTimerRef.current = null;
@@ -459,6 +500,7 @@ export function useLiveVoiceSession({
               type: 'init',
               voiceName: selectedVoice,
               systemInstruction: systemInstructionRef.current || '',
+              language: languageRef.current || 'en',
             })
           );
         };
@@ -596,45 +638,177 @@ export function useLiveVoiceSession({
     [stopAllPlayback]
   );
 
-  const speakFallbackText = useCallback(
-    (text: string) => {
-      const clean = text.replace(/```[\s\S]*?```/g, ' ').replace(/[#*_`>]/g, '').trim();
-      if (!clean || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  const speakViaBrowserFallback = useCallback((clean: string, genId: number) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (genId !== ttsGenerationRef.current) return;
 
-      stopAllPlayback();
-      const utterance = new SpeechSynthesisUtterance(clean.slice(0, 1400));
-      utterance.rate = 1.03;
+    const segments = splitByScriptSegments(clean.slice(0, 1400));
+    if (segments.length === 0) return;
 
-      const startPulse = () => {
-        setStatus('speaking');
-        const t0 = performance.now();
-        if (ttsPulseTimerRef.current) clearInterval(ttsPulseTimerRef.current);
-        ttsPulseTimerRef.current = setInterval(() => {
-          const s = (performance.now() - t0) / 1000;
-          levelsRef.current.output = 0.42 + 0.28 * Math.sin(s * 12) + 0.16 * Math.cos(s * 19);
-        }, 65);
-      };
+    const voices = window.speechSynthesis.getVoices?.() || [];
+    const bnVoice =
+      voices.find((v) => v.lang.toLowerCase().startsWith('bn-bd')) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith('bn'));
+    const enVoice =
+      voices.find((v) => v.lang.toLowerCase().startsWith('en-us')) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith('en'));
 
-      const finishPulse = () => {
-        if (ttsPulseTimerRef.current) {
-          clearInterval(ttsPulseTimerRef.current);
-          ttsPulseTimerRef.current = null;
-        }
-        levelsRef.current.output = 0;
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          setStatus(isMutedRef.current ? 'muted' : 'listening');
-        } else {
-          setStatus('idle');
-        }
-      };
+    const startPulse = () => {
+      setStatus('speaking');
+      const t0 = performance.now();
+      if (ttsPulseTimerRef.current) clearInterval(ttsPulseTimerRef.current);
+      ttsPulseTimerRef.current = setInterval(() => {
+        const s = (performance.now() - t0) / 1000;
+        levelsRef.current.output = 0.42 + 0.28 * Math.sin(s * 12) + 0.16 * Math.cos(s * 19);
+      }, 65);
+    };
 
-      utterance.onstart = startPulse;
-      utterance.onend = finishPulse;
-      utterance.onerror = finishPulse;
-      startPulse();
+    const finishPulse = () => {
+      if (ttsPulseTimerRef.current) {
+        clearInterval(ttsPulseTimerRef.current);
+        ttsPulseTimerRef.current = null;
+      }
+      levelsRef.current.output = 0;
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        setStatus(isMutedRef.current ? 'muted' : 'listening');
+      } else {
+        setStatus('idle');
+      }
+    };
+
+    let idx = 0;
+    const speakNext = () => {
+      if (genId !== ttsGenerationRef.current || idx >= segments.length) {
+        finishPulse();
+        return;
+      }
+      const seg = segments[idx++];
+      const utterance = new SpeechSynthesisUtterance(seg.text);
+      utterance.lang = seg.lang;
+      if (seg.lang.startsWith('bn') && bnVoice) {
+        utterance.voice = bnVoice;
+      } else if (seg.lang.startsWith('en') && enVoice) {
+        utterance.voice = enVoice;
+      }
+      utterance.rate = 1.02;
+      utterance.onend = speakNext;
+      utterance.onerror = speakNext;
       window.speechSynthesis.speak(utterance);
+    };
+
+    startPulse();
+    speakNext();
+  }, []);
+
+  const speakFallbackText = useCallback(
+    async (text: string) => {
+      const clean = text
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/[#*_>~|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!clean) return;
+
+      setLastSpokenText(clean);
+      stopAllPlayback();
+      const genId = ttsGenerationRef.current;
+      const controller = new AbortController();
+      ttsAbortRef.current = controller;
+
+      try {
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            text: clean.slice(0, 1800),
+            voiceName: voiceRef.current,
+            language: languageRef.current,
+          }),
+        });
+
+        if (genId !== ttsGenerationRef.current) return;
+        if (!res.ok) {
+          throw new Error(`TTS HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const base64Audio = typeof data?.audioBase64 === 'string' ? data.audioBase64 : '';
+        if (!base64Audio || genId !== ttsGenerationRef.current) {
+          throw new Error('Empty neural TTS payload');
+        }
+
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) {
+          throw new Error('Web Audio API unavailable');
+        }
+
+        if (!outputCtxRef.current || outputCtxRef.current.state === 'closed') {
+          outputCtxRef.current = new AudioCtx({ sampleRate: 24000 });
+          nextStartTimeRef.current = outputCtxRef.current.currentTime;
+        }
+        const ctx = outputCtxRef.current;
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+
+        const binary = atob(base64Audio);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+        if (genId !== ttsGenerationRef.current) return;
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        const sampleBuf = new Float32Array(analyser.fftSize);
+
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+
+        activeSourcesRef.current.add(source);
+        setStatus('speaking');
+
+        const tickLevel = () => {
+          if (genId !== ttsGenerationRef.current || activeSourcesRef.current.size === 0) {
+            levelsRef.current.output = 0;
+            ttsAnalyserRafRef.current = null;
+            return;
+          }
+          analyser.getFloatTimeDomainData(sampleBuf);
+          levelsRef.current.output = computeRms(sampleBuf);
+          ttsAnalyserRafRef.current = requestAnimationFrame(tickLevel);
+        };
+
+        source.onended = () => {
+          activeSourcesRef.current.delete(source);
+          if (ttsAnalyserRafRef.current !== null) {
+            cancelAnimationFrame(ttsAnalyserRafRef.current);
+            ttsAnalyserRafRef.current = null;
+          }
+          levelsRef.current.output = 0;
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            setStatus(isMutedRef.current ? 'muted' : 'listening');
+          } else {
+            setStatus('idle');
+          }
+        };
+
+        source.start(0);
+        ttsAnalyserRafRef.current = requestAnimationFrame(tickLevel);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        speakViaBrowserFallback(clean, genId);
+      }
     },
-    [stopAllPlayback]
+    [speakViaBrowserFallback, stopAllPlayback]
   );
 
   const interruptPlayback = useCallback(() => {
@@ -671,6 +845,7 @@ export function useLiveVoiceSession({
     transcripts,
     liveUserText,
     liveModelText,
+    lastSpokenText,
     levelsRef,
     connect,
     disconnect,

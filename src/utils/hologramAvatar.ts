@@ -3,6 +3,7 @@ import type { LiveVoiceName } from '../hooks/useLiveVoiceSession';
 import { detectClientFaceInCanvas, type NormalizedFaceBox } from './clientFaceDetection';
 
 export type AvatarPresetId = 'female' | 'male' | 'custom';
+export type AvatarRenderQuality = 'performance' | 'ultra';
 
 export interface CustomFaceTraits {
   skinHex?: string;
@@ -20,6 +21,7 @@ export interface AvatarPreference {
   customImageDataUrl: string | null;
   customImageName?: string;
   customTraits?: CustomFaceTraits;
+  renderQuality?: AvatarRenderQuality;
 }
 
 export interface AvatarPresetMeta {
@@ -46,9 +48,38 @@ export const AVATAR_PRESETS: AvatarPresetMeta[] = [
 
 const STORAGE_KEY = 'supremeai_voice_avatar_pref_v1';
 const VOICE_STORAGE_KEY = 'supremeai_live_voice_name_v1';
+const RENDER_QUALITY_STORAGE_KEY = 'supremeai_avatar_render_quality_v1';
 export const VOICE_AVATAR_SYNC_EVENT = 'supremeai:voice-avatar-updated';
 
 const VALID_VOICES: LiveVoiceName[] = ['Zephyr', 'Puck', 'Kore', 'Charon', 'Fenrir'];
+
+export function loadRenderQualityPreference(): AvatarRenderQuality {
+  try {
+    const raw = localStorage.getItem(RENDER_QUALITY_STORAGE_KEY);
+    if (raw === 'performance' || raw === 'ultra') return raw;
+    const prefRaw = localStorage.getItem(STORAGE_KEY);
+    if (prefRaw) {
+      const parsed = JSON.parse(prefRaw) as Partial<AvatarPreference>;
+      if (parsed.renderQuality === 'performance' || parsed.renderQuality === 'ultra') {
+        return parsed.renderQuality;
+      }
+    }
+  } catch {
+    // Ignore storage issues
+  }
+  return 'ultra';
+}
+
+export function saveRenderQualityPreference(quality: AvatarRenderQuality): void {
+  try {
+    localStorage.setItem(RENDER_QUALITY_STORAGE_KEY, quality);
+    const current = loadAvatarPreference();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, renderQuality: quality }));
+    window.dispatchEvent(new CustomEvent(VOICE_AVATAR_SYNC_EVENT));
+  } catch {
+    // Ignore storage issues
+  }
+}
 
 export function loadVoicePreference(): LiveVoiceName {
   try {
@@ -70,10 +101,24 @@ export function saveVoicePreference(voice: LiveVoiceName): void {
 }
 
 export function loadAvatarPreference(): AvatarPreference {
+  const renderQuality = (() => {
+    try {
+      const rq = localStorage.getItem(RENDER_QUALITY_STORAGE_KEY);
+      if (rq === 'performance' || rq === 'ultra') return rq;
+    } catch {
+      // Ignore storage issues
+    }
+    return undefined;
+  })();
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { preset: 'female', customImageDataUrl: null };
+      return {
+        preset: 'female',
+        customImageDataUrl: null,
+        renderQuality: renderQuality || 'ultra',
+      };
     }
     const parsed = JSON.parse(raw) as Partial<AvatarPreference>;
     const preset: AvatarPresetId =
@@ -84,23 +129,35 @@ export function loadAvatarPreference(): AvatarPreference {
       typeof parsed.customImageDataUrl === 'string' && parsed.customImageDataUrl.startsWith('data:image/')
         ? parsed.customImageDataUrl
         : null;
+    const resolvedQuality: AvatarRenderQuality =
+      renderQuality ||
+      (parsed.renderQuality === 'performance' || parsed.renderQuality === 'ultra'
+        ? parsed.renderQuality
+        : 'ultra');
+
     if (preset === 'custom' && !customImageDataUrl) {
-      return { preset: 'female', customImageDataUrl: null };
+      return { preset: 'female', customImageDataUrl: null, renderQuality: resolvedQuality };
     }
     return {
       preset,
       customImageDataUrl,
       customImageName: typeof parsed.customImageName === 'string' ? parsed.customImageName : undefined,
       customTraits: parsed.customTraits,
+      renderQuality: resolvedQuality,
     };
   } catch {
-    return { preset: 'female', customImageDataUrl: null };
+    return { preset: 'female', customImageDataUrl: null, renderQuality: renderQuality || 'ultra' };
   }
 }
 
 export function saveAvatarPreference(pref: AvatarPreference): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pref));
+    const quality: AvatarRenderQuality =
+      pref.renderQuality === 'performance' || pref.renderQuality === 'ultra'
+        ? pref.renderQuality
+        : loadRenderQualityPreference();
+    localStorage.setItem(RENDER_QUALITY_STORAGE_KEY, quality);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...pref, renderQuality: quality }));
     window.dispatchEvent(new CustomEvent(VOICE_AVATAR_SYNC_EVENT));
   } catch {
     // Ignore storage quota issues gracefully

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { RolePersona, ModelDetail } from '../../types';
 import { useThemeStore } from '../../stores/useThemeStore';
+import { useI18n } from '../../utils/i18n';
 
 interface ChatEmptyStateProps {
   activeRole: RolePersona;
@@ -18,6 +19,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   const [isKeyPulse, setIsKeyPulse] = useState(false);
   const liveTheme = useThemeStore((s) => s.liveTheme);
   const isScenic = liveTheme !== 'cyber-studio';
+  const { t } = useI18n();
 
   const firstName = userName.split(' ')[0].replace(/[^a-zA-Z0-9_-]/g, '') || 'there';
 
@@ -87,7 +89,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
           isScenic ? 'drop-shadow-[0_1px_12px_rgba(255,255,255,0.65)] dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.65)]' : ''
         }`}
       >
-        Where should we start,{' '}
+        {t.emptyGreetingPrefix}{' '}
         <span className="theme-accent-gradient-text">
           {firstName}?
         </span>

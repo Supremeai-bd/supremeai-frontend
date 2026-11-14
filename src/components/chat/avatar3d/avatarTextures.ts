@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CustomFaceTraits } from '../../../utils/hologramAvatar';
+import type { AvatarRenderQuality, CustomFaceTraits } from '../../../utils/hologramAvatar';
 
 export interface AvatarTextureSet {
   skin: THREE.CanvasTexture;
@@ -36,10 +36,12 @@ function sanitizeHex(hex: string | undefined, fallback: string): string {
 export function createSkinTexture(
   isFemale: boolean,
   anisotropy = 4,
-  customSkinHex?: string
+  customSkinHex?: string,
+  quality: AvatarRenderQuality = 'ultra'
 ): THREE.CanvasTexture {
-  const w = 1024;
-  const h = 512;
+  const texScale = quality === 'performance' ? 0.5 : 1;
+  const w = Math.round(1024 * texScale);
+  const h = Math.round(512 * texScale);
   const { canvas, ctx } = makeCanvas(w, h);
 
   const skinBase = sanitizeHex(customSkinHex, isFemale ? '#f3d4c4' : '#e8bfa7');
@@ -62,7 +64,7 @@ export function createSkinTexture(
   }
 
   // Gentle facial center luminance glow (u ~ 0.5, v ~ 0.48)
-  const faceGlow = ctx.createRadialGradient(w * 0.5, h * 0.48, 12, w * 0.5, h * 0.48, w * 0.24);
+  const faceGlow = ctx.createRadialGradient(w * 0.5, h * 0.48, 12 * texScale, w * 0.5, h * 0.48, w * 0.24);
   faceGlow.addColorStop(0, 'rgba(255, 245, 238, 0.28)');
   faceGlow.addColorStop(0.6, 'rgba(255, 236, 224, 0.12)');
   faceGlow.addColorStop(1, 'rgba(220, 185, 175, 0)');
@@ -71,13 +73,14 @@ export function createSkinTexture(
 
   // Rosy cheek blush gradients aligned symmetrically around center front
   const drawCheekBlush = (cx: number, cy: number) => {
-    const blush = ctx.createRadialGradient(cx, cy, 4, cx, cy, 56);
+    const r = 56 * texScale;
+    const blush = ctx.createRadialGradient(cx, cy, 4 * texScale, cx, cy, r);
     blush.addColorStop(0, isFemale ? 'rgba(236, 118, 128, 0.22)' : 'rgba(216, 118, 112, 0.13)');
     blush.addColorStop(0.6, 'rgba(232, 125, 130, 0.07)');
     blush.addColorStop(1, 'rgba(232, 125, 130, 0)');
     ctx.fillStyle = blush;
     ctx.beginPath();
-    ctx.arc(cx, cy, 56, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
   };
   drawCheekBlush(w * 0.435, h * 0.545);
@@ -85,13 +88,14 @@ export function createSkinTexture(
 
   // Soft orbital eye socket shading so eyes sit naturally framed
   const drawSocketShade = (cx: number, cy: number) => {
-    const shade = ctx.createRadialGradient(cx, cy, 6, cx, cy, 34);
+    const r = 34 * texScale;
+    const shade = ctx.createRadialGradient(cx, cy, 6 * texScale, cx, cy, r);
     shade.addColorStop(0, 'rgba(130, 92, 92, 0.24)');
     shade.addColorStop(0.65, 'rgba(155, 112, 108, 0.1)');
     shade.addColorStop(1, 'rgba(155, 112, 108, 0)');
     ctx.fillStyle = shade;
     ctx.beginPath();
-    ctx.arc(cx, cy, 34, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
   };
   drawSocketShade(w * 0.456, h * 0.466);
@@ -104,29 +108,31 @@ export function createSkinTexture(
   noseGrad.addColorStop(1, 'rgba(255, 248, 240, 0)');
   ctx.fillStyle = noseGrad;
   ctx.beginPath();
-  ctx.ellipse(w * 0.5, h * 0.505, 10, 28, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.5, h * 0.505, 10 * texScale, 28 * texScale, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Subtle lip-zone natural warmth
-  const lipBorder = ctx.createRadialGradient(w * 0.5, h * 0.615, 4, w * 0.5, h * 0.615, 38);
+  const lipBorder = ctx.createRadialGradient(w * 0.5, h * 0.615, 4 * texScale, w * 0.5, h * 0.615, 38 * texScale);
   lipBorder.addColorStop(0, 'rgba(195, 92, 98, 0.2)');
   lipBorder.addColorStop(1, 'rgba(195, 92, 98, 0)');
   ctx.fillStyle = lipBorder;
   ctx.beginPath();
-  ctx.ellipse(w * 0.5, h * 0.615, 38, 18, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.5, h * 0.615, 38 * texScale, 18 * texScale, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ultra-fine organic skin micro-variation
-  ctx.fillStyle = 'rgba(160, 120, 105, 0.035)';
-  for (let i = 0; i < 1600; i++) {
-    const px = (((i * 733) % 997) / 997) * w;
-    const py = (((i * 419 + 17) % 509) / 509) * h;
-    ctx.fillRect(px, py, 1.5, 1.5);
+  // Ultra-fine organic skin micro-variation (skipped in Performance mode for faster texture generation)
+  if (quality === 'ultra') {
+    ctx.fillStyle = 'rgba(160, 120, 105, 0.035)';
+    for (let i = 0; i < 1600; i++) {
+      const px = (((i * 733) % 997) / 997) * w;
+      const py = (((i * 419 + 17) % 509) / 509) * h;
+      ctx.fillRect(px, py, 1.5, 1.5);
+    }
   }
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = anisotropy;
+  tex.anisotropy = quality === 'performance' ? 1 : anisotropy;
   tex.needsUpdate = true;
   return tex;
 }
@@ -139,10 +145,11 @@ export function createSkinTexture(
 export function createCustomFaceSkinTexture(
   faceImg: HTMLImageElement,
   traits: CustomFaceTraits | undefined,
-  anisotropy = 4
+  anisotropy = 4,
+  quality: AvatarRenderQuality = 'ultra'
 ): THREE.CanvasTexture {
   const isFemale = traits?.genderCue === 'female';
-  const baseTex = createSkinTexture(isFemale, anisotropy, traits?.skinHex);
+  const baseTex = createSkinTexture(isFemale, anisotropy, traits?.skinHex, quality);
   const canvas = baseTex.image as HTMLCanvasElement;
   const ctx = canvas.getContext('2d');
   if (!ctx) return baseTex;
@@ -206,14 +213,16 @@ export function createCustomFaceSkinTexture(
 export function createEyeTexture(
   irisPrimaryHex: string,
   irisInnerHex: string,
-  anisotropy = 4
+  anisotropy = 4,
+  quality: AvatarRenderQuality = 'ultra'
 ): THREE.CanvasTexture {
-  const w = 512;
-  const h = 512;
+  const texScale = quality === 'performance' ? 0.5 : 1;
+  const w = Math.round(512 * texScale);
+  const h = Math.round(512 * texScale);
   const { canvas, ctx } = makeCanvas(w, h);
 
   // Sclera base with warm realistic outer shading
-  const scleraGrad = ctx.createRadialGradient(w * 0.5, h * 0.5, 38, w * 0.5, h * 0.5, w * 0.48);
+  const scleraGrad = ctx.createRadialGradient(w * 0.5, h * 0.5, 38 * texScale, w * 0.5, h * 0.5, w * 0.48);
   scleraGrad.addColorStop(0, '#fcfdfd');
   scleraGrad.addColorStop(0.5, '#f2f5f8');
   scleraGrad.addColorStop(0.85, '#dde3eb');
@@ -223,8 +232,8 @@ export function createEyeTexture(
 
   const cx = w * 0.5;
   const cy = h * 0.5;
-  const rx = 44;
-  const ry = 70;
+  const rx = 44 * texScale;
+  const ry = 70 * texScale;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -282,7 +291,7 @@ export function createEyeTexture(
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = anisotropy;
+  tex.anisotropy = quality === 'performance' ? 1 : anisotropy;
   tex.needsUpdate = true;
   return tex;
 }
@@ -290,9 +299,10 @@ export function createEyeTexture(
 export function createHairTexture(
   baseHex: string,
   highlightHex: string,
-  anisotropy = 4
+  anisotropy = 4,
+  quality: AvatarRenderQuality = 'ultra'
 ): THREE.CanvasTexture {
-  const size = 256;
+  const size = quality === 'performance' ? 128 : 256;
   const { canvas, ctx } = makeCanvas(size, size);
 
   const grad = ctx.createLinearGradient(0, 0, 0, size);
@@ -302,7 +312,8 @@ export function createHairTexture(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
-  for (let x = 0; x < size; x += 2) {
+  const step = quality === 'performance' ? 4 : 2;
+  for (let x = 0; x < size; x += step) {
     ctx.strokeStyle = x % 4 === 0 ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.14)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -316,7 +327,7 @@ export function createHairTexture(
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 2);
-  tex.anisotropy = anisotropy;
+  tex.anisotropy = quality === 'performance' ? 1 : anisotropy;
   tex.needsUpdate = true;
   return tex;
 }
@@ -357,7 +368,8 @@ export function createAvatarTextureSet(
   isFemale: boolean,
   anisotropy = 4,
   customFaceImg?: HTMLImageElement | null,
-  customTraits?: CustomFaceTraits
+  customTraits?: CustomFaceTraits,
+  quality: AvatarRenderQuality = 'ultra'
 ): AvatarTextureSet {
   const hairBase = sanitizeHex(customTraits?.hairHex, isFemale ? '#1a233a' : '#1b2234');
   const eyePrimary = sanitizeHex(customTraits?.eyeHex, isFemale ? '#0ea5e9' : '#2563eb');
@@ -365,13 +377,14 @@ export function createAvatarTextureSet(
 
   return {
     skin: customFaceImg
-      ? createCustomFaceSkinTexture(customFaceImg, customTraits, anisotropy)
-      : createSkinTexture(isFemale, anisotropy, customTraits?.skinHex),
-    eye: createEyeTexture(eyePrimary, eyeInner, anisotropy),
+      ? createCustomFaceSkinTexture(customFaceImg, customTraits, anisotropy, quality)
+      : createSkinTexture(isFemale, anisotropy, customTraits?.skinHex, quality),
+    eye: createEyeTexture(eyePrimary, eyeInner, anisotropy, quality),
     hair: createHairTexture(
       hairBase,
       customTraits?.hairHex ? '#334155' : isFemale ? '#2d3f63' : '#2a3754',
-      anisotropy
+      anisotropy,
+      quality
     ),
     mouthInterior: createMouthInteriorTexture(),
     particle: createParticleSpriteTexture(),

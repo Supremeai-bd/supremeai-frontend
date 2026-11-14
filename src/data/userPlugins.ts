@@ -105,6 +105,7 @@ export const DEFAULT_USER_SETTINGS: UserAccountSettings = {
   autoCodeReview: true,
   streamResponses: true,
   defaultModel: 'supreme-core',
+  language: 'en',
   layoutMode: 'sidebar-focus',
   contentLayout: 'fluid',
   developerMode: false,
