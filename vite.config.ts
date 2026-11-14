@@ -11,6 +11,19 @@ export default defineConfig(() => {
         '@': path.resolve(import.meta.dirname, '.'),
       },
     },
+    build: {
+      rolldownOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules/three')) return 'vendor-three';
+            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'vendor-charts';
+            if (id.includes('node_modules/@xterm')) return 'vendor-xterm';
+            if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
+            if (id.includes('node_modules')) return 'vendor';
+          },
+        },
+      },
+    },
     server: {
       allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

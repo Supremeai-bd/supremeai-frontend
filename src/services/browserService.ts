@@ -50,7 +50,7 @@ export const browserService = {
       return {
         session_id: `fallback_${Date.now()}`,
         status: 'proxy-mode',
-        url: savedUrl || 'http://localhost:3000/api/health',
+        url: savedUrl || '/api/health',
       };
     }
   },

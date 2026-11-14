@@ -159,7 +159,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isAgentStreamEnabled: true,
   commandHistory: [],
 
-  browserUrl: 'http://localhost:3000/api/health',
+  browserUrl: '/api/health',
   browserTitle: 'SupremeAI Studio Web Agent',
   browserStatus: 'idle',
   browserHtml: '',

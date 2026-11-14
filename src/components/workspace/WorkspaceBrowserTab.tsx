@@ -58,7 +58,7 @@ export const WorkspaceBrowserTab: React.FC = () => {
   // Auto-load initial local studio health page if idle when tab is opened
   useEffect(() => {
     if (browserStatus === 'idle' && !browserHtml) {
-      navigateBrowser('http://localhost:3000/api/health');
+      navigateBrowser('/api/health');
     }
   }, [browserStatus, browserHtml, navigateBrowser]);
 
@@ -137,8 +137,8 @@ export const WorkspaceBrowserTab: React.FC = () => {
   const canGoForward = browserHistoryIndex < browserHistoryStack.length - 1;
 
   const BOOKMARKS = [
-    { label: 'Studio Health API', url: 'http://localhost:3000/api/health' },
-    { label: 'MCP Cluster JSON', url: 'http://localhost:3000/api/mcp-tower/services' },
+    { label: 'Studio Health API', url: '/api/health' },
+    { label: 'MCP Cluster JSON', url: '/api/mcp-tower/services' },
     { label: 'Example.com', url: 'https://example.com' },
     { label: 'Wikipedia AI', url: 'https://en.wikipedia.org/wiki/Artificial_intelligence' },
   ];

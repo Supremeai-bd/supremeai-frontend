@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, Check, Paperclip, Sparkles, User } from 'lucide-react';
 import { Marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { ChatMessage, RolePersona, ModelDetail } from '../../types';
 import { ResearchReportViewer } from './ResearchReportViewer';
 
@@ -52,7 +53,7 @@ function createMarkdownProcessor(showDockButtons: boolean) {
           <div class="code-block-header flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-xs font-mono select-none">
             <span class="flex items-center gap-1.5 font-medium text-slate-300">
               <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
-              <span class="uppercase tracking-wider text-[11px]">${cleanLang}</span>
+              <span class="uppercase tracking-wider text-[11px]">${escapeHtml(cleanLang)}</span>
             </span>
             <div class="flex items-center gap-1.5">
               ${dockActions}
@@ -191,7 +192,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             )}
             <div
               className="markdown-body text-xs leading-relaxed text-slate-800 dark:text-slate-200 font-sans"
-              dangerouslySetInnerHTML={{ __html: renderedContent }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedContent) }}
             />
           </>
         )}
