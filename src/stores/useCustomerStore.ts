@@ -23,6 +23,10 @@ import {
 } from '../data/userPlugins';
 import { toast } from './useToastStore';
 import { knowledgeService } from '../services/knowledgeService';
+import { apiKeyService } from '../services/apiKeyService';
+import { webhookService } from '../services/webhookService';
+import { billingService } from '../services/billingService';
+import { projectService } from '../services/projectService';
 
 const API_KEYS_KEY = 'supremeai_studio_api_keys';
 const WEBHOOKS_KEY = 'supremeai_studio_webhooks';
@@ -44,13 +48,15 @@ interface CustomerState {
   userSettings: UserAccountSettings;
 
   // API Key Actions
-  addApiKey: (newKey: Omit<ApiKeyItem, 'id' | 'createdAt' | 'lastUsed'>) => void;
-  revokeApiKey: (id: string) => void;
+  fetchApiKeys: () => Promise<void>;
+  addApiKey: (newKey: Omit<ApiKeyItem, 'id' | 'createdAt' | 'lastUsed'>) => Promise<void> | void;
+  revokeApiKey: (id: string) => Promise<void> | void;
 
   // Webhook Actions
-  addWebhook: (newWebhook: Omit<WebhookItem, 'id' | 'lastTriggered' | 'failureCount'>) => void;
-  deleteWebhook: (id: string) => void;
-  testWebhook: (id: string) => void;
+  fetchWebhooks: () => Promise<void>;
+  addWebhook: (newWebhook: Omit<WebhookItem, 'id' | 'lastTriggered' | 'failureCount'>) => Promise<void> | void;
+  deleteWebhook: (id: string) => Promise<void> | void;
+  testWebhook: (id: string) => Promise<void> | void;
 
   // Knowledge Base Actions
   fetchKnowledgeDocs: () => Promise<void>;
@@ -64,11 +70,13 @@ interface CustomerState {
   removeTeamMember: (id: string) => void;
 
   // Billing Actions
-  topUpTokens: (addedTokens: number, costUsd: number) => void;
+  fetchInvoices: () => Promise<void>;
+  topUpTokens: (addedTokens: number, costUsd: number) => Promise<void> | void;
 
   // Project Actions
-  addProject: (project: Omit<UserProject, 'id' | 'lastSynced' | 'stars' | 'aiReviewStatus'>) => void;
-  deleteProject: (id: string) => void;
+  fetchProjects: () => Promise<void>;
+  addProject: (project: Omit<UserProject, 'id' | 'lastSynced' | 'stars' | 'aiReviewStatus'>) => Promise<void> | void;
+  deleteProject: (id: string) => Promise<void> | void;
 
   // Plugin Actions
   togglePlugin: (id: string) => void;
@@ -107,22 +115,31 @@ export const useCustomerStore = create<CustomerState>((set) => {
     userPlugins: initialPlugins,
     userSettings: initialSettings,
 
-    addApiKey: (newKey) => {
-      const keyItem: ApiKeyItem = {
-        ...newKey,
-        id: `key_${Date.now()}`,
-        createdAt: new Date().toISOString().slice(0, 10),
-        lastUsed: 'Never',
-      };
-      set((state) => {
-        const updated = [keyItem, ...state.apiKeys];
-        localStorage.setItem(API_KEYS_KEY, JSON.stringify(updated));
-        return { apiKeys: updated };
-      });
-      toast.success('API Key Generated', `Created key with prefix ${keyItem.keyPrefix}`);
+    fetchApiKeys: async () => {
+      try {
+        const keys = await apiKeyService.fetchApiKeys();
+        set({ apiKeys: keys });
+        localStorage.setItem(API_KEYS_KEY, JSON.stringify(keys));
+      } catch (err) {
+        console.warn('Failed to fetch API keys from server:', err);
+      }
     },
 
-    revokeApiKey: (id: string) => {
+    addApiKey: async (newKey) => {
+      try {
+        const keyItem = await apiKeyService.createApiKey(newKey);
+        set((state) => {
+          const updated = [keyItem, ...state.apiKeys.filter((k) => k.id !== keyItem.id)];
+          localStorage.setItem(API_KEYS_KEY, JSON.stringify(updated));
+          return { apiKeys: updated };
+        });
+        toast.success('API Key Generated', `Created key with prefix ${keyItem.keyPrefix}`);
+      } catch (err) {
+        console.error('Error generating API key:', err);
+      }
+    },
+
+    revokeApiKey: async (id: string) => {
       set((state) => {
         const updated = state.apiKeys.map((k) =>
           k.id === id ? { ...k, status: 'revoked' as const } : k
@@ -131,41 +148,70 @@ export const useCustomerStore = create<CustomerState>((set) => {
         return { apiKeys: updated };
       });
       toast.warning('API Key Revoked', 'The key is permanently decommissioned.');
+      try {
+        await apiKeyService.revokeApiKey(id);
+      } catch (err) {
+        console.error('Error revoking API key on server:', err);
+      }
     },
 
-    addWebhook: (newWebhook) => {
-      const wh: WebhookItem = {
-        ...newWebhook,
-        id: `wh_${Date.now()}`,
-        lastTriggered: 'Never',
-        failureCount: 0,
-      };
-      set((state) => {
-        const updated = [wh, ...state.webhooks];
-        localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(updated));
-        return { webhooks: updated };
-      });
-      toast.success('Webhook Endpoint Configured', wh.url);
+    fetchWebhooks: async () => {
+      try {
+        const whs = await webhookService.fetchWebhooks();
+        set({ webhooks: whs });
+        localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(whs));
+      } catch (err) {
+        console.warn('Failed to fetch webhooks from server:', err);
+      }
     },
 
-    deleteWebhook: (id: string) => {
+    addWebhook: async (newWebhook) => {
+      try {
+        const wh = await webhookService.createWebhook(newWebhook);
+        set((state) => {
+          const updated = [wh, ...state.webhooks.filter((w) => w.id !== wh.id)];
+          localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(updated));
+          return { webhooks: updated };
+        });
+        toast.success('Webhook Endpoint Configured', wh.url);
+      } catch (err) {
+        console.error('Error creating webhook on server:', err);
+      }
+    },
+
+    deleteWebhook: async (id: string) => {
       set((state) => {
         const updated = state.webhooks.filter((w) => w.id !== id);
         localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(updated));
         return { webhooks: updated };
       });
       toast.info('Webhook Removed', 'Endpoint unregistered.');
+      try {
+        await webhookService.deleteWebhook(id);
+      } catch (err) {
+        console.error('Error deleting webhook on server:', err);
+      }
     },
 
-    testWebhook: (id: string) => {
-      set((state) => {
-        const updated = state.webhooks.map((w) =>
-          w.id === id ? { ...w, lastTriggered: 'Just now (200 OK test ping)' } : w
-        );
-        localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(updated));
-        return { webhooks: updated };
-      });
-      toast.success('Ping Delivered', 'Test payload returned HTTP 200 OK.');
+    testWebhook: async (id: string) => {
+      try {
+        const res = await webhookService.testWebhook(id);
+        const statusText = res.success ? `HTTP ${res.status_code || 200} OK` : (res.error || 'Failed');
+        set((state) => {
+          const updated = state.webhooks.map((w) =>
+            w.id === id ? { ...w, lastTriggered: `Just now (${statusText})` } : w
+          );
+          localStorage.setItem(WEBHOOKS_KEY, JSON.stringify(updated));
+          return { webhooks: updated };
+        });
+        if (res.success) {
+          toast.success('Ping Delivered', 'Test payload returned HTTP 200 OK.');
+        } else {
+          toast.error('Ping Failed', res.error || 'Endpoint unreachable.');
+        }
+      } catch (err) {
+        console.error('Error testing webhook:', err);
+      }
     },
 
     fetchKnowledgeDocs: async () => {
@@ -261,55 +307,76 @@ export const useCustomerStore = create<CustomerState>((set) => {
       toast.info('Member Removed', 'User removed from team roster.');
     },
 
-    topUpTokens: (addedTokens: number, costUsd: number) => {
-      const newInv: BillingInvoice = {
-        id: `inv_topup_${Date.now()}`,
-        invoiceNumber: `TOP-2026-${String(Date.now()).slice(-4)}`,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-        amountUsd: costUsd,
-        status: 'paid',
-        planName: `Pay-As-You-Go Credits (${(addedTokens / 1000000).toFixed(1)}M Tokens)`,
-      };
-
-      set((state) => {
-        const updatedSettings = {
-          ...state.userSettings,
-          monthlyTokensLimit: state.userSettings.monthlyTokensLimit + addedTokens,
-        };
-        const updatedInvoices = [newInv, ...state.invoices];
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
-        localStorage.setItem(INVOICES_KEY, JSON.stringify(updatedInvoices));
-        return {
-          userSettings: updatedSettings,
-          invoices: updatedInvoices,
-        };
-      });
-      toast.success('Tokens Recharged', `Added ${(addedTokens / 1000000).toFixed(1)}M tokens to your balance.`);
+    fetchInvoices: async () => {
+      try {
+        const invs = await billingService.fetchInvoices();
+        set({ invoices: invs });
+        localStorage.setItem(INVOICES_KEY, JSON.stringify(invs));
+      } catch (err) {
+        console.warn('Failed to fetch invoices:', err);
+      }
     },
 
-    addProject: (project) => {
-      const newProject: UserProject = {
-        ...project,
-        id: `proj_${Date.now()}`,
-        lastSynced: Date.now(),
-        stars: 1,
-        aiReviewStatus: 'idle',
-      };
-      set((state) => {
-        const updated = [newProject, ...state.userProjects];
-        localStorage.setItem(PROJECTS_KEY, JSON.stringify(updated));
-        return { userProjects: updated };
-      });
-      toast.success('Project Connected', `Repository ${newProject.name} linked.`);
+    topUpTokens: async (addedTokens: number, costUsd: number) => {
+      try {
+        const res = await billingService.createTopUp(addedTokens, costUsd);
+        const newInv = res.invoice;
+
+        set((state) => {
+          const updatedSettings = {
+            ...state.userSettings,
+            monthlyTokensLimit: state.userSettings.monthlyTokensLimit + addedTokens,
+          };
+          const updatedInvoices = [newInv, ...state.invoices];
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
+          localStorage.setItem(INVOICES_KEY, JSON.stringify(updatedInvoices));
+          return {
+            userSettings: updatedSettings,
+            invoices: updatedInvoices,
+          };
+        });
+        toast.success('Tokens Recharged', `Added ${(addedTokens / 1000000).toFixed(1)}M tokens to your balance.`);
+      } catch (err) {
+        console.error('Error recharging tokens:', err);
+      }
     },
 
-    deleteProject: (id: string) => {
+    fetchProjects: async () => {
+      try {
+        const projs = await projectService.fetchProjects();
+        set({ userProjects: projs });
+        localStorage.setItem(PROJECTS_KEY, JSON.stringify(projs));
+      } catch (err) {
+        console.warn('Failed to fetch projects:', err);
+      }
+    },
+
+    addProject: async (project) => {
+      try {
+        const newProject = await projectService.createProject(project);
+        set((state) => {
+          const updated = [newProject, ...state.userProjects.filter((p) => p.id !== newProject.id)];
+          localStorage.setItem(PROJECTS_KEY, JSON.stringify(updated));
+          return { userProjects: updated };
+        });
+        toast.success('Project Connected', `Repository ${newProject.name} linked.`);
+      } catch (err) {
+        console.error('Error connecting project:', err);
+      }
+    },
+
+    deleteProject: async (id: string) => {
       set((state) => {
         const updated = state.userProjects.filter((p) => p.id !== id);
         localStorage.setItem(PROJECTS_KEY, JSON.stringify(updated));
         return { userProjects: updated };
       });
       toast.info('Project Disconnected', 'Repository removed from studio.');
+      try {
+        await projectService.deleteProject(id);
+      } catch (err) {
+        console.error('Error disconnecting project on server:', err);
+      }
     },
 
     togglePlugin: (id: string) => {
