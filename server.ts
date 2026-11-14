@@ -1617,6 +1617,108 @@ async function startServer() {
     res.json({ success: true, jobs: devQueueJobs });
   });
 
+  // --- Workspace User Knowledge Endpoints ---
+  let devKnowledgeDocs = [
+    {
+      id: 'doc_arch_01',
+      title: 'SupremeAI Core Architecture Spec v2.4.md',
+      type: 'markdown',
+      sizeBytes: 142000,
+      tokenCount: 28400,
+      chunkCount: 32,
+      status: 'indexed',
+      lastIndexed: '2 hours ago',
+      isGroundingActive: true,
+      contentPreview: 'Architecture specification for multi-agent swarm orchestration and real-time LLM router...',
+    },
+    {
+      id: 'doc_mcp_02',
+      title: 'Model Context Protocol Engineering Spec.pdf',
+      type: 'pdf',
+      sizeBytes: 310000,
+      tokenCount: 62000,
+      chunkCount: 68,
+      status: 'indexed',
+      lastIndexed: 'Yesterday',
+      isGroundingActive: true,
+      contentPreview: 'MCP specification compliance guidelines: JSON-RPC stdio and SSE transport protocols...',
+    },
+    {
+      id: 'doc_code_03',
+      title: 'Supremeai-bd/supremeai Service Handlers.ts',
+      type: 'code',
+      sizeBytes: 88400,
+      tokenCount: 19800,
+      chunkCount: 24,
+      status: 'indexed',
+      lastIndexed: '3 days ago',
+      isGroundingActive: false,
+      contentPreview: 'TypeScript microservice definitions for auth-token-prober, sse-stream-broker...',
+    },
+    {
+      id: 'doc_audit_04',
+      title: 'Security Hardening & RBAC Rules.md',
+      type: 'markdown',
+      sizeBytes: 54000,
+      tokenCount: 11200,
+      chunkCount: 14,
+      status: 'indexed',
+      lastIndexed: '4 days ago',
+      isGroundingActive: true,
+      contentPreview: 'Zero-trust principle enforcement, fail-closed auth guards, sanitization policies...',
+    },
+  ];
+
+  app.get(['/api/user/knowledge', '/api/v1/user/knowledge'], (_req: Request, res: Response) => {
+    res.json({ documents: devKnowledgeDocs });
+  });
+
+  app.post(['/api/user/knowledge', '/api/v1/user/knowledge'], (req: Request, res: Response) => {
+    const payload = req.body || {};
+    const newDoc = {
+      id: `doc_${Date.now()}`,
+      title: payload.title || 'Untitled Document',
+      type: payload.type || 'markdown',
+      sizeBytes: payload.sizeBytes || 1024,
+      tokenCount: payload.tokenCount || 250,
+      chunkCount: payload.chunkCount || 1,
+      status: payload.status || 'indexed',
+      lastIndexed: 'Just now',
+      isGroundingActive: payload.isGroundingActive ?? true,
+      contentPreview: payload.contentPreview || payload.title || 'New document content',
+    };
+    devKnowledgeDocs.unshift(newDoc);
+    res.json({ success: true, document: newDoc, documents: devKnowledgeDocs });
+  });
+
+  app.patch(['/api/user/knowledge/:id', '/api/v1/user/knowledge/:id'], (req: Request, res: Response) => {
+    const { id } = req.params;
+    const doc = devKnowledgeDocs.find((d) => d.id === id);
+    if (!doc) {
+      res.status(404).json({ error: 'Knowledge document not found' });
+      return;
+    }
+    if (req.body?.isGroundingActive !== undefined) {
+      doc.isGroundingActive = Boolean(req.body.isGroundingActive);
+    }
+    if (req.body?.title) {
+      doc.title = req.body.title;
+    }
+    doc.lastIndexed = 'Just now';
+    res.json({ success: true, document: doc });
+  });
+
+  app.delete(['/api/user/knowledge/:id', '/api/v1/user/knowledge/:id'], (req: Request, res: Response) => {
+    const { id } = req.params;
+    const beforeLen = devKnowledgeDocs.length;
+    devKnowledgeDocs = devKnowledgeDocs.filter((d) => d.id !== id);
+    if (devKnowledgeDocs.length === beforeLen) {
+      res.status(404).json({ error: 'Knowledge document not found' });
+      return;
+    }
+    res.json({ success: true, documents: devKnowledgeDocs });
+  });
+
   // Provider Mesh & Real Server-Side Health Probe Endpoints
   app.get('/api/admin/providers', (_req: Request, res: Response) => {
     res.json({ providers: providerMesh });

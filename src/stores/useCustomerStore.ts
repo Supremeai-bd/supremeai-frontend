@@ -22,6 +22,7 @@ import {
   DEFAULT_USER_SETTINGS,
 } from '../data/userPlugins';
 import { toast } from './useToastStore';
+import { knowledgeService } from '../services/knowledgeService';
 
 const API_KEYS_KEY = 'supremeai_studio_api_keys';
 const WEBHOOKS_KEY = 'supremeai_studio_webhooks';
@@ -52,9 +53,10 @@ interface CustomerState {
   testWebhook: (id: string) => void;
 
   // Knowledge Base Actions
-  addKnowledgeDoc: (doc: Omit<KnowledgeDoc, 'id' | 'lastIndexed'>) => void;
-  toggleKnowledgeGrounding: (id: string) => void;
-  deleteKnowledgeDoc: (id: string) => void;
+  fetchKnowledgeDocs: () => Promise<void>;
+  addKnowledgeDoc: (doc: Omit<KnowledgeDoc, 'id' | 'lastIndexed'>) => Promise<void> | void;
+  toggleKnowledgeGrounding: (id: string) => Promise<void> | void;
+  deleteKnowledgeDoc: (id: string) => Promise<void> | void;
 
   // Team Actions
   inviteTeamMember: (member: Omit<TeamMember, 'id' | 'joinedDate' | 'avatar'>) => void;
@@ -166,37 +168,62 @@ export const useCustomerStore = create<CustomerState>((set) => {
       toast.success('Ping Delivered', 'Test payload returned HTTP 200 OK.');
     },
 
-    addKnowledgeDoc: (doc) => {
-      const newDoc: KnowledgeDoc = {
-        ...doc,
-        id: `doc_${Date.now()}`,
-        lastIndexed: 'Just now',
-      };
-      set((state) => {
-        const updated = [newDoc, ...state.knowledgeDocs];
-        localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(updated));
-        return { knowledgeDocs: updated };
-      });
-      toast.success('Document Indexed', `"${newDoc.title}" ready for semantic grounding.`);
+    fetchKnowledgeDocs: async () => {
+      try {
+        const docs = await knowledgeService.fetchUserDocs();
+        set({ knowledgeDocs: docs });
+        localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(docs));
+      } catch (err) {
+        console.warn('Failed to fetch knowledge docs from server:', err);
+      }
     },
 
-    toggleKnowledgeGrounding: (id: string) => {
+    addKnowledgeDoc: async (doc) => {
+      try {
+        const created = await knowledgeService.createDoc(doc);
+        set((state) => {
+          const updated = [created, ...state.knowledgeDocs.filter((d) => d.id !== created.id)];
+          localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(updated));
+          return { knowledgeDocs: updated };
+        });
+        toast.success('Document Indexed', `"${created.title}" ready for semantic grounding.`);
+      } catch (err) {
+        console.error('Error creating knowledge doc:', err);
+      }
+    },
+
+    toggleKnowledgeGrounding: async (id: string) => {
+      let targetState = true;
       set((state) => {
+        const match = state.knowledgeDocs.find((d) => d.id === id);
+        if (match) {
+          targetState = !match.isGroundingActive;
+        }
         const updated = state.knowledgeDocs.map((d) =>
           d.id === id ? { ...d, isGroundingActive: !d.isGroundingActive } : d
         );
         localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(updated));
         return { knowledgeDocs: updated };
       });
+      try {
+        await knowledgeService.toggleGrounding(id, targetState);
+      } catch (err) {
+        console.error('Error toggling grounding:', err);
+      }
     },
 
-    deleteKnowledgeDoc: (id: string) => {
+    deleteKnowledgeDoc: async (id: string) => {
       set((state) => {
         const updated = state.knowledgeDocs.filter((d) => d.id !== id);
         localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(updated));
         return { knowledgeDocs: updated };
       });
       toast.info('Document Removed', 'Source removed from knowledge base index.');
+      try {
+        await knowledgeService.deleteDoc(id);
+      } catch (err) {
+        console.error('Error deleting doc:', err);
+      }
     },
 
     inviteTeamMember: (member) => {
