@@ -52,6 +52,13 @@ import { AdminProviderKeysView } from './components/admin/AdminProviderKeysView'
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
 import { AdminTwoFactorModal } from './components/admin/AdminTwoFactorModal';
 import { HitlApprovalModal } from './components/admin/HitlApprovalModal';
+import { ControlCenterSafetyGateModal } from './components/admin/ControlCenterSafetyGateModal';
+import { ControlCenterHitlPoliciesView } from './components/admin/ControlCenterHitlPoliciesView';
+import { ControlCenterReleaseGateView } from './components/admin/ControlCenterReleaseGateView';
+import { ControlCenterAgentBridgeView } from './components/admin/ControlCenterAgentBridgeView';
+import { ControlCenterMemoryGraphView } from './components/admin/ControlCenterMemoryGraphView';
+import { ControlCenterComputeFleetView } from './components/admin/ControlCenterComputeFleetView';
+import { ControlCenterFinOpsOmnichannelView } from './components/admin/ControlCenterFinOpsOmnichannelView';
 import { useHitlApproval } from './hooks/useHitlApproval';
 import { PromptLibraryModal } from './components/user/PromptLibraryModal';
 import { AuthPage } from './components/auth/AuthPage';
@@ -79,6 +86,12 @@ import { UserProject, ChatAttachment } from './types';
 
 const ADMIN_ONLY_TABS = new Set([
   'admin-overview',
+  'hitl-policies',
+  'release-gate',
+  'external-agents',
+  'memory-graph',
+  'compute-fleet',
+  'finops-omnichannel',
   'agent-swarm',
   'task-queue',
   'schema-parity',
@@ -109,7 +122,13 @@ const SUBVIEW_TITLES: Record<string, string> = {
   usage: 'Usage Analytics',
   'user-plugins': 'Plugins & Tools',
   'user-settings': 'Account & Workspace Settings',
-  'admin-overview': 'Admin Overview',
+  'admin-overview': 'Central Control Center',
+  'hitl-policies': 'HITL Approvals & Policies',
+  'release-gate': 'Release Gate & Render Deploy',
+  'external-agents': 'External Agents & Bridge',
+  'memory-graph': 'Memory, Qdrant & AST Graph',
+  'compute-fleet': 'Kaggle GPU & CDP Browser Audit',
+  'finops-omnichannel': 'FinOps Mesh, Telegram & Cron',
   'agent-swarm': 'Autonomous Agent Swarm',
   'task-queue': 'Distributed Task Queue',
   'schema-parity': 'Schema Parity Matrix',
@@ -1220,6 +1239,18 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'hitl-policies' && <ControlCenterHitlPoliciesView />}
+
+          {activeTab === 'release-gate' && <ControlCenterReleaseGateView />}
+
+          {activeTab === 'external-agents' && <ControlCenterAgentBridgeView />}
+
+          {activeTab === 'memory-graph' && <ControlCenterMemoryGraphView />}
+
+          {activeTab === 'compute-fleet' && <ControlCenterComputeFleetView />}
+
+          {activeTab === 'finops-omnichannel' && <ControlCenterFinOpsOmnichannelView />}
+
           {activeTab === 'agent-swarm' && (
             <AdminAgentSwarmView
               workers={swarmWorkers}
@@ -1403,6 +1434,8 @@ export default function App() {
           onClose={dismissHitl}
           isProcessing={isHitlProcessing}
         />
+
+        <ControlCenterSafetyGateModal />
 
         <PromptLibraryModal
           isOpen={isPromptModalOpen}

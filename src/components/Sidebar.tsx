@@ -30,6 +30,12 @@ import {
   LogIn,
   MessageSquare,
   Sparkles,
+  Rocket,
+  GitBranch,
+  Brain,
+  Globe,
+  Wallet,
+  ShieldAlert,
 } from 'lucide-react';
 import { ChatSession, RolePersona, UserRole, AuthUser } from '../types';
 import { useThemeStore, LIVE_THEMES } from '../stores/useThemeStore';
@@ -315,7 +321,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {currentRole === 'admin' ? (
           <>
             <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Operations & Swarm
+              Command & Safety
             </div>
 
             <button
@@ -333,136 +339,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              onClick={() => onSelectTab('chat-history')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'chat-history'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <History className="w-4 h-4 text-slate-500" />
-                <span>All Conversations</span>
-              </div>
-              <span className="text-[10px] font-mono tabular-nums text-slate-400">
-                {sessions.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('agent-swarm')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'agent-swarm'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Bot className="w-4 h-4 text-purple-500" />
-                <span>Agent Swarm</span>
-              </div>
-              <span className="text-[10px] font-mono tabular-nums text-purple-600 dark:text-purple-400">
-                4 active
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('task-queue')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'task-queue'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Activity className="w-4 h-4 text-amber-500" />
-                <span>Task Queue & Redis</span>
-              </div>
-              <span className="text-[10px] font-mono text-slate-400">
-                BullMQ
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('mcp-tower')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'mcp-tower'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Radio className={`w-4 h-4 ${mcpAlertCount > 0 ? 'text-rose-500' : 'text-slate-500'}`} />
-                <span>MCP Tower</span>
-              </div>
-              {mcpAlertCount > 0 ? (
-                <span className="text-[10px] font-mono tabular-nums text-rose-600 dark:text-rose-400 font-semibold">
-                  {mcpAlertCount} alert{mcpAlertCount > 1 ? 's' : ''}
-                </span>
-              ) : (
-                <span className="text-[10px] font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
-                  8/8 OK
-                </span>
-              )}
-            </button>
-
-            <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Infrastructure & Routing
-            </div>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('llm-gateway')}
+              onClick={() => onSelectTab('hitl-policies')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'llm-gateway'
+                activeTab === 'hitl-policies'
                   ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Cpu className="w-4 h-4 text-blue-500" />
-              <span>LLM Gateway</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('schema-parity')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'schema-parity'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Database className="w-4 h-4 text-emerald-500" />
-              <span>Schema Parity</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('feature-flags')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'feature-flags'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Sliders className="w-4 h-4 text-cyan-500" />
-              <span>Feature Flags</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab('provider-keys')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'provider-keys'
-                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Key className="w-4 h-4 text-purple-500" />
-              <span>Provider API Keys</span>
+              <ShieldAlert className="w-4 h-4 text-amber-500" />
+              <span>HITL & Policies</span>
             </button>
 
             <button
@@ -492,25 +377,138 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Customers & Models
+              Build & Release
             </div>
 
             <button
               type="button"
-              onClick={() => onSelectTab('customers')}
+              onClick={() => onSelectTab('release-gate')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'release-gate'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Rocket className="w-4 h-4 text-emerald-500" />
+              <span>Release Gate & Render</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('schema-parity')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'schema-parity'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Database className="w-4 h-4 text-emerald-500" />
+              <span>Schema Parity</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('repos')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'repos'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <FolderGit2 className="w-4 h-4 text-slate-500" />
+              <span>Ecosystem Repos</span>
+            </button>
+
+            <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Operations & Agents
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('agent-swarm')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'customers'
+                activeTab === 'agent-swarm'
                   ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Users className="w-4 h-4 text-slate-500" />
-                <span>Customers</span>
+                <Bot className="w-4 h-4 text-purple-500" />
+                <span>Agent Swarm</span>
               </div>
-              <span className="text-[10px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                {customersCount}
+              <span className="text-[10px] font-mono tabular-nums text-purple-600 dark:text-purple-400">
+                4 active
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('external-agents')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'external-agents'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <GitBranch className="w-4 h-4 text-blue-500" />
+              <span>External Agents & Bridge</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('mcp-tower')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'mcp-tower'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Radio className={`w-4 h-4 ${mcpAlertCount > 0 ? 'text-rose-500' : 'text-slate-500'}`} />
+                <span>MCP Tower & Tools</span>
+              </div>
+              {mcpAlertCount > 0 ? (
+                <span className="text-[10px] font-mono tabular-nums text-rose-600 dark:text-rose-400 font-semibold">
+                  {mcpAlertCount} alert{mcpAlertCount > 1 ? 's' : ''}
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                  8/8 OK
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('task-queue')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'task-queue'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Activity className="w-4 h-4 text-amber-500" />
+                <span>Task Queue & Redis</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">BullMQ</span>
+            </button>
+
+            <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Intelligence & Memory
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('memory-graph')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'memory-graph'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Brain className="w-4 h-4 text-purple-500" />
+              <span>Memory, Qdrant & AST</span>
             </button>
 
             <button
@@ -541,15 +539,107 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              onClick={() => onSelectTab('repos')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'repos'
+              onClick={() => onSelectTab('chat-history')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'chat-history'
                   ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <FolderGit2 className="w-4 h-4 text-slate-500" />
-              <span>Ecosystem Repos</span>
+              <div className="flex items-center gap-3">
+                <History className="w-4 h-4 text-slate-500" />
+                <span>All Conversations</span>
+              </div>
+              <span className="text-[10px] font-mono tabular-nums text-slate-400">
+                {sessions.length}
+              </span>
+            </button>
+
+            <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Infra & FinOps
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('llm-gateway')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'llm-gateway'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Cpu className="w-4 h-4 text-blue-500" />
+              <span>LLM Gateway</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('provider-keys')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'provider-keys'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Key className="w-4 h-4 text-purple-500" />
+              <span>Provider API Keys</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('compute-fleet')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'compute-fleet'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-cyan-500" />
+              <span>Kaggle & CDP Audit</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('finops-omnichannel')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'finops-omnichannel'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Wallet className="w-4 h-4 text-emerald-500" />
+              <span>FinOps & Telegram</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('customers')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'customers'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Users className="w-4 h-4 text-slate-500" />
+                <span>Customers</span>
+              </div>
+              <span className="text-[10px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                {customersCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab('feature-flags')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'feature-flags'
+                  ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-medium'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Sliders className="w-4 h-4 text-cyan-500" />
+              <span>Feature Flags</span>
             </button>
 
             <button

@@ -125,40 +125,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Studio Chat
+              Chat
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('chat-history')}
+              onClick={() => onSelectTab('hitl-policies')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'chat-history'
+                activeTab === 'hitl-policies'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              History
+              HITL & Policies
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('customers')}
+              onClick={() => onSelectTab('release-gate')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'customers'
+                activeTab === 'release-gate'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Customers
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectTab('models')}
-              className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'models'
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
-                  : 'hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Models
+              Release Gate
             </button>
             <button
               type="button"
@@ -178,14 +167,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => onSelectTab('feature-flags')}
+              onClick={() => onSelectTab('customers')}
               className={`cursor-pointer transition-colors whitespace-nowrap shrink-0 py-1.5 px-2.5 rounded-lg ${
-                activeTab === 'feature-flags'
+                activeTab === 'customers'
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
                   : 'hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Flags
+              Customers
             </button>
           </>
         ) : (

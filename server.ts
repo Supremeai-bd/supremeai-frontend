@@ -10,6 +10,7 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI, LiveServerMessage, Modality, ThinkingLevel, Type } from '@google/genai';
 import { WebSocketServer, WebSocket } from 'ws';
+import { registerControlPlaneRoutes } from './src/server/controlPlaneRouter';
 
 const execAsync = promisify(exec);
 dotenv.config();
@@ -2519,6 +2520,9 @@ async function startServer() {
       message: `Synced ${vaultKeys.length} API keys from Infisical Vault.`,
     });
   });
+
+  // Register Unified Central Control Center Proxy & MCP Tower Routes
+  registerControlPlaneRoutes(app, { recordAudit, isIpBlocked });
 
   // Local Billing & Usage endpoints so Customer Plan & Usage reads cleanly without 404s
   app.get('/api/billing/wallet', (_req: Request, res: Response) => {
